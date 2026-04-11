@@ -15,7 +15,7 @@ export type PaginatedResponse<T> = {
 export async function adminApiFetch(path: string, options?: RequestInit): Promise<any> {
   if (typeof window === "undefined") throw new Error("adminApiFetch called on server");
 
-  const base = process.env.NEXT_PUBLIC_API_BASE ?? "http://localhost:5000";
+  const base = process.env.NEXT_PUBLIC_API_BASE ?? "https://niko-unsinged-literarily.ngrok-free.dev";
   const headers: Record<string, string> = {
     "Content-Type": "application/json",
     ...((options?.headers as Record<string, string>) ?? {}),

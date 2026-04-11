@@ -4,7 +4,7 @@ import { useEffect, useRef, useState, useCallback } from "react";
 import { adminApiFetch } from "@/lib/adminApi";
 import { useMounted } from "@/lib/useMounted";
 
-const API_BASE = process.env.NEXT_PUBLIC_API_BASE ?? "http://localhost:5000";
+const API_BASE = process.env.NEXT_PUBLIC_API_BASE ?? "https://niko-unsinged-literarily.ngrok-free.dev";
 
 // ── Toolbar button ────────────────────────────────────────────────────────────
 function ToolBtn({

@@ -10,7 +10,7 @@ export function getSocket() {
   }
 
   if (!socket) {
-    const url = process.env.NEXT_PUBLIC_API_BASE || "http://localhost:5000";
+    const url = process.env.NEXT_PUBLIC_API_BASE || "https://niko-unsinged-literarily.ngrok-free.dev";
     socket = io(url, {
       auth: { apiKey },
       transports: ["websocket"],

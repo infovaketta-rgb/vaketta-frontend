@@ -127,7 +127,7 @@ export default function TopBar() {
     const token = localStorage.getItem("TOKEN");
     if (token) {
       fetch(
-        `${process.env.NEXT_PUBLIC_API_BASE || "http://localhost:5000"}/auth/logout`,
+        `${process.env.NEXT_PUBLIC_API_BASE || "https://niko-unsinged-literarily.ngrok-free.dev"}/auth/logout`,
         { method: "POST", headers: { Authorization: `Bearer ${token}` } }
       ).catch(() => {});
     }
