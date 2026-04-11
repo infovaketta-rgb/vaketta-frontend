@@ -2,14 +2,11 @@
 
 import { useEffect } from "react";
 import { useRouter } from "next/navigation";
-import { isAuthenticated } from "@/lib/auth";
 
-export default function Home() {
+export default function AdminRootPage() {
   const router = useRouter();
-
   useEffect(() => {
-    router.replace(isAuthenticated() ? "/dashboard" : "/login");
+    router.replace("/admin/dashboard");
   }, [router]);
-
   return null;
 }
