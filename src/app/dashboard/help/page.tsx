@@ -75,7 +75,7 @@ function PrivacyModal({ onClose }: { onClose: () => void }) {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    fetch(`${API_BASE}/admin/privacy-policy`)
+    fetch(`${API_BASE}/admin/privacy-policy`, { headers: { "ngrok-skip-browser-warning": "true" } })
       .then((r) => r.json())
       .then((data) => { setPolicy(data); setLoading(false); })
       .catch(() => setLoading(false));

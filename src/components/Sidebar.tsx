@@ -33,12 +33,7 @@ export default function Sidebar() {
     <aside className="flex h-screen w-60 shrink-0 flex-col border-r border-white/8 bg-[#0C1B33] text-white">
       {/* Brand */}
       <div className="flex h-14 shrink-0 items-center gap-2.5 border-b border-white/8 px-4">
-        <div className="flex h-7 w-7 items-center justify-center rounded-lg bg-[#B8912E]">
-          <svg className="h-4 w-4 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
-              d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6" />
-          </svg>
-        </div>
+        <img src="/vakettaVlogo.png" alt="Vaketta" className="h-7 w-7 object-contain" />
         <div>
           <p className="text-sm font-semibold leading-none tracking-tight text-white">Vaketta PMS</p>
           <p className="mt-0.5 text-[10px] text-white/40">Hotel Management</p>

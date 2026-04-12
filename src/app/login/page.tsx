@@ -15,7 +15,7 @@ export default function Login() {
         `${process.env.NEXT_PUBLIC_API_BASE || "https://niko-unsinged-literarily.ngrok-free.dev"}/auth/login`,
         {
           method: "POST",
-          headers: { "Content-Type": "application/json" },
+          headers: { "Content-Type": "application/json", "ngrok-skip-browser-warning": "true" },
           body: JSON.stringify({ email, password }),
         }
       );

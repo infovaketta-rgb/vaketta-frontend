@@ -16,7 +16,7 @@ export default function PrivacyPolicyPage() {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    fetch(`${API_BASE}/admin/privacy-policy`)
+    fetch(`${API_BASE}/admin/privacy-policy`, { headers: { "ngrok-skip-browser-warning": "true" } })
       .then((r) => r.json())
       .then((data) => { setPolicy(data); setLoading(false); })
       .catch(() => setLoading(false));
@@ -29,9 +29,7 @@ export default function PrivacyPolicyPage() {
       <header className="border-b border-[#E5E0D4] bg-white">
         <div className="mx-auto flex max-w-4xl items-center justify-between px-6 py-4">
           <div className="flex items-center gap-3">
-            <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-[#B8912E] text-sm font-bold text-white">
-              V
-            </div>
+            <img src="/vakettaVlogo.png" alt="Vaketta" className="h-8 w-8 object-contain" />
             <span className="text-lg font-bold text-[#0C1B33]">Vaketta</span>
           </div>
           <Link
@@ -59,9 +57,7 @@ export default function PrivacyPolicyPage() {
 
             {/* Hero header */}
             <div className="border-b border-[#E5E0D4] bg-[#0C1B33] px-10 py-10 text-center">
-              <div className="mx-auto mb-3 flex h-12 w-12 items-center justify-center rounded-xl bg-[#B8912E] text-xl font-bold text-white">
-                V
-              </div>
+              <img src="/vakettaVlogo.png" alt="Vaketta" className="mx-auto mb-3 h-12 w-12 object-contain" />
               <h1 className="text-3xl font-bold text-white">VAKETTA</h1>
               <p className="mt-1 text-lg font-medium text-[#B8912E]">Privacy Policy</p>
               {policy.effectiveDate && (

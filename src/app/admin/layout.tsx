@@ -57,9 +57,7 @@ function AdminSidebar() {
     <aside className="flex h-screen w-56 shrink-0 flex-col bg-[#0C1B33]">
       {/* Brand */}
       <div className="flex items-center gap-2.5 border-b border-white/8 px-4 py-5">
-        <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-[#B8912E] text-sm font-bold text-white">
-          V
-        </div>
+        <img src="/vakettaVlogo.png" alt="Vaketta" className="h-8 w-8 object-contain" />
         <div>
           <p className="text-xs font-bold uppercase tracking-widest text-white/40">Vaketta</p>
           <p className="text-sm font-bold leading-none text-white">Admin Panel</p>

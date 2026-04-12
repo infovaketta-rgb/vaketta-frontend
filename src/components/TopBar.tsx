@@ -128,7 +128,7 @@ export default function TopBar() {
     if (token) {
       fetch(
         `${process.env.NEXT_PUBLIC_API_BASE || "https://niko-unsinged-literarily.ngrok-free.dev"}/auth/logout`,
-        { method: "POST", headers: { Authorization: `Bearer ${token}` } }
+        { method: "POST", headers: { Authorization: `Bearer ${token}`, "ngrok-skip-browser-warning": "true" } }
       ).catch(() => {});
     }
     resetSocket();
