@@ -12,7 +12,7 @@ export default function Login() {
     setLoading(true);
     try {
       const res = await fetch(
-        `${process.env.NEXT_PUBLIC_API_BASE || "https://niko-unsinged-literarily.ngrok-free.dev"}/auth/login`,
+        `${process.env.NEXT_PUBLIC_API_BASE ?? ""}/auth/login`,
         {
           method: "POST",
           headers: { "Content-Type": "application/json", "ngrok-skip-browser-warning": "true" },

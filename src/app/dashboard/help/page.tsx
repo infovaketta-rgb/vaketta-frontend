@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import { useMounted } from "@/lib/useMounted";
 
-const API_BASE = process.env.NEXT_PUBLIC_API_BASE ?? "https://niko-unsinged-literarily.ngrok-free.dev";
+const API_BASE = process.env.NEXT_PUBLIC_API_BASE ?? "";
 
 type PolicyData = { effectiveDate: string; content: string; updatedAt: string } | null;
 

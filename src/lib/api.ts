@@ -1,5 +1,4 @@
-const API_BASE =
-  process.env.NEXT_PUBLIC_API_BASE || "https://niko-unsinged-literarily.ngrok-free.dev";
+const API_BASE = process.env.NEXT_PUBLIC_API_BASE ?? "";
 
 export async function apiFetch(
   path: string,
