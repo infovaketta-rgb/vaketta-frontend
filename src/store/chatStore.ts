@@ -24,6 +24,7 @@ type ChatState = {
   addMessage: (msg: Message) => void;
   markMessagesRead: (guestId: string) => void;
   updateMessageStatus: (messageId: string, status: string) => void;
+  removeMessage: (messageId: string) => void;
   setBotEnabled: (enabled: boolean) => void;
 };
 
@@ -85,6 +86,11 @@ export const useChatStore = create<ChatState>((set) => ({
       messages: state.messages.map((m) =>
         m.id === messageId ? { ...m, status } : m
       ),
+    })),
+
+  removeMessage: (messageId: string) =>
+    set((state) => ({
+      messages: state.messages.filter((m) => m.id !== messageId),
     })),
 
   setBotEnabled: (enabled) => set({ botEnabled: enabled }),

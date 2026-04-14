@@ -324,6 +324,101 @@ function getAvatarColor(phone: string): string {
 
 // ── ChatWindow ────────────────────────────────────────────────────────────────
 
+// ── Delete popup (WhatsApp-style) ─────────────────────────────────────────────
+const DELETE_FOR_ME_KEY = "vaketta_deleted_msgs";
+
+function getLocalDeleted(): Set<string> {
+  try {
+    const raw = localStorage.getItem(DELETE_FOR_ME_KEY);
+    return new Set(raw ? JSON.parse(raw) : []);
+  } catch { return new Set(); }
+}
+
+function addLocalDeleted(id: string) {
+  const s = getLocalDeleted();
+  s.add(id);
+  localStorage.setItem(DELETE_FOR_ME_KEY, JSON.stringify([...s]));
+}
+
+function DeletePopup({
+  messageId,
+  isOut,
+  onClose,
+  onDeleteForEveryone,
+  onDeleteForMe,
+}: {
+  messageId: string;
+  isOut: boolean;
+  onClose: () => void;
+  onDeleteForEveryone: (id: string) => void;
+  onDeleteForMe: (id: string) => void;
+}) {
+  return (
+    <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/40 backdrop-blur-[2px]"
+      onClick={onClose}>
+      <div
+        className="w-full sm:w-80 rounded-t-2xl sm:rounded-2xl bg-white shadow-2xl overflow-hidden"
+        onClick={(e) => e.stopPropagation()}
+      >
+        {/* Header */}
+        <div className="px-5 pt-5 pb-3 border-b border-gray-100">
+          <p className="text-sm font-semibold text-gray-800 text-center">Delete message?</p>
+          <p className="text-xs text-gray-400 text-center mt-1">This action cannot be undone.</p>
+        </div>
+
+        {/* Options */}
+        <div className="py-1">
+          {isOut && (
+            <button
+              onClick={() => { onDeleteForEveryone(messageId); onClose(); }}
+              className="w-full flex items-center gap-3 px-5 py-3.5 text-left hover:bg-red-50 transition-colors group"
+            >
+              <div className="w-8 h-8 rounded-full bg-red-100 group-hover:bg-red-200 flex items-center justify-center shrink-0 transition-colors">
+                <svg className="w-4 h-4 text-red-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
+                    d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                </svg>
+              </div>
+              <div>
+                <p className="text-sm font-semibold text-red-600">Delete for everyone</p>
+                <p className="text-xs text-gray-400">Removes from DB and cloud storage</p>
+              </div>
+            </button>
+          )}
+
+          <button
+            onClick={() => { onDeleteForMe(messageId); onClose(); }}
+            className="w-full flex items-center gap-3 px-5 py-3.5 text-left hover:bg-gray-50 transition-colors group"
+          >
+            <div className="w-8 h-8 rounded-full bg-gray-100 group-hover:bg-gray-200 flex items-center justify-center shrink-0 transition-colors">
+              <svg className="w-4 h-4 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
+                  d="M13.875 18.825A10.05 10.05 0 0112 19c-4.478 0-8.268-2.943-9.543-7a9.97 9.97 0 011.563-3.029m5.858.908a3 3 0 114.243 4.243M9.878 9.878l4.242 4.242M9.88 9.88l-3.29-3.29m7.532 7.532l3.29 3.29M3 3l3.59 3.59m0 0A9.953 9.953 0 0112 5c4.478 0 8.268 2.943 9.543 7a10.025 10.025 0 01-4.132 5.411m0 0L21 21" />
+              </svg>
+            </div>
+            <div>
+              <p className="text-sm font-semibold text-gray-700">Delete for me</p>
+              <p className="text-xs text-gray-400">Hides on this device only</p>
+            </div>
+          </button>
+
+          <button
+            onClick={onClose}
+            className="w-full flex items-center gap-3 px-5 py-3.5 text-left hover:bg-gray-50 transition-colors group border-t border-gray-100"
+          >
+            <div className="w-8 h-8 rounded-full bg-gray-100 group-hover:bg-gray-200 flex items-center justify-center shrink-0 transition-colors">
+              <svg className="w-4 h-4 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+              </svg>
+            </div>
+            <p className="text-sm font-semibold text-gray-600">Cancel</p>
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 export default function ChatWindow() {
   const mounted = useMounted();
   const [showBooking, setShowBooking] = useState(false);
@@ -336,9 +431,18 @@ export default function ChatWindow() {
   const addMessage = useChatStore((s) => s.addMessage);
   const markMessagesRead = useChatStore((s) => s.markMessagesRead);
   const updateMessageStatus = useChatStore((s) => s.updateMessageStatus);
+  const removeMessage = useChatStore((s) => s.removeMessage);
   const botEnabled = useChatStore((s) => s.botEnabled);
   const setBotEnabledStore = useChatStore((s) => s.setBotEnabled);
   const selectedGuestPhone = useChatStore((s) => s.selectedGuestPhone);
+
+  // Delete state
+  const [deleteTarget, setDeleteTarget] = useState<{ id: string; isOut: boolean } | null>(null);
+  const [localDeleted, setLocalDeleted] = useState<Set<string>>(new Set());
+
+  useEffect(() => {
+    setLocalDeleted(getLocalDeleted());
+  }, []);
 
   const [text, setText] = useState("");
   const [togglingBot, setTogglingBot] = useState(false);
@@ -411,17 +515,36 @@ export default function ChatWindow() {
     const onRead = ({ guestId: readGuestId }: { guestId: string }) => markMessagesRead(readGuestId);
     const onStatus = ({ messageId, status }: { messageId: string; status: string }) =>
       updateMessageStatus(messageId, status);
+    const onDeleted = ({ messageId }: { messageId: string }) => removeMessage(messageId);
 
     socket.on("message:new", onNewMessage);
     socket.on("message:read", onRead);
     socket.on("message:status", onStatus);
+    socket.on("message:deleted", onDeleted);
 
     return () => {
       socket.off("message:new", onNewMessage);
       socket.off("message:read", onRead);
       socket.off("message:status", onStatus);
+      socket.off("message:deleted", onDeleted);
     };
   }, [mounted]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Delete for everyone — calls API, removes from store
+  async function handleDeleteForEveryone(messageId: string) {
+    try {
+      await apiFetch(`/messages/${messageId}`, { method: "DELETE" });
+      removeMessage(messageId);
+    } catch (e) {
+      console.error("Delete failed", e);
+    }
+  }
+
+  // Delete for me — hides locally only
+  function handleDeleteForMe(messageId: string) {
+    addLocalDeleted(messageId);
+    setLocalDeleted((prev) => new Set([...prev, messageId]));
+  }
 
   // Bot toggle
   async function toggleBot() {
@@ -579,7 +702,9 @@ export default function ChatWindow() {
     );
   }
 
-  const grouped = groupMessagesByDate(messages.filter((m) => m.status !== "REPLACED"));
+  const grouped = groupMessagesByDate(
+    messages.filter((m) => m.status !== "REPLACED" && !localDeleted.has(m.id))
+  );
   const firstUnreadId = messages.find(
     (m) => m.direction === "IN" && m.status === "RECEIVED"
   )?.id ?? null;
@@ -701,7 +826,22 @@ export default function ChatWindow() {
                         <div className="flex-1 h-px bg-green-300 opacity-60" />
                       </div>
                     )}
-                    <div className={`flex ${isOut ? "justify-end" : "justify-start"}`}>
+                    {/* Bubble row — hover reveals ⋮ delete button */}
+                    <div className={`flex items-end gap-1.5 group/row ${isOut ? "justify-end" : "justify-start"}`}>
+
+                      {/* ⋮ button — left side for incoming, right side for outgoing */}
+                      {!isOut && (
+                        <button
+                          onClick={() => setDeleteTarget({ id: m.id, isOut })}
+                          className="opacity-0 group-hover/row:opacity-100 transition-opacity shrink-0 w-6 h-6 rounded-full hover:bg-gray-200 flex items-center justify-center text-gray-400 hover:text-gray-600 mb-1"
+                          title="Delete message"
+                        >
+                          <svg className="w-3.5 h-3.5" fill="currentColor" viewBox="0 0 24 24">
+                            <path d="M12 8c1.1 0 2-.9 2-2s-.9-2-2-2-2 .9-2 2 .9 2 2 2zm0 2c-1.1 0-2 .9-2 2s.9 2 2 2 2-.9 2-2-.9-2-2-2zm0 6c-1.1 0-2 .9-2 2s.9 2 2 2 2-.9 2-2-.9-2-2-2z" />
+                          </svg>
+                        </button>
+                      )}
+
                       <div
                         className={`relative max-w-[65%] px-3 py-2 rounded-2xl shadow-sm text-sm leading-relaxed ${
                           isOut
@@ -737,6 +877,18 @@ export default function ChatWindow() {
                           )}
                         </div>
                       </div>
+
+                      {isOut && (
+                        <button
+                          onClick={() => setDeleteTarget({ id: m.id, isOut })}
+                          className="opacity-0 group-hover/row:opacity-100 transition-opacity shrink-0 w-6 h-6 rounded-full hover:bg-gray-200 flex items-center justify-center text-gray-400 hover:text-gray-600 mb-1"
+                          title="Delete message"
+                        >
+                          <svg className="w-3.5 h-3.5" fill="currentColor" viewBox="0 0 24 24">
+                            <path d="M12 8c1.1 0 2-.9 2-2s-.9-2-2-2-2 .9-2 2 .9 2 2 2zm0 2c-1.1 0-2 .9-2 2s.9 2 2 2 2-.9 2-2-.9-2-2-2zm0 6c-1.1 0-2 .9-2 2s.9 2 2 2 2-.9 2-2-.9-2-2-2z" />
+                          </svg>
+                        </button>
+                      )}
                     </div>
                   </div>
                 );
@@ -886,6 +1038,17 @@ export default function ChatWindow() {
             </svg>
           </a>
         </div>
+      )}
+
+      {/* Delete popup */}
+      {deleteTarget && (
+        <DeletePopup
+          messageId={deleteTarget.id}
+          isOut={deleteTarget.isOut}
+          onClose={() => setDeleteTarget(null)}
+          onDeleteForEveryone={handleDeleteForEveryone}
+          onDeleteForMe={handleDeleteForMe}
+        />
       )}
     </div>
   );
