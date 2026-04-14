@@ -325,21 +325,6 @@ function getAvatarColor(phone: string): string {
 // ── ChatWindow ────────────────────────────────────────────────────────────────
 
 // ── Delete popup (WhatsApp-style) ─────────────────────────────────────────────
-const DELETE_FOR_ME_KEY = "vaketta_deleted_msgs";
-
-function getLocalDeleted(): Set<string> {
-  try {
-    const raw = localStorage.getItem(DELETE_FOR_ME_KEY);
-    return new Set(raw ? JSON.parse(raw) : []);
-  } catch { return new Set(); }
-}
-
-function addLocalDeleted(id: string) {
-  const s = getLocalDeleted();
-  s.add(id);
-  localStorage.setItem(DELETE_FOR_ME_KEY, JSON.stringify([...s]));
-}
-
 function DeletePopup({
   messageId,
   isOut,
@@ -354,8 +339,10 @@ function DeletePopup({
   onDeleteForMe: (id: string) => void;
 }) {
   return (
-    <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/40 backdrop-blur-[2px]"
-      onClick={onClose}>
+    <div
+      className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/40 backdrop-blur-[2px]"
+      onClick={onClose}
+    >
       <div
         className="w-full sm:w-80 rounded-t-2xl sm:rounded-2xl bg-white shadow-2xl overflow-hidden"
         onClick={(e) => e.stopPropagation()}
@@ -368,6 +355,7 @@ function DeletePopup({
 
         {/* Options */}
         <div className="py-1">
+          {/* Delete for everyone — only valid for outgoing messages (we sent them) */}
           {isOut && (
             <button
               onClick={() => { onDeleteForEveryone(messageId); onClose(); }}
@@ -381,11 +369,12 @@ function DeletePopup({
               </div>
               <div>
                 <p className="text-sm font-semibold text-red-600">Delete for everyone</p>
-                <p className="text-xs text-gray-400">Removes from DB and cloud storage</p>
+                <p className="text-xs text-gray-400">Deletes from DB and unsends from guest's WhatsApp</p>
               </div>
             </button>
           )}
 
+          {/* Delete for me — deletes from DB only, not from WhatsApp */}
           <button
             onClick={() => { onDeleteForMe(messageId); onClose(); }}
             className="w-full flex items-center gap-3 px-5 py-3.5 text-left hover:bg-gray-50 transition-colors group"
@@ -393,12 +382,12 @@ function DeletePopup({
             <div className="w-8 h-8 rounded-full bg-gray-100 group-hover:bg-gray-200 flex items-center justify-center shrink-0 transition-colors">
               <svg className="w-4 h-4 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
-                  d="M13.875 18.825A10.05 10.05 0 0112 19c-4.478 0-8.268-2.943-9.543-7a9.97 9.97 0 011.563-3.029m5.858.908a3 3 0 114.243 4.243M9.878 9.878l4.242 4.242M9.88 9.88l-3.29-3.29m7.532 7.532l3.29 3.29M3 3l3.59 3.59m0 0A9.953 9.953 0 0112 5c4.478 0 8.268 2.943 9.543 7a10.025 10.025 0 01-4.132 5.411m0 0L21 21" />
+                  d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
               </svg>
             </div>
             <div>
               <p className="text-sm font-semibold text-gray-700">Delete for me</p>
-              <p className="text-xs text-gray-400">Hides on this device only</p>
+              <p className="text-xs text-gray-400">Deletes from DB only, not from WhatsApp</p>
             </div>
           </button>
 
@@ -438,11 +427,6 @@ export default function ChatWindow() {
 
   // Delete state
   const [deleteTarget, setDeleteTarget] = useState<{ id: string; isOut: boolean } | null>(null);
-  const [localDeleted, setLocalDeleted] = useState<Set<string>>(new Set());
-
-  useEffect(() => {
-    setLocalDeleted(getLocalDeleted());
-  }, []);
 
   const [text, setText] = useState("");
   const [togglingBot, setTogglingBot] = useState(false);
@@ -530,20 +514,24 @@ export default function ChatWindow() {
     };
   }, [mounted]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  // Delete for everyone — calls API, removes from store
+  // Delete for everyone — deletes from DB + unsends from guest's WhatsApp
   async function handleDeleteForEveryone(messageId: string) {
+    try {
+      await apiFetch(`/messages/${messageId}?everyone=true`, { method: "DELETE" });
+      removeMessage(messageId);
+    } catch (e) {
+      console.error("Delete for everyone failed", e);
+    }
+  }
+
+  // Delete for me — deletes from DB only, not from WhatsApp
+  async function handleDeleteForMe(messageId: string) {
     try {
       await apiFetch(`/messages/${messageId}`, { method: "DELETE" });
       removeMessage(messageId);
     } catch (e) {
-      console.error("Delete failed", e);
+      console.error("Delete for me failed", e);
     }
-  }
-
-  // Delete for me — hides locally only
-  function handleDeleteForMe(messageId: string) {
-    addLocalDeleted(messageId);
-    setLocalDeleted((prev) => new Set([...prev, messageId]));
   }
 
   // Bot toggle
@@ -703,7 +691,7 @@ export default function ChatWindow() {
   }
 
   const grouped = groupMessagesByDate(
-    messages.filter((m) => m.status !== "REPLACED" && !localDeleted.has(m.id))
+    messages.filter((m) => m.status !== "REPLACED")
   );
   const firstUnreadId = messages.find(
     (m) => m.direction === "IN" && m.status === "RECEIVED"
