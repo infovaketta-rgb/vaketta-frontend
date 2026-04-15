@@ -53,7 +53,7 @@ export default function NodePalette() {
   }
 
   return (
-    <div className="flex w-44 shrink-0 flex-col gap-3 rounded-xl border border-gray-200 bg-white p-3 shadow-sm overflow-y-auto">
+    <div className="flex w-44 min-h-0 flex-1 flex-col gap-3 rounded-xl border border-gray-200 bg-white p-3 shadow-sm overflow-y-auto">
       {CATEGORIES.map((cat) => (
         <div key={cat.title}>
           <p className="mb-1.5 text-[9px] font-bold uppercase tracking-widest text-gray-400">

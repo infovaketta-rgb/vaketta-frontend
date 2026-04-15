@@ -258,7 +258,7 @@ export default function FlowCanvasPage() {
 
       <div className="flex min-h-0 flex-1 gap-3 p-3">
         {!readOnly && (
-          <div className="flex flex-col gap-2">
+          <div className="flex min-h-0 flex-col gap-2">
             <NodePalette />
             {!hasStart && (
               <button
