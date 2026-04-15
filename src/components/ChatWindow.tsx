@@ -324,19 +324,15 @@ function getAvatarColor(phone: string): string {
 
 // ── ChatWindow ────────────────────────────────────────────────────────────────
 
-// ── Delete popup (WhatsApp-style) ─────────────────────────────────────────────
+// ── Delete popup ──────────────────────────────────────────────────────────────
 function DeletePopup({
   messageId,
-  isOut,
   onClose,
-  onDeleteForEveryone,
-  onDeleteForMe,
+  onDelete,
 }: {
   messageId: string;
-  isOut: boolean;
   onClose: () => void;
-  onDeleteForEveryone: (id: string) => void;
-  onDeleteForMe: (id: string) => void;
+  onDelete: (id: string) => void;
 }) {
   return (
     <div
@@ -344,51 +340,26 @@ function DeletePopup({
       onClick={onClose}
     >
       <div
-        className="w-full sm:w-80 rounded-t-2xl sm:rounded-2xl bg-white shadow-2xl overflow-hidden"
+        className="w-full sm:w-72 rounded-t-2xl sm:rounded-2xl bg-white shadow-2xl overflow-hidden"
         onClick={(e) => e.stopPropagation()}
       >
-        {/* Header */}
-        <div className="px-5 pt-5 pb-3 border-b border-gray-100">
-          <p className="text-sm font-semibold text-gray-800 text-center">Delete message?</p>
-          <p className="text-xs text-gray-400 text-center mt-1">This action cannot be undone.</p>
+        <div className="px-5 pt-5 pb-3 border-b border-gray-100 text-center">
+          <p className="text-sm font-semibold text-gray-800">Delete message?</p>
+          <p className="text-xs text-gray-400 mt-1">The message will be removed from the chat history.</p>
         </div>
 
-        {/* Options */}
         <div className="py-1">
-          {/* Delete for everyone — only valid for outgoing messages (we sent them) */}
-          {isOut && (
-            <button
-              onClick={() => { onDeleteForEveryone(messageId); onClose(); }}
-              className="w-full flex items-center gap-3 px-5 py-3.5 text-left hover:bg-red-50 transition-colors group"
-            >
-              <div className="w-8 h-8 rounded-full bg-red-100 group-hover:bg-red-200 flex items-center justify-center shrink-0 transition-colors">
-                <svg className="w-4 h-4 text-red-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
-                    d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-                </svg>
-              </div>
-              <div>
-                <p className="text-sm font-semibold text-red-600">Delete for everyone</p>
-                <p className="text-xs text-gray-400">Deletes from DB and unsends from guest's WhatsApp</p>
-              </div>
-            </button>
-          )}
-
-          {/* Delete for me — deletes from DB only, not from WhatsApp */}
           <button
-            onClick={() => { onDeleteForMe(messageId); onClose(); }}
-            className="w-full flex items-center gap-3 px-5 py-3.5 text-left hover:bg-gray-50 transition-colors group"
+            onClick={() => { onDelete(messageId); onClose(); }}
+            className="w-full flex items-center gap-3 px-5 py-3.5 text-left hover:bg-red-50 transition-colors group"
           >
-            <div className="w-8 h-8 rounded-full bg-gray-100 group-hover:bg-gray-200 flex items-center justify-center shrink-0 transition-colors">
-              <svg className="w-4 h-4 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <div className="w-8 h-8 rounded-full bg-red-100 group-hover:bg-red-200 flex items-center justify-center shrink-0 transition-colors">
+              <svg className="w-4 h-4 text-red-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
                   d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
               </svg>
             </div>
-            <div>
-              <p className="text-sm font-semibold text-gray-700">Delete for me</p>
-              <p className="text-xs text-gray-400">Deletes from DB only, not from WhatsApp</p>
-            </div>
+            <p className="text-sm font-semibold text-red-600">Delete message</p>
           </button>
 
           <button
@@ -420,13 +391,17 @@ export default function ChatWindow() {
   const addMessage = useChatStore((s) => s.addMessage);
   const markMessagesRead = useChatStore((s) => s.markMessagesRead);
   const updateMessageStatus = useChatStore((s) => s.updateMessageStatus);
-  const removeMessage = useChatStore((s) => s.removeMessage);
+
   const botEnabled = useChatStore((s) => s.botEnabled);
   const setBotEnabledStore = useChatStore((s) => s.setBotEnabled);
   const selectedGuestPhone = useChatStore((s) => s.selectedGuestPhone);
 
   // Delete state
   const [deleteTarget, setDeleteTarget] = useState<{ id: string; isOut: boolean } | null>(null);
+
+  // Undo-send state: messageId → remaining seconds
+  const [pendingUndos, setPendingUndos] = useState<Map<string, number>>(new Map());
+  const undoTimersRef = useRef<Map<string, ReturnType<typeof setInterval>>>(new Map());
 
   const [text, setText] = useState("");
   const [togglingBot, setTogglingBot] = useState(false);
@@ -499,38 +474,55 @@ export default function ChatWindow() {
     const onRead = ({ guestId: readGuestId }: { guestId: string }) => markMessagesRead(readGuestId);
     const onStatus = ({ messageId, status }: { messageId: string; status: string }) =>
       updateMessageStatus(messageId, status);
-    const onDeleted = ({ messageId }: { messageId: string }) => removeMessage(messageId);
+    const onDeleted = ({ messageId, deletedBy }: { messageId: string; deletedBy: string }) => {
+      // Patch the message in-store to its tombstone shape
+      useChatStore.setState((s) => ({
+        messages: s.messages.map((m) =>
+          m.id === messageId
+            ? { ...m, deleted: true, deletedBy, body: null, mediaUrl: null, mimeType: null, fileName: null }
+            : m
+        ),
+      }));
+    };
+
+    const onUndo = ({ messageId }: { messageId: string }) => {
+      // Another tab cancelled the send — remove bubble and clear any countdown
+      const timer = undoTimersRef.current.get(messageId);
+      if (timer) { clearInterval(timer); undoTimersRef.current.delete(messageId); }
+      setPendingUndos((prev) => { const n = new Map(prev); n.delete(messageId); return n; });
+      useChatStore.getState().removeMessage(messageId);
+    };
 
     socket.on("message:new", onNewMessage);
     socket.on("message:read", onRead);
     socket.on("message:status", onStatus);
     socket.on("message:deleted", onDeleted);
+    socket.on("message:undo", onUndo);
 
     return () => {
       socket.off("message:new", onNewMessage);
       socket.off("message:read", onRead);
       socket.off("message:status", onStatus);
       socket.off("message:deleted", onDeleted);
+      socket.off("message:undo", onUndo);
     };
   }, [mounted]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  // Delete for everyone — deletes from DB + unsends from guest's WhatsApp
-  async function handleDeleteForEveryone(messageId: string) {
+  // Delete message — soft-delete in DB, bubble becomes tombstone
+  async function handleDelete(messageId: string) {
     try {
-      await apiFetch(`/messages/${messageId}?everyone=true`, { method: "DELETE" });
-      removeMessage(messageId);
+      const res = await apiFetch(`/messages/${messageId}`, { method: "DELETE" });
+      const deletedBy: string = res?.message?.deletedBy ?? "Staff";
+      // Patch message in-store to tombstone shape
+      useChatStore.setState((s) => ({
+        messages: s.messages.map((m) =>
+          m.id === messageId
+            ? { ...m, deleted: true, deletedBy, body: null, mediaUrl: null, mimeType: null, fileName: null }
+            : m
+        ),
+      }));
     } catch (e) {
-      console.error("Delete for everyone failed", e);
-    }
-  }
-
-  // Delete for me — deletes from DB only, not from WhatsApp
-  async function handleDeleteForMe(messageId: string) {
-    try {
-      await apiFetch(`/messages/${messageId}`, { method: "DELETE" });
-      removeMessage(messageId);
-    } catch (e) {
-      console.error("Delete for me failed", e);
+      console.error("Delete failed", e);
     }
   }
 
@@ -625,19 +617,48 @@ export default function ChatWindow() {
       timestamp:   new Date().toISOString(),
       status:      "SENDING",
       guestId,
+      deleted:     false,
+      deletedBy:   null,
+      jobId:       null,
     };
     addMessage(optimistic);
     setText("");
 
     try {
-      const saved = await apiFetch("/messages/reply", {
+      const result = await apiFetch("/messages/reply", {
         method: "POST",
         body: JSON.stringify({ guestId, text: optimistic.body }),
       });
-      // Replace optimistic entry with real DB record (socket may arrive first — deduplication handles it)
+      // result is { message, delaySeconds }
+      const saved = result.message ?? result;
+      const delaySeconds: number | null = result.delaySeconds ?? null;
+
+      // Replace optimistic entry with real DB record
       addMessage({ ...saved, guestId });
-      // Remove the temp optimistic entry
       updateMessageStatus(tempId, "REPLACED");
+
+      // Start undo countdown if delay is set
+      if (delaySeconds && saved.id) {
+        const msgId = saved.id as string;
+        setPendingUndos((prev) => new Map(prev).set(msgId, delaySeconds));
+
+        const timer = setInterval(() => {
+          setPendingUndos((prev) => {
+            const next = new Map(prev);
+            const remaining = (next.get(msgId) ?? 1) - 1;
+            if (remaining <= 0) {
+              next.delete(msgId);
+              clearInterval(undoTimersRef.current.get(msgId));
+              undoTimersRef.current.delete(msgId);
+            } else {
+              next.set(msgId, remaining);
+            }
+            return next;
+          });
+        }, 1000);
+
+        undoTimersRef.current.set(msgId, timer);
+      }
     } catch (e: any) {
       console.error("Send failed", e);
       updateMessageStatus(tempId, "FAILED");
@@ -645,6 +666,21 @@ export default function ChatWindow() {
       setTimeout(() => setSendError(""), 4000);
     } finally {
       setSending(false);
+    }
+  }
+
+  // Undo a delayed send — cancels the BullMQ job and removes the bubble
+  async function handleUndo(messageId: string) {
+    // Clear countdown timer immediately
+    const timer = undoTimersRef.current.get(messageId);
+    if (timer) { clearInterval(timer); undoTimersRef.current.delete(messageId); }
+    setPendingUndos((prev) => { const n = new Map(prev); n.delete(messageId); return n; });
+
+    try {
+      await apiFetch(`/messages/${messageId}/undo-send`, { method: "DELETE" });
+      useChatStore.getState().removeMessage(messageId);
+    } catch (e) {
+      console.error("Undo failed", e);
     }
   }
 
@@ -818,7 +854,7 @@ export default function ChatWindow() {
                     <div className={`flex items-end gap-1.5 group/row ${isOut ? "justify-end" : "justify-start"}`}>
 
                       {/* ⋮ button — left side for incoming, right side for outgoing */}
-                      {!isOut && (
+                      {!isOut && !m.deleted && (
                         <button
                           onClick={() => setDeleteTarget({ id: m.id, isOut })}
                           className="opacity-0 group-hover/row:opacity-100 transition-opacity shrink-0 w-6 h-6 rounded-full hover:bg-gray-200 flex items-center justify-center text-gray-400 hover:text-gray-600 mb-1"
@@ -837,7 +873,15 @@ export default function ChatWindow() {
                             : "bg-white text-gray-900 rounded-bl-sm"
                         }`}
                       >
-                        {m.mediaUrl ? (
+                        {m.deleted ? (
+                          <p className="flex items-center gap-1.5 pr-10 italic text-gray-400 text-sm select-none">
+                            <svg className="w-3.5 h-3.5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
+                                d="M18.364 18.364A9 9 0 005.636 5.636m12.728 12.728A9 9 0 015.636 5.636m12.728 12.728L5.636 5.636" />
+                            </svg>
+                            Message deleted by {m.deletedBy ?? "Staff"}
+                          </p>
+                        ) : m.mediaUrl ? (
                           <MediaBubble
                             mediaUrl={m.mediaUrl}
                             mimeType={m.mimeType ?? "application/octet-stream"}
@@ -866,7 +910,7 @@ export default function ChatWindow() {
                         </div>
                       </div>
 
-                      {isOut && (
+                      {isOut && !m.deleted && (
                         <button
                           onClick={() => setDeleteTarget({ id: m.id, isOut })}
                           className="opacity-0 group-hover/row:opacity-100 transition-opacity shrink-0 w-6 h-6 rounded-full hover:bg-gray-200 flex items-center justify-center text-gray-400 hover:text-gray-600 mb-1"
@@ -891,6 +935,28 @@ export default function ChatWindow() {
       {sendError && (
         <p className="text-xs text-red-500 bg-red-50 border-t border-red-100 px-4 py-1.5">{sendError}</p>
       )}
+
+      {/* Undo-send countdown strips */}
+      {pendingUndos.size > 0 && Array.from(pendingUndos.entries()).map(([msgId, secs]) => (
+        <div
+          key={msgId}
+          className="flex items-center justify-between bg-[#2B0D3E] text-white text-xs px-4 py-2 border-t border-purple-900"
+        >
+          <span className="flex items-center gap-2">
+            <svg className="w-3.5 h-3.5 animate-spin opacity-70" fill="none" viewBox="0 0 24 24">
+              <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+              <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8H4z" />
+            </svg>
+            Sending in {secs}s…
+          </span>
+          <button
+            onClick={() => handleUndo(msgId)}
+            className="font-semibold text-yellow-300 hover:text-yellow-100 transition-colors px-2 py-0.5 rounded hover:bg-white/10"
+          >
+            Undo
+          </button>
+        </div>
+      ))}
 
       {/* Input Bar */}
       <div className="bg-white border-t border-gray-200 px-3 py-2.5 flex items-center gap-2">
@@ -1032,10 +1098,8 @@ export default function ChatWindow() {
       {deleteTarget && (
         <DeletePopup
           messageId={deleteTarget.id}
-          isOut={deleteTarget.isOut}
           onClose={() => setDeleteTarget(null)}
-          onDeleteForEveryone={handleDeleteForEveryone}
-          onDeleteForMe={handleDeleteForMe}
+          onDelete={handleDelete}
         />
       )}
     </div>

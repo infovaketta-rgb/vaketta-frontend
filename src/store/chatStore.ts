@@ -11,6 +11,9 @@ export type Message = {
   timestamp:   string;
   status:      string;
   guestId:     string;
+  deleted:     boolean;
+  deletedBy:   string | null;
+  jobId:       string | null;
 };
 
 type ChatState = {

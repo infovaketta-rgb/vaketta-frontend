@@ -111,6 +111,12 @@ export default function ConfigurationPage() {
   const [fbConnecting, setFbConnecting] = useState(false);
   const [fbError,      setFbError]      = useState("");
 
+  // Message delay state
+  const [delayEnabled, setDelayEnabled]   = useState(false);
+  const [delaySeconds, setDelaySeconds]   = useState(10);
+  const [delaySaving,  setDelaySaving]    = useState(false);
+  const [delaySaved,   setDelaySaved]     = useState(false);
+
   const [form, setForm] = useState<Profile>({
     name:         "",
     phone:        "",
@@ -138,6 +144,11 @@ export default function ConfigurationPage() {
           website:      data.website      ?? "",
           apiKey:       data.apiKey       ?? null,
         });
+        // Load delay settings from config
+        if (data.config) {
+          setDelayEnabled(data.config.messageDelayEnabled ?? false);
+          setDelaySeconds(data.config.messageDelaySeconds ?? 10);
+        }
       })
       .catch(() => setError("Failed to load configuration."))
       .finally(() => setLoading(false));
@@ -195,6 +206,25 @@ export default function ConfigurationPage() {
     await navigator.clipboard.writeText(form.apiKey);
     setCopied(true);
     setTimeout(() => setCopied(false), 2000);
+  }
+
+  async function handleDelaySave() {
+    setDelaySaving(true);
+    try {
+      await apiFetch("/hotel-settings", {
+        method: "PATCH",
+        body: JSON.stringify({
+          messageDelayEnabled: delayEnabled,
+          messageDelaySeconds: Math.max(1, Math.min(60, delaySeconds)),
+        }),
+      });
+      setDelaySaved(true);
+      setTimeout(() => setDelaySaved(false), 3000);
+    } catch (e: any) {
+      console.error("Failed to save delay settings", e);
+    } finally {
+      setDelaySaving(false);
+    }
   }
 
   async function handleTest() {
@@ -479,6 +509,69 @@ export default function ConfigurationPage() {
           </SectionCard>
 
           {/* ── API Key ── */}
+          {/* ── Message Delay ── */}
+          <SectionCard
+            title="Message Delay"
+            subtitle="Add a short delay before messages are sent — lets you undo accidental sends."
+          >
+            <div className="space-y-4">
+              {/* Toggle */}
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-sm font-medium text-gray-800">Enable message delay</p>
+                  <p className="text-xs text-gray-400 mt-0.5">When on, outgoing messages wait before sending so you can cancel them.</p>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setDelayEnabled((v) => !v)}
+                  className={`relative inline-flex h-6 w-11 shrink-0 rounded-full border-2 border-transparent transition-colors focus:outline-none ${
+                    delayEnabled ? "bg-[#7A3F91]" : "bg-gray-200"
+                  }`}
+                >
+                  <span
+                    className={`inline-block h-5 w-5 rounded-full bg-white shadow transition-transform ${
+                      delayEnabled ? "translate-x-5" : "translate-x-0"
+                    }`}
+                  />
+                </button>
+              </div>
+
+              {/* Delay seconds input — only shown when enabled */}
+              {delayEnabled && (
+                <Field label="Delay duration" hint="How many seconds to wait before sending (1–60).">
+                  <div className="flex items-center gap-3">
+                    <input
+                      type="number"
+                      min={1}
+                      max={60}
+                      value={delaySeconds}
+                      onChange={(e) => setDelaySeconds(Math.max(1, Math.min(60, Number(e.target.value))))}
+                      className={`${inputClass} w-24`}
+                    />
+                    <span className="text-sm text-gray-500">seconds</span>
+                  </div>
+                </Field>
+              )}
+
+              <div className="flex justify-end pt-1">
+                <button
+                  type="button"
+                  onClick={handleDelaySave}
+                  disabled={delaySaving}
+                  className="flex items-center gap-2 rounded-lg bg-[#7A3F91] px-4 py-2 text-sm font-semibold text-white transition hover:bg-[#2B0D3E] disabled:opacity-50"
+                >
+                  {delaySaving ? (
+                    <><span className="h-3.5 w-3.5 animate-spin rounded-full border-2 border-white border-t-transparent" />Saving…</>
+                  ) : delaySaved ? (
+                    <><svg className="h-3.5 w-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M5 13l4 4L19 7"/></svg>Saved</>
+                  ) : (
+                    "Save"
+                  )}
+                </button>
+              </div>
+            </div>
+          </SectionCard>
+
           <SectionCard
             title="Platform API Key"
             subtitle="Your hotel API key — used to authenticate WhatsApp webhook events."
