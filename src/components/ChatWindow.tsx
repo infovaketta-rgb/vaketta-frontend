@@ -410,6 +410,13 @@ export default function ChatWindow() {
   const [isRecording, setIsRecording] = useState(false);
   const [lightboxSrc, setLightboxSrc] = useState<string | null>(null);
 
+  // Media preview state — file staged here before confirm-send
+  const [mediaPreview, setMediaPreview] = useState<{
+    file:    File;
+    dataUrl: string | null; // null for non-image/video (doc/audio)
+    caption: string;
+  } | null>(null);
+
   const fileInputRef = useRef<HTMLInputElement>(null);
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const audioChunksRef = useRef<Blob[]>([]);
@@ -544,8 +551,18 @@ export default function ChatWindow() {
     }
   }
 
-  // Send media file
-  async function sendMediaFile(file: File) {
+  const ALLOWED_MEDIA_TYPES = [
+    "image/jpeg","image/jpg","image/png","image/webp","image/gif",
+    "video/mp4","video/3gpp","video/quicktime",
+    "audio/ogg","audio/mpeg","audio/mp4","audio/webm","audio/wav",
+    "application/pdf","application/msword",
+    "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+    "application/vnd.ms-excel",
+    "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+  ];
+
+  // Low-level upload — used by confirmSendMedia and voice recording
+  async function uploadMedia(file: File, caption?: string) {
     if (!guestId) return;
     setSendError("");
     setUploadingMedia(true);
@@ -554,20 +571,51 @@ export default function ChatWindow() {
       const form = new FormData();
       form.append("file", file);
       form.append("guestId", guestId);
+      if (caption?.trim()) form.append("caption", caption.trim());
       const res = await fetch(`${API_BASE}/messages/send-media`, {
         method: "POST",
         headers: token ? { Authorization: `Bearer ${token}` } : {},
         body: form,
       });
-      if (!res.ok) throw new Error("Upload failed");
-    } catch (e) {
+      const data = await res.json();
+      if (!res.ok) throw new Error(data?.error ?? "Upload failed");
+      if (data?.id) addMessage({ ...data, guestId });
+    } catch (e: any) {
       console.error("Media send failed", e);
-      setSendError("Failed to send file. Please try again.");
+      setSendError(e?.message ?? "Failed to send file. Please try again.");
       setTimeout(() => setSendError(""), 4000);
     } finally {
       setUploadingMedia(false);
-      if (fileInputRef.current) fileInputRef.current.value = "";
     }
+  }
+
+  // Stage a file for preview — validates then shows preview modal
+  function stageMediaFile(file: File) {
+    if (!guestId) return;
+    if (file.size > 10 * 1024 * 1024) {
+      setSendError("File too large. Maximum size is 10 MB.");
+      setTimeout(() => setSendError(""), 4000);
+      if (fileInputRef.current) fileInputRef.current.value = "";
+      return;
+    }
+    if (!ALLOWED_MEDIA_TYPES.includes(file.type)) {
+      setSendError("Unsupported file type.");
+      setTimeout(() => setSendError(""), 4000);
+      if (fileInputRef.current) fileInputRef.current.value = "";
+      return;
+    }
+    const canPreview = file.type.startsWith("image/") || file.type.startsWith("video/");
+    const dataUrl = canPreview ? URL.createObjectURL(file) : null;
+    setMediaPreview({ file, dataUrl, caption: "" });
+    if (fileInputRef.current) fileInputRef.current.value = "";
+  }
+
+  // Confirm send from preview modal
+  async function confirmSendMedia() {
+    if (!guestId || !mediaPreview) return;
+    const { file, caption } = mediaPreview;
+    setMediaPreview(null);
+    await uploadMedia(file, caption);
   }
 
   // Voice recording
@@ -581,7 +629,8 @@ export default function ChatWindow() {
         const blob = new Blob(audioChunksRef.current, { type: "audio/webm" });
         const file = new File([blob], `voice-${Date.now()}.webm`, { type: "audio/webm" });
         stream.getTracks().forEach((t) => t.stop());
-        await sendMediaFile(file);
+        // Voice recordings skip preview — send directly
+        await uploadMedia(file);
       };
       recorder.start();
       mediaRecorderRef.current = recorder;
@@ -958,6 +1007,78 @@ export default function ChatWindow() {
         </div>
       ))}
 
+      {/* Media preview modal */}
+      {mediaPreview && (
+        <div className="border-t border-gray-200 bg-white px-4 py-3 space-y-3">
+          {/* Preview area */}
+          <div className="flex items-start gap-3">
+            <div className="shrink-0 rounded-xl overflow-hidden bg-gray-100 flex items-center justify-center w-24 h-24">
+              {mediaPreview.dataUrl && mediaPreview.file.type.startsWith("image/") ? (
+                // eslint-disable-next-line @next/next/no-img-element
+                <img src={mediaPreview.dataUrl} alt="preview" className="w-full h-full object-cover" />
+              ) : mediaPreview.dataUrl && mediaPreview.file.type.startsWith("video/") ? (
+                <video src={mediaPreview.dataUrl} className="w-full h-full object-cover" muted />
+              ) : mediaPreview.file.type.startsWith("audio/") ? (
+                <div className="flex flex-col items-center gap-1 text-gray-500">
+                  <svg className="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9 19V6l12-3v13M9 19c0 1.105-1.343 2-3 2s-3-.895-3-2 1.343-2 3-2 3 .895 3 2zm12-3c0 1.105-1.343 2-3 2s-3-.895-3-2 1.343-2 3-2 3 .895 3 2z" />
+                  </svg>
+                  <span className="text-[10px]">Audio</span>
+                </div>
+              ) : (
+                <div className="flex flex-col items-center gap-1 text-gray-500">
+                  <svg className="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                  </svg>
+                  <span className="text-[10px] truncate max-w-20">{mediaPreview.file.name}</span>
+                </div>
+              )}
+            </div>
+            <div className="flex-1 min-w-0">
+              <p className="text-xs font-medium text-gray-700 truncate">{mediaPreview.file.name}</p>
+              <p className="text-[11px] text-gray-400 mt-0.5">{(mediaPreview.file.size / 1024).toFixed(0)} KB</p>
+              <input
+                type="text"
+                value={mediaPreview.caption}
+                onChange={(e) => setMediaPreview((p) => p ? { ...p, caption: e.target.value } : p)}
+                onKeyDown={(e) => e.key === "Enter" && confirmSendMedia()}
+                placeholder="Add a caption… (optional)"
+                className="mt-2 w-full rounded-lg border border-gray-200 px-3 py-1.5 text-sm text-gray-800 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-[#7A3F91] transition"
+                autoFocus
+              />
+            </div>
+          </div>
+          {/* Actions */}
+          <div className="flex items-center justify-end gap-2">
+            <button
+              onClick={() => {
+                if (mediaPreview.dataUrl) URL.revokeObjectURL(mediaPreview.dataUrl);
+                setMediaPreview(null);
+              }}
+              className="rounded-lg border border-gray-200 px-4 py-1.5 text-sm text-gray-600 hover:bg-gray-50 transition"
+            >
+              Cancel
+            </button>
+            <button
+              onClick={confirmSendMedia}
+              disabled={uploadingMedia}
+              className="flex items-center gap-2 rounded-lg bg-[#7A3F91] px-4 py-1.5 text-sm font-semibold text-white hover:bg-[#2B0D3E] disabled:opacity-50 transition"
+            >
+              {uploadingMedia ? (
+                <><span className="h-3.5 w-3.5 animate-spin rounded-full border-2 border-white border-t-transparent" />Sending…</>
+              ) : (
+                <>
+                  <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8" />
+                  </svg>
+                  Send
+                </>
+              )}
+            </button>
+          </div>
+        </div>
+      )}
+
       {/* Input Bar */}
       <div className="bg-white border-t border-gray-200 px-3 py-2.5 flex items-center gap-2">
         {/* Hidden file input */}
@@ -968,7 +1089,7 @@ export default function ChatWindow() {
           className="hidden"
           onChange={(e) => {
             const file = e.target.files?.[0];
-            if (file) sendMediaFile(file);
+            if (file) stageMediaFile(file);
           }}
         />
 
