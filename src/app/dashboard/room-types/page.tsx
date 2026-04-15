@@ -33,6 +33,71 @@ function guestLabel(rt: RoomType) {
   return "—";
 }
 
+  // ── Shared form fields ────────────────────────────────────────────────────────
+  function FormFields({ f, setF, isInline }: {
+    f: typeof emptyForm;
+    setF: React.Dispatch<React.SetStateAction<typeof emptyForm>>;
+    isInline?: boolean;
+  }) {
+    const i = isInline ? `${inpSm} w-32` : inp;
+    const l = isInline ? lblSm : lbl;
+
+    return (
+      <>
+        <div className={isInline ? "" : undefined}>
+          <label className={l}>Name</label>
+          <input type="text" required value={f.name}
+            onChange={(e) => setF((p) => ({ ...p, name: e.target.value }))}
+            className={isInline ? `${inpSm} w-44` : inp} placeholder="e.g. Deluxe Room" />
+        </div>
+
+        <div>
+          <label className={l}>Price (₹/night)</label>
+          <input type="number" required min={0} value={f.basePrice}
+            onChange={(e) => setF((p) => ({ ...p, basePrice: e.target.value }))}
+            className={i} placeholder="2500" />
+        </div>
+
+        <div>
+          <label className={l}>Total rooms</label>
+          <input type="number" min={1} value={f.totalRooms}
+            onChange={(e) => setF((p) => ({ ...p, totalRooms: e.target.value }))}
+            className={i} placeholder="5" />
+        </div>
+
+        {/* Guest limits block */}
+        <div className={isInline ? "flex flex-col gap-1" : "rounded-lg border border-gray-100 bg-gray-50 p-3 space-y-2"}>
+          {!isInline && <p className="text-xs font-semibold text-gray-500">Guest limits <span className="font-normal text-gray-400">(optional — used to filter rooms in WhatsApp flows)</span></p>}
+          <div className={isInline ? "flex gap-2" : "grid grid-cols-3 gap-3"}>
+            <div>
+              <label className={l}>Max adults</label>
+              <input type="number" min={0} value={f.maxAdults}
+                onChange={(e) => setF((p) => ({ ...p, maxAdults: e.target.value }))}
+                className={i} placeholder="2" />
+            </div>
+            <div>
+              <label className={l}>Max children</label>
+              <input type="number" min={0} value={f.maxChildren}
+                onChange={(e) => setF((p) => ({ ...p, maxChildren: e.target.value }))}
+                className={i} placeholder="1" />
+            </div>
+            <div>
+              <label className={l}>Total capacity</label>
+              <input type="number" min={1} value={f.capacity}
+                onChange={(e) => setF((p) => ({ ...p, capacity: e.target.value }))}
+                className={i} placeholder="3" />
+            </div>
+          </div>
+          {!isInline && (
+            <p className="text-[11px] text-gray-400">
+              "Total capacity" is the sum of all guests. Adults + children is the preferred approach — the flow builder will filter rooms based on these values.
+            </p>
+          )}
+        </div>
+      </>
+    );
+  }
+
 export default function RoomTypesPage() {
   const mounted = useMounted();
   const [roomTypes, setRoomTypes] = useState<RoomType[]>([]);
@@ -115,70 +180,7 @@ export default function RoomTypesPage() {
     }
   }
 
-  // ── Shared form fields ────────────────────────────────────────────────────────
-  function FormFields({ f, setF, isInline }: {
-    f: typeof emptyForm;
-    setF: React.Dispatch<React.SetStateAction<typeof emptyForm>>;
-    isInline?: boolean;
-  }) {
-    const i = isInline ? `${inpSm} w-32` : inp;
-    const l = isInline ? lblSm : lbl;
 
-    return (
-      <>
-        <div className={isInline ? "" : undefined}>
-          <label className={l}>Name</label>
-          <input type="text" required value={f.name}
-            onChange={(e) => setF((p) => ({ ...p, name: e.target.value }))}
-            className={isInline ? `${inpSm} w-44` : inp} placeholder="e.g. Deluxe Room" />
-        </div>
-
-        <div>
-          <label className={l}>Price (₹/night)</label>
-          <input type="number" required min={0} value={f.basePrice}
-            onChange={(e) => setF((p) => ({ ...p, basePrice: e.target.value }))}
-            className={i} placeholder="2500" />
-        </div>
-
-        <div>
-          <label className={l}>Total rooms</label>
-          <input type="number" min={1} value={f.totalRooms}
-            onChange={(e) => setF((p) => ({ ...p, totalRooms: e.target.value }))}
-            className={i} placeholder="5" />
-        </div>
-
-        {/* Guest limits block */}
-        <div className={isInline ? "flex flex-col gap-1" : "rounded-lg border border-gray-100 bg-gray-50 p-3 space-y-2"}>
-          {!isInline && <p className="text-xs font-semibold text-gray-500">Guest limits <span className="font-normal text-gray-400">(optional — used to filter rooms in WhatsApp flows)</span></p>}
-          <div className={isInline ? "flex gap-2" : "grid grid-cols-3 gap-3"}>
-            <div>
-              <label className={l}>Max adults</label>
-              <input type="number" min={0} value={f.maxAdults}
-                onChange={(e) => setF((p) => ({ ...p, maxAdults: e.target.value }))}
-                className={i} placeholder="2" />
-            </div>
-            <div>
-              <label className={l}>Max children</label>
-              <input type="number" min={0} value={f.maxChildren}
-                onChange={(e) => setF((p) => ({ ...p, maxChildren: e.target.value }))}
-                className={i} placeholder="1" />
-            </div>
-            <div>
-              <label className={l}>Total capacity</label>
-              <input type="number" min={1} value={f.capacity}
-                onChange={(e) => setF((p) => ({ ...p, capacity: e.target.value }))}
-                className={i} placeholder="3" />
-            </div>
-          </div>
-          {!isInline && (
-            <p className="text-[11px] text-gray-400">
-              "Total capacity" is the sum of all guests. Adults + children is the preferred approach — the flow builder will filter rooms based on these values.
-            </p>
-          )}
-        </div>
-      </>
-    );
-  }
 
   return (
     <div className="p-8 h-full overflow-y-auto">
