@@ -6,23 +6,77 @@ import { apiFetch } from "@/lib/api";
 import { useMounted } from "@/lib/useMounted";
 import { formatCurrency, formatDate } from "@/lib/locale";
 
+const inputClass =
+  "w-full rounded-lg border border-[#E5E0D4] px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#1B52A8]/25 focus:border-[#1B52A8]";
+
 export default function BookingDetailPage() {
   const mounted   = useMounted();
   const router    = useRouter();
   const { id }    = useParams() as { id: string };
 
-  const [booking,  setBooking]  = useState<any | null>(null);
-  const [loading,  setLoading]  = useState(true);
-  const [error,    setError]    = useState("");
+  const [booking,   setBooking]   = useState<any | null>(null);
+  const [loading,   setLoading]   = useState(true);
+  const [error,     setError]     = useState("");
   const [actioning, setActioning] = useState(false);
+  const [roomTypes, setRoomTypes] = useState<any[]>([]);
+
+  // Edit modal state
+  const [editing,     setEditing]     = useState(false);
+  const [editForm,    setEditForm]    = useState({
+    guestName: "", roomTypeId: "", checkIn: "", checkOut: "",
+    pricePerNight: "", advancePaid: "",
+  });
+  const [editError,   setEditError]   = useState("");
+  const [editLoading, setEditLoading] = useState(false);
 
   useEffect(() => {
     if (!mounted) return;
-    apiFetch(`/bookings/${id}`)
-      .then(setBooking)
+    Promise.all([
+      apiFetch(`/bookings/${id}`),
+      apiFetch("/room-types"),
+    ])
+      .then(([b, r]) => { setBooking(b); setRoomTypes(r); })
       .catch((e: any) => setError(e.message || "Failed to load booking"))
       .finally(() => setLoading(false));
   }, [mounted, id]);
+
+  function openEdit() {
+    setEditForm({
+      guestName:     booking.guestName || "",
+      roomTypeId:    booking.roomTypeId || "",
+      checkIn:       booking.checkIn?.slice(0, 10) || "",
+      checkOut:      booking.checkOut?.slice(0, 10) || "",
+      pricePerNight: String(booking.pricePerNight || ""),
+      advancePaid:   String(booking.advancePaid || ""),
+    });
+    setEditError("");
+    setEditing(true);
+  }
+
+  async function handleEdit(e: React.SyntheticEvent) {
+    e.preventDefault();
+    setEditError("");
+    setEditLoading(true);
+    try {
+      const updated = await apiFetch(`/bookings/${id}`, {
+        method: "PATCH",
+        body: JSON.stringify({
+          guestName:     editForm.guestName,
+          roomTypeId:    editForm.roomTypeId,
+          checkIn:       editForm.checkIn,
+          checkOut:      editForm.checkOut,
+          pricePerNight: Number(editForm.pricePerNight),
+          advancePaid:   Number(editForm.advancePaid),
+        }),
+      });
+      setBooking(updated);
+      setEditing(false);
+    } catch (err: any) {
+      setEditError(err.message || "Failed to update booking.");
+    } finally {
+      setEditLoading(false);
+    }
+  }
 
   async function changeStatus(status: string) {
     setActioning(true);
@@ -192,6 +246,17 @@ export default function BookingDetailPage() {
               Actions
             </p>
             <div className="flex flex-col gap-2">
+              {booking.status !== "CANCELLED" && (
+                <>
+                  <ActionButton
+                    label="Edit Booking"
+                    onClick={openEdit}
+                    disabled={actioning}
+                    className="border border-[#E5E0D4] text-[#0C1B33] hover:bg-[#F4F2ED]"
+                  />
+                  <hr className="border-[#E5E0D4]" />
+                </>
+              )}
               {booking.status === "PENDING" && (
                 <>
                   <ActionButton
@@ -268,6 +333,115 @@ export default function BookingDetailPage() {
           </div>
         </div>
       </div>
+
+      {/* Edit modal */}
+      {editing && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
+          <div className="bg-white rounded-2xl shadow-xl w-full max-w-md mx-4 p-6">
+            <div className="flex items-center justify-between mb-5">
+              <h2 className="text-base font-semibold text-[#0C1B33]">Edit Booking</h2>
+              <button
+                onClick={() => setEditing(false)}
+                className="text-slate-400 hover:text-slate-600 transition text-xl leading-none"
+              >
+                ×
+              </button>
+            </div>
+            <form onSubmit={handleEdit} className="flex flex-col gap-3">
+              <div>
+                <label className="block text-xs font-medium text-[#0C1B33]/60 mb-1">Guest Name</label>
+                <input
+                  type="text"
+                  value={editForm.guestName}
+                  onChange={(e) => setEditForm((f) => ({ ...f, guestName: e.target.value }))}
+                  className={inputClass}
+                />
+              </div>
+              <div>
+                <label className="block text-xs font-medium text-[#0C1B33]/60 mb-1">Room Type</label>
+                <select
+                  value={editForm.roomTypeId}
+                  onChange={(e) => {
+                    const rt = roomTypes.find((r) => r.id === e.target.value);
+                    setEditForm((f) => ({
+                      ...f,
+                      roomTypeId: e.target.value,
+                      pricePerNight: rt ? String(rt.basePrice) : f.pricePerNight,
+                    }));
+                  }}
+                  className={inputClass}
+                >
+                  <option value="">Select room type</option>
+                  {roomTypes.map((r) => (
+                    <option key={r.id} value={r.id}>
+                      {r.name} — ₹{r.basePrice}/night
+                    </option>
+                  ))}
+                </select>
+              </div>
+              <div className="flex gap-3">
+                <div className="flex-1">
+                  <label className="block text-xs font-medium text-[#0C1B33]/60 mb-1">Check In</label>
+                  <input
+                    type="date"
+                    value={editForm.checkIn}
+                    onChange={(e) => setEditForm((f) => ({ ...f, checkIn: e.target.value }))}
+                    className={inputClass}
+                  />
+                </div>
+                <div className="flex-1">
+                  <label className="block text-xs font-medium text-[#0C1B33]/60 mb-1">Check Out</label>
+                  <input
+                    type="date"
+                    value={editForm.checkOut}
+                    onChange={(e) => setEditForm((f) => ({ ...f, checkOut: e.target.value }))}
+                    className={inputClass}
+                  />
+                </div>
+              </div>
+              <div className="flex gap-3">
+                <div className="flex-1">
+                  <label className="block text-xs font-medium text-[#0C1B33]/60 mb-1">Price / Night (₹)</label>
+                  <input
+                    type="number"
+                    min={0}
+                    value={editForm.pricePerNight}
+                    onChange={(e) => setEditForm((f) => ({ ...f, pricePerNight: e.target.value }))}
+                    className={inputClass}
+                  />
+                </div>
+                <div className="flex-1">
+                  <label className="block text-xs font-medium text-[#0C1B33]/60 mb-1">Advance Paid (₹)</label>
+                  <input
+                    type="number"
+                    min={0}
+                    value={editForm.advancePaid}
+                    onChange={(e) => setEditForm((f) => ({ ...f, advancePaid: e.target.value }))}
+                    className={inputClass}
+                  />
+                </div>
+              </div>
+              {editError && <p className="text-xs text-red-600">{editError}</p>}
+              <div className="flex gap-2 mt-1">
+                <button
+                  type="submit"
+                  disabled={editLoading}
+                  className="flex-1 rounded-lg bg-[#1B52A8] py-2 text-sm font-medium text-white hover:bg-[#163F82] transition disabled:opacity-50"
+                >
+                  {editLoading ? "Saving…" : "Save Changes"}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setEditing(false)}
+                  className="flex-1 rounded-lg border border-[#E5E0D4] py-2 text-sm font-medium text-[#0C1B33]/70 hover:bg-[#F4F2ED] transition"
+                >
+                  Cancel
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
