@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import { useRouter } from "next/navigation";
 import { apiFetch } from "@/lib/api";
 import { useMounted } from "@/lib/useMounted";
 import BookingCalendar from "@/components/BookingCalendar";
@@ -11,6 +12,7 @@ const inputClass =
 
 export default function BookingsPage() {
   const mounted = useMounted();
+  const router  = useRouter();
   const [bookings, setBookings] = useState<any[]>([]);
   const [loadError, setLoadError] = useState("");
   const [openMenuId, setOpenMenuId] = useState<string | null>(null);
@@ -140,7 +142,8 @@ export default function BookingsPage() {
           <table className="w-full text-sm">
             <thead className="border-b border-[#E5E0D4] bg-[#F4F2ED]">
               <tr className="text-left text-[#0C1B33]/55 text-xs uppercase tracking-wider font-semibold">
-                <th className="px-6 py-3 rounded-tl-xl">Guest</th>
+                <th className="px-6 py-3 rounded-tl-xl">Reference</th>
+                <th className="px-6 py-3">Guest</th>
                 <th className="px-6 py-3">Room</th>
                 <th className="px-6 py-3">Check In</th>
                 <th className="px-6 py-3">Check Out</th>
@@ -153,13 +156,29 @@ export default function BookingsPage() {
             <tbody className="divide-y divide-[#E5E0D4]">
               {bookings.length === 0 && (
                 <tr>
-                  <td colSpan={8} className="px-6 py-10 text-center text-[#0C1B33]/40">
+                  <td colSpan={9} className="px-6 py-10 text-center text-[#0C1B33]/40">
                     No bookings yet.
                   </td>
                 </tr>
               )}
               {bookings.map((b) => (
-                <tr key={b.id} className="hover:bg-[#F4F2ED]/60 transition">
+                <tr
+                  key={b.id}
+                  onClick={(e) => {
+                    if ((e.target as HTMLElement).closest("[data-no-nav]")) return;
+                    router.push(`/dashboard/bookings/${b.id}`);
+                  }}
+                  className="hover:bg-[#F4F2ED]/60 transition cursor-pointer"
+                >
+                  <td className="px-6 py-3">
+                    {b.referenceNumber ? (
+                      <span className="font-mono text-xs font-semibold text-[#1B52A8] bg-[#1B52A8]/8 px-2 py-1 rounded-md">
+                        {b.referenceNumber}
+                      </span>
+                    ) : (
+                      <span className="text-[#0C1B33]/30 text-xs">—</span>
+                    )}
+                  </td>
                   <td className="px-6 py-3 font-medium text-[#0C1B33]">
                     {b.guestName || b.guest?.name}
                   </td>
@@ -179,10 +198,11 @@ export default function BookingsPage() {
                   <td className="px-6 py-3">
                     <StatusBadge status={b.status} />
                   </td>
-                  <td className="px-6 py-3 relative">
+                  <td className="px-6 py-3 relative" data-no-nav>
                     {b.status !== "CANCELLED" && (
-                      <div ref={openMenuId === b.id ? menuRef : undefined}>
+                      <div ref={openMenuId === b.id ? menuRef : undefined} data-no-nav>
                         <button
+                          data-no-nav
                           onClick={() => setOpenMenuId(openMenuId === b.id ? null : b.id)}
                           className="w-8 h-8 flex items-center justify-center rounded-full hover:bg-[#F4F2ED] text-[#0C1B33]/50 transition"
                         >
@@ -190,8 +210,9 @@ export default function BookingsPage() {
                         </button>
 
                         {openMenuId === b.id && (
-                          <div className="absolute right-6 top-10 z-50 w-36 bg-white border border-[#E5E0D4] rounded-xl shadow-lg py-1 overflow-hidden">
+                          <div data-no-nav className="absolute right-6 top-10 z-50 w-36 bg-white border border-[#E5E0D4] rounded-xl shadow-lg py-1 overflow-hidden">
                             <button
+                              data-no-nav
                               onClick={() => openEdit(b)}
                               className="w-full text-left px-4 py-2 text-sm text-[#0C1B33] hover:bg-[#F4F2ED] transition"
                             >
@@ -199,6 +220,7 @@ export default function BookingsPage() {
                             </button>
                             {b.status === "PENDING" && (
                               <button
+                                data-no-nav
                                 onClick={() => updateStatus(b.id, "CONFIRMED")}
                                 className="w-full text-left px-4 py-2 text-sm text-emerald-600 hover:bg-emerald-50 transition"
                               >
@@ -206,6 +228,7 @@ export default function BookingsPage() {
                               </button>
                             )}
                             <button
+                              data-no-nav
                               onClick={() => updateStatus(b.id, "CANCELLED")}
                               className="w-full text-left px-4 py-2 text-sm text-red-500 hover:bg-red-50 transition"
                             >
