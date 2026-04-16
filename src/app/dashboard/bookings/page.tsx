@@ -51,18 +51,20 @@ export default function BookingsPage() {
     return () => document.removeEventListener("mousedown", handleClick);
   }, []);
 
-  async function updateStatus(id: string, status: string) {
-    try {
-      const updated = await apiFetch(`/bookings/${id}/status`, {
-        method: "PATCH",
-        body: JSON.stringify({ status }),
-      });
-      setBookings((prev) => prev.map((b) => (b.id === id ? { ...b, ...updated } : b)));
-    } catch (err) {
-      console.error(err);
-    }
-    setOpenMenuId(null);
+async function updateStatus(id: string, status: string) {
+  try {
+    await apiFetch(`/bookings/${id}/status`, {
+      method: "PATCH",
+      body: JSON.stringify({ status }),
+    });
+    setBookings((prev) =>
+      prev.map((b) => (b.id === id ? { ...b, status } : b))
+    );
+  } catch (err) {
+    console.error(err);
   }
+  setOpenMenuId(null);
+}
 
   function openEdit(booking: any) {
     setEditingBooking(booking);
