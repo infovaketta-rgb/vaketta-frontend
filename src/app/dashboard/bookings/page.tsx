@@ -319,6 +319,7 @@ async function updateStatus(id: string, status: string) {
                   <input
                     type="number"
                     min={0}
+                    step="0.01"
                     value={editForm.pricePerNight}
                     onChange={(e) => setEditForm((f) => ({ ...f, pricePerNight: e.target.value }))}
                     className={inputClass}
@@ -329,6 +330,7 @@ async function updateStatus(id: string, status: string) {
                   <input
                     type="number"
                     min={0}
+                    step="0.01"
                     value={editForm.advancePaid}
                     onChange={(e) => setEditForm((f) => ({ ...f, advancePaid: e.target.value }))}
                     className={inputClass}
