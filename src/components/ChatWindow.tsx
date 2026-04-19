@@ -499,21 +499,14 @@ export default function ChatWindow() {
   useChatStore.getState().removeMessage(messageId);
 };
 
-const onStaffNotification = ({ guestName }: { guestName: string }) => {
-  if (typeof window !== "undefined" && Notification.permission === "granted") {
-    new Notification("💬 Guest needs assistance", {
-      body: `${guestName} is waiting for staff support`,
-      icon: "/favicon.ico",
-    });
-  }
-};
+
 
 socket.on("message:new", onNewMessage);
 socket.on("message:read", onRead);
 socket.on("message:status", onStatus);
 socket.on("message:deleted", onDeleted);
 socket.on("message:undo", onUndo);
-socket.on("staff:notification", onStaffNotification);
+
 
 return () => {
   socket.off("message:new", onNewMessage);
@@ -521,7 +514,7 @@ return () => {
   socket.off("message:status", onStatus);
   socket.off("message:deleted", onDeleted);
   socket.off("message:undo", onUndo);
-  socket.off("staff:notification", onStaffNotification);
+  
 };
   }, [mounted]); // eslint-disable-line react-hooks/exhaustive-deps
 

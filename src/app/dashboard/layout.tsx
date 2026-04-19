@@ -5,6 +5,7 @@ import TopBar from "@/components/TopBar";
 import { useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { isAuthenticated } from "@/lib/auth";
+import { getSocket } from "@/lib/socket";  // ← add this
 
 export default function DashboardLayout({
   children,
@@ -24,6 +25,24 @@ export default function DashboardLayout({
     Notification.requestPermission();
   }
 }, []);
+
+// ← add this
+  useEffect(() => {
+    if (!isAuthenticated()) return;
+    const socket = getSocket();
+
+    const onStaffNotification = ({ guestName }: { guestName: string }) => {
+      if (Notification.permission === "granted") {
+        new Notification("💬 Guest needs assistance", {
+          body: `${guestName} is waiting for staff support`,
+          icon: "/favicon.ico",
+        });
+      }
+    };
+
+    socket.on("staff:notification", onStaffNotification);
+    return () => { socket.off("staff:notification", onStaffNotification); };
+  }, []);
 
   return (
     <div className="flex h-screen min-h-0 w-full overflow-hidden">
