@@ -19,6 +19,12 @@ export default function DashboardLayout({
     }
   }, []);
 
+  useEffect(() => {
+  if (typeof window !== "undefined" && "Notification" in window && Notification.permission === "default") {
+    Notification.requestPermission();
+  }
+}, []);
+
   return (
     <div className="flex h-screen min-h-0 w-full overflow-hidden">
       <Sidebar />

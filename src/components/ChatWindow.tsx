@@ -493,26 +493,36 @@ export default function ChatWindow() {
     };
 
     const onUndo = ({ messageId }: { messageId: string }) => {
-      // Another tab cancelled the send — remove bubble and clear any countdown
-      const timer = undoTimersRef.current.get(messageId);
-      if (timer) { clearInterval(timer); undoTimersRef.current.delete(messageId); }
-      setPendingUndos((prev) => { const n = new Map(prev); n.delete(messageId); return n; });
-      useChatStore.getState().removeMessage(messageId);
-    };
+  const timer = undoTimersRef.current.get(messageId);
+  if (timer) { clearInterval(timer); undoTimersRef.current.delete(messageId); }
+  setPendingUndos((prev) => { const n = new Map(prev); n.delete(messageId); return n; });
+  useChatStore.getState().removeMessage(messageId);
+};
 
-    socket.on("message:new", onNewMessage);
-    socket.on("message:read", onRead);
-    socket.on("message:status", onStatus);
-    socket.on("message:deleted", onDeleted);
-    socket.on("message:undo", onUndo);
+const onStaffNotification = ({ guestName }: { guestName: string }) => {
+  if (typeof window !== "undefined" && Notification.permission === "granted") {
+    new Notification("💬 Guest needs assistance", {
+      body: `${guestName} is waiting for staff support`,
+      icon: "/favicon.ico",
+    });
+  }
+};
 
-    return () => {
-      socket.off("message:new", onNewMessage);
-      socket.off("message:read", onRead);
-      socket.off("message:status", onStatus);
-      socket.off("message:deleted", onDeleted);
-      socket.off("message:undo", onUndo);
-    };
+socket.on("message:new", onNewMessage);
+socket.on("message:read", onRead);
+socket.on("message:status", onStatus);
+socket.on("message:deleted", onDeleted);
+socket.on("message:undo", onUndo);
+socket.on("staff:notification", onStaffNotification);
+
+return () => {
+  socket.off("message:new", onNewMessage);
+  socket.off("message:read", onRead);
+  socket.off("message:status", onStatus);
+  socket.off("message:deleted", onDeleted);
+  socket.off("message:undo", onUndo);
+  socket.off("staff:notification", onStaffNotification);
+};
   }, [mounted]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Delete message — soft-delete in DB, bubble becomes tombstone
