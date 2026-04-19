@@ -35,7 +35,7 @@ export default function DashboardLayout({
       if (Notification.permission === "granted") {
         new Notification("💬 Guest needs assistance", {
           body: `${guestName} is waiting for staff support`,
-          icon: "/vakettaVlogo.png",
+          icon: "/vchat icon.png",
         });
       }
     };
