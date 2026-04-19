@@ -51,12 +51,7 @@ export default function Login() {
       <div className="hidden lg:flex lg:w-[45%] flex-col justify-between bg-[#0C1B33] px-12 py-10">
         {/* Logo */}
         <div className="flex items-center gap-3">
-          <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-[#B8912E]">
-            <svg className="h-5 w-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
-                d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6" />
-            </svg>
-          </div>
+          <img src="/vchat icon.png" alt="Vaketta" className="h-9 w-9 object-contain" />
           <div>
             <p className="text-base font-bold tracking-tight text-white">Vaketta PMS</p>
             <p className="text-[11px] text-white/40">Hotel Management System</p>
@@ -99,12 +94,7 @@ export default function Login() {
       <div className="flex flex-1 flex-col items-center justify-center bg-[#F4F2ED] px-6">
         {/* Mobile logo */}
         <div className="mb-8 flex items-center gap-2.5 lg:hidden">
-          <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-[#0C1B33]">
-            <svg className="h-4 w-4 text-[#B8912E]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
-                d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6" />
-            </svg>
-          </div>
+          <img src="/vchat icon.png" alt="Vaketta" className="h-8 w-8 object-contain" />
           <span className="text-base font-bold text-[#0C1B33]">Vaketta PMS</span>
         </div>
 

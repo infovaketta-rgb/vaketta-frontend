@@ -33,7 +33,7 @@ export default function Sidebar() {
     <aside className="flex h-screen w-60 shrink-0 flex-col border-r border-white/8 bg-[#0C1B33] text-white">
       {/* Brand */}
       <div className="flex h-14 shrink-0 items-center gap-2.5 border-b border-white/8 px-4">
-        <img src="/vakettaVlogo.png" alt="Vaketta" className="h-7 w-7 object-contain" />
+        <img src="/vchat icon.png" alt="Vaketta" className="h-7 w-7 object-contain" />
         <div>
           <p className="text-sm font-semibold leading-none tracking-tight text-white">Vaketta PMS</p>
           <p className="mt-0.5 text-[10px] text-white/40">Hotel Management</p>
