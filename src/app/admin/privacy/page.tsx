@@ -121,7 +121,7 @@ export default function PrivacyPolicyAdminPage() {
         </div>
         <div className="flex items-center gap-3">
           <a
-            href="/privacy"
+            href="/privacy-policy"
             target="_blank"
             rel="noopener noreferrer"
             className="flex items-center gap-1.5 rounded-lg border border-[#E5E0D4] bg-white px-4 py-2 text-sm text-[#0C1B33] transition hover:bg-[#F4F2ED]"
