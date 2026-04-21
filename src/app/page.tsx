@@ -665,6 +665,8 @@ export default function LandingPage() {
                 <div className="space-y-2">
                   <p className="mb-3 text-xs font-bold uppercase tracking-widest text-white/20">Company</p>
                   <p><Link href="/privacy-policy" className="text-white/35 transition hover:text-white">Privacy Policy</Link></p>
+                  <p><Link href="/terms" className="text-white/35 transition hover:text-white">Terms of Service</Link></p>
+                  <p><Link href="/data-deletion" className="text-white/35 transition hover:text-white">Data Deletion</Link></p>
                   <p><a href="mailto:support@vaketta.com" className="text-white/35 transition hover:text-white">Support</a></p>
                   <p><Link href="/login" className="text-white/35 transition hover:text-white">Sign in</Link></p>
                 </div>

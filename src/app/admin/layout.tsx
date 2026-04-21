@@ -36,7 +36,9 @@ const NAV_SECTIONS = [
     items: [
       { href: "/admin/admins",   icon: "👤", label: "Admins" },
       { href: "/admin/settings", icon: "⚙️", label: "Settings" },
-      { href: "/admin/privacy",  icon: "📄", label: "Privacy Policy" },
+      { href: "/admin/privacy",        icon: "📄", label: "Privacy Policy" },
+      { href: "/admin/terms",           icon: "📋", label: "Terms of Service" },
+      { href: "/admin/data-deletion",   icon: "🗑️", label: "Data Deletion" },
     ],
   },
 ];
