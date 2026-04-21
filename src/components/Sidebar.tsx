@@ -35,8 +35,8 @@ export default function Sidebar() {
       <div className="flex h-14 shrink-0 items-center gap-2.5 border-b border-white/8 px-4">
         <img src="/vchat icon.png" alt="Vaketta" className="h-7 w-7 object-contain" />
         <div>
-          <p className="text-sm font-semibold leading-none tracking-tight text-white">Vaketta PMS</p>
-          <p className="mt-0.5 text-[10px] text-white/40">Hotel Management</p>
+          <p className="text-sm font-semibold leading-none tracking-tight text-white">Vaketta Chat</p>
+          <p className="mt-0.5 text-[10px] text-white/40">Hotel Automation</p>
         </div>
       </div>
 

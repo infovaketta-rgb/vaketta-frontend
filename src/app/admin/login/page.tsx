@@ -16,7 +16,7 @@ export default function AdminLoginPage() {
 
   if (!mounted) return null;
 
-  async function handleSubmit(e: React.FormEvent) {
+  async function handleSubmit(e: React.SyntheticEvent) {
     e.preventDefault();
     setError("");
     setLoading(true);
@@ -60,7 +60,7 @@ export default function AdminLoginPage() {
           </p>
         </div>
 
-        <p className="text-xs text-white/25">Vaketta PMS &mdash; Admin access only</p>
+        <p className="text-xs text-white/25">Vaketta Chat &mdash; Admin access only</p>
       </div>
 
       {/* Right — form */}

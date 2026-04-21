@@ -53,8 +53,8 @@ export default function Login() {
         <div className="flex items-center gap-3">
           <img src="/vchat icon.png" alt="Vaketta" className="h-9 w-9 object-contain" />
           <div>
-            <p className="text-base font-bold tracking-tight text-white">Vaketta PMS</p>
-            <p className="text-[11px] text-white/40">Hotel Management System</p>
+            <p className="text-base font-bold tracking-tight text-white">Vaketta Chat</p>
+            <p className="text-[11px] text-white/40">Hotel Automation</p>
           </div>
         </div>
 
@@ -95,7 +95,7 @@ export default function Login() {
         {/* Mobile logo */}
         <div className="mb-8 flex items-center gap-2.5 lg:hidden">
           <img src="/vchat icon.png" alt="Vaketta" className="h-8 w-8 object-contain" />
-          <span className="text-base font-bold text-[#0C1B33]">Vaketta PMS</span>
+          <span className="text-base font-bold text-[#0C1B33]">Vaketta Chat</span>
         </div>
 
         <div className="w-full max-w-sm">
@@ -149,7 +149,7 @@ export default function Login() {
           </div>
 
           <p className="mt-8 text-center text-xs text-[#64748B]">
-            Vaketta PMS &mdash; Secure hotel management platform
+            Vaketta Chat &mdash; Hotel Automation Platform
           </p>
         </div>
       </div>
