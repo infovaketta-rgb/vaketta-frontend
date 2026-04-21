@@ -34,6 +34,7 @@ export default function TermsAdminPage() {
   const [success,  setSuccess]  = useState("");
   const [error,    setError]    = useState("");
   const [, forceUpdate] = useState(0);
+  const fetchedContent = useRef<string>("");
 
   useEffect(() => {
     if (!mounted) return;
@@ -41,11 +42,16 @@ export default function TermsAdminPage() {
       .then((r) => r.json())
       .then((data) => {
         setEffectiveDate(data.effectiveDate ?? "");
-        if (editorRef.current) editorRef.current.innerHTML = data.content ?? "";
+        fetchedContent.current = data.content ?? "";
         setLoading(false);
       })
       .catch(() => setLoading(false));
   }, [mounted]);
+
+  useEffect(() => {
+    if (loading) return;
+    if (editorRef.current) editorRef.current.innerHTML = fetchedContent.current;
+  }, [loading]);
 
   const onSelectionChange = useCallback(() => forceUpdate((n) => n + 1), []);
   useEffect(() => {

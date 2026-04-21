@@ -50,6 +50,7 @@ export default function PrivacyPolicyAdminPage() {
   const [success,  setSuccess]  = useState("");
   const [error,    setError]    = useState("");
   const [, forceUpdate] = useState(0);
+  const fetchedContent = useRef<string>("");
 
   // Load current policy
   useEffect(() => {
@@ -58,13 +59,17 @@ export default function PrivacyPolicyAdminPage() {
       .then((r) => r.json())
       .then((data) => {
         setEffectiveDate(data.effectiveDate ?? "");
-        if (editorRef.current) {
-          editorRef.current.innerHTML = data.content ?? "";
-        }
+        fetchedContent.current = data.content ?? "";
         setLoading(false);
       })
       .catch(() => setLoading(false));
   }, [mounted]);
+
+  // Apply fetched content once the editor div is in the DOM (after loading gate lifts)
+  useEffect(() => {
+    if (loading) return;
+    if (editorRef.current) editorRef.current.innerHTML = fetchedContent.current;
+  }, [loading]);
 
   // Re-render toolbar active states on selection change
   const onSelectionChange = useCallback(() => forceUpdate((n) => n + 1), []);
