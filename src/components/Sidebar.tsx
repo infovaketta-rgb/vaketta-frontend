@@ -4,6 +4,7 @@ import Link from "next/link";
 import Image from "next/image";
 import { usePathname } from "next/navigation";
 import { getUserRole } from "@/lib/auth";
+import { useMounted } from "@/lib/useMounted";
 
 interface SidebarProps {
   open?: boolean;
@@ -39,8 +40,9 @@ function NavItem({
 }
 
 export default function Sidebar({ open = false, onClose }: SidebarProps) {
-  const role = getUserRole();
-  const showBookings  = role === "ADMIN" || role === "MANAGER";
+  const mounted = useMounted();
+  const role = mounted ? getUserRole() : null;
+  const showBookings   = role === "ADMIN" || role === "MANAGER";
   const showAdminLinks = role === "ADMIN";
 
   return (
