@@ -125,9 +125,9 @@ export default function BookingDetailPage() {
   const phone   = booking.guest?.phone ?? "";
 
   return (
-    <div className="h-full overflow-y-auto bg-[#F4F2ED] p-8">
+    <div className="h-full overflow-y-auto bg-[#F4F2ED] p-4 md:p-8">
       {/* Header */}
-      <div className="mb-6 flex items-start justify-between gap-4">
+      <div className="mb-6 flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
         <div className="flex items-center gap-3">
           <button
             onClick={() => router.push("/dashboard/bookings")}
@@ -187,7 +187,7 @@ export default function BookingDetailPage() {
             <p className="mb-4 text-xs font-semibold uppercase tracking-wider text-[#0C1B33]/40">
               Stay Details
             </p>
-            <dl className="grid grid-cols-2 gap-x-6 gap-y-3 text-sm">
+            <dl className="grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-3 text-sm">
               <div>
                 <dt className="text-[#0C1B33]/50">Room Type</dt>
                 <dd className="mt-0.5 font-medium text-[#0C1B33]">{booking.roomType?.name ?? "—"}</dd>

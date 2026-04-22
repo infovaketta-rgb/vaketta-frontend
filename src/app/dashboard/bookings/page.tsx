@@ -126,13 +126,13 @@ async function updateStatus(id: string, status: string) {
   }
 
   return (
-    <div className="p-8 h-full overflow-y-auto bg-[#F4F2ED]">
+    <div className="p-4 md:p-8 h-full overflow-y-auto bg-[#F4F2ED]">
       {loadError && (
         <div className="mb-4 rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
           {loadError}
         </div>
       )}
-      <div className="flex items-center justify-between mb-6">
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between mb-6">
         <h1 className="text-2xl font-bold text-[#0C1B33]">Bookings</h1>
         <div className="flex items-center gap-2">
           <button
@@ -181,7 +181,71 @@ async function updateStatus(id: string, status: string) {
 
       {view === "list" && (
         <div className="bg-white rounded-xl shadow-sm border border-[#E5E0D4]">
-          <table className="w-full text-sm">
+          {/* Mobile card list */}
+          <div className="md:hidden flex flex-col divide-y divide-[#E5E0D4]">
+            {loading && [...Array(4)].map((_, i) => (
+              <div key={i} className="px-4 py-3 animate-pulse flex flex-col gap-2">
+                <div className="h-3 w-24 rounded bg-[#E5E0D4]" />
+                <div className="h-3 w-40 rounded bg-[#E5E0D4]" />
+              </div>
+            ))}
+            {!loading && bookings.length === 0 && (
+              <div className="px-4 py-10 text-center text-[#0C1B33]/40 text-sm">No bookings yet.</div>
+            )}
+            {!loading && bookings.map((b) => (
+              <div
+                key={b.id}
+                onClick={(e) => {
+                  if ((e.target as HTMLElement).closest("[data-no-nav]")) return;
+                  router.push(`/dashboard/bookings/${b.id}`);
+                }}
+                className="px-4 py-3 cursor-pointer hover:bg-[#F4F2ED]/60 transition"
+              >
+                <div className="flex items-start justify-between gap-2 mb-1">
+                  <div className="flex items-center gap-2 min-w-0">
+                    {b.referenceNumber && (
+                      <span className="font-mono text-[11px] font-semibold text-[#1B52A8] bg-[#1B52A8]/8 px-1.5 py-0.5 rounded shrink-0">
+                        {b.referenceNumber}
+                      </span>
+                    )}
+                    <span className="text-sm font-semibold text-[#0C1B33] truncate">
+                      {b.guestName || b.guest?.name}
+                    </span>
+                  </div>
+                  <StatusBadge status={b.status} />
+                </div>
+                <div className="text-xs text-[#0C1B33]/60 mb-1">
+                  {b.roomType?.name} · {formatDate(b.checkIn)} → {formatDate(b.checkOut)}
+                </div>
+                <div className="flex items-center justify-between">
+                  <span className="text-xs font-semibold text-[#B8912E]">{formatCurrency(b.totalPrice ?? 0)}</span>
+                  {b.status !== "CANCELLED" && (
+                    <div className="relative" data-no-nav>
+                      <button
+                        data-no-nav
+                        onClick={() => setOpenMenuId(openMenuId === b.id ? null : b.id)}
+                        className="w-7 h-7 flex items-center justify-center rounded-full hover:bg-[#F4F2ED] text-[#0C1B33]/50 transition text-base"
+                      >
+                        ⋮
+                      </button>
+                      {openMenuId === b.id && (
+                        <div ref={menuRef} data-no-nav className="absolute right-0 top-8 z-50 w-36 bg-white border border-[#E5E0D4] rounded-xl shadow-lg py-1 overflow-hidden">
+                          <button data-no-nav onClick={() => openEdit(b)} className="w-full text-left px-4 py-2 text-sm text-[#0C1B33] hover:bg-[#F4F2ED] transition">Edit</button>
+                          {b.status === "PENDING" && (
+                            <button data-no-nav onClick={() => updateStatus(b.id, "CONFIRMED")} className="w-full text-left px-4 py-2 text-sm text-emerald-600 hover:bg-emerald-50 transition">Confirm</button>
+                          )}
+                          <button data-no-nav onClick={() => updateStatus(b.id, "CANCELLED")} className="w-full text-left px-4 py-2 text-sm text-red-500 hover:bg-red-50 transition">Cancel</button>
+                        </div>
+                      )}
+                    </div>
+                  )}
+                </div>
+              </div>
+            ))}
+          </div>
+
+          {/* Desktop table */}
+          <table className="hidden md:table w-full text-sm">
             <thead className="border-b border-[#E5E0D4] bg-[#F4F2ED]">
               <tr className="text-left text-[#0C1B33]/55 text-xs uppercase tracking-wider font-semibold">
                 <th className="px-3 py-3 rounded-tl-xl w-8">
