@@ -71,7 +71,7 @@ export default function SettingsPage() {
   if (error) return <div className="p-8 text-sm text-red-500">{error}</div>;
 
   return (
-    <div className="p-8 max-w-2xl space-y-6">
+    <div className="p-4 md:p-8 w-full max-w-2xl space-y-6">
 
       {/* Hotel Profile */}
       <SectionCard title="Hotel Profile" description="Read-only details about your property.">
