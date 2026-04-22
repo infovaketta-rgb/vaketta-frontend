@@ -36,6 +36,7 @@ type Config = {
   bookingFlowId: string | null;
   menuFlowId: string | null;
   aiEnabled: boolean;
+  aiInstructions: string | null;
   businessStartHour: number;
   businessEndHour: number;
   allDay: boolean;
@@ -510,6 +511,7 @@ export default function BotPage() {
         setFlowsLoaded(true);
         const cfg = s.config ?? {
           autoReplyEnabled: true, bookingEnabled: true, bookingFlowId: null, menuFlowId: null, aiEnabled: false,
+          aiInstructions: null,
           businessStartHour: 9, businessEndHour: 21, allDay: false,
           timezone: "UTC", defaultLanguage: "en",
           welcomeMessage: "", nightMessage: "", botMessages: {},
@@ -1130,6 +1132,21 @@ export default function BotPage() {
                     <Toggle enabled={(config as any)[key]} onChange={(v) => setConfig((c) => c && ({ ...c, [key]: v }))} />
                   </div>
                 ))}
+
+                {/* AI custom instructions */}
+                {config.aiEnabled && (
+                  <div className="space-y-1">
+                    <p className="text-sm font-medium text-gray-700">Custom AI Instructions</p>
+                    <p className="text-xs text-gray-400">Tell the AI how to handle specific situations</p>
+                    <textarea
+                      rows={5}
+                      className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm text-gray-800 placeholder-gray-300 focus:outline-none focus:ring-2 focus:ring-[#7A3F91] resize-none"
+                      placeholder="e.g. If a guest asks for a price adjustment, don't decline — tell them it can be arranged and offer to connect them with staff."
+                      value={config.aiInstructions ?? ""}
+                      onChange={(e) => setConfig((c) => c && ({ ...c, aiInstructions: e.target.value || null }))}
+                    />
+                  </div>
+                )}
 
                 {/* Menu flow picker — makes the main menu fully flow-driven */}
                 <div className="rounded-xl border border-indigo-100 bg-indigo-50 p-4 space-y-3">
