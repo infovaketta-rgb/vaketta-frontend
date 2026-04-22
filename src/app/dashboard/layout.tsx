@@ -4,7 +4,7 @@ import Sidebar from "@/components/Sidebar";
 import TopBar from "@/components/TopBar";
 import ToastContainer from "@/components/Toast";
 import { useToastStore } from "@/store/toastStore";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { isAuthenticated } from "@/lib/auth";
 import { getSocket } from "@/lib/socket";  // ← add this
@@ -20,9 +20,14 @@ export default function DashboardLayout({
   const { addToast } = useToastStore();
   const [debugMode, setDebugMode]   = useState(false);
   const [debugLog,  setDebugLog]    = useState<string[]>([]);
+  const logEndRef = useRef<HTMLDivElement>(null);
 
   const pushLog = (msg: string) =>
     setDebugLog((prev) => [...prev, `${new Date().toISOString().slice(11, 23)} ${msg}`]);
+
+  useEffect(() => {
+    logEndRef.current?.scrollIntoView({ behavior: "smooth" });
+  }, [debugLog]);
 
   useEffect(() => {
     if (window.location.search.includes("debug=push")) setDebugMode(true);
@@ -76,7 +81,12 @@ export default function DashboardLayout({
         headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
         body:    JSON.stringify(sub.toJSON()),
       });
-      pushLog(`backend → ${saveRes.status} ${saveRes.ok ? "✓ saved" : "❌ failed"}`);
+      if (saveRes.ok) {
+        pushLog(`✅ subscription saved (${saveRes.status})`);
+      } else {
+        const body = await saveRes.text().catch(() => "");
+        pushLog(`❌ backend error ${saveRes.status}${body ? `: ${body.slice(0, 120)}` : ""}`);
+      }
     }
 
     setupPush().catch((err) => pushLog(`❌ error: ${err?.message ?? err}`));
@@ -119,19 +129,22 @@ export default function DashboardLayout({
       </div>
       <ToastContainer />
       {debugMode && (
-        <div className="fixed bottom-4 left-4 z-9999 w-96 max-h-72 overflow-y-auto rounded-xl border border-slate-300 bg-slate-900/95 p-3 shadow-2xl backdrop-blur">
-          <p className="mb-2 text-[10px] font-bold uppercase tracking-widest text-slate-400">
+        <div className="fixed bottom-4 left-4 z-9999 w-80 rounded-xl border border-slate-600 bg-slate-900/95 shadow-2xl backdrop-blur">
+          <p className="border-b border-slate-700 px-3 py-2 text-[10px] font-bold uppercase tracking-widest text-slate-400">
             Push Debug
           </p>
-          {debugLog.length === 0 ? (
-            <p className="text-[11px] text-slate-500">waiting…</p>
-          ) : (
-            debugLog.map((line, i) => (
-              <p key={i} className="font-mono text-[11px] leading-relaxed text-slate-200">
-                {line}
-              </p>
-            ))
-          )}
+          <div className="max-h-48 overflow-y-auto px-3 py-2">
+            {debugLog.length === 0 ? (
+              <p className="text-[11px] text-slate-500">waiting…</p>
+            ) : (
+              debugLog.map((line, i) => (
+                <p key={i} className={`font-mono text-[11px] leading-relaxed ${line.includes("❌") ? "text-red-400" : line.includes("✅") ? "text-emerald-400" : "text-slate-200"}`}>
+                  {line}
+                </p>
+              ))
+            )}
+            <div ref={logEndRef} />
+          </div>
         </div>
       )}
     </div>

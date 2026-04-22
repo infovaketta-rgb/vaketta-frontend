@@ -744,6 +744,35 @@ export default function NodeInspectorPanel({
               </p>
             )}
 
+            {/* ── Business hours gate (handoff_to_staff + notify_staff) ── */}
+            {(at === "handoff_to_staff" || at === "notify_staff") && (
+              <SectionBox title="Business hours gate" color="blue">
+                <label className="flex items-center gap-2 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    disabled={readOnly}
+                    checked={!!(d as any).businessHoursOnly}
+                    onChange={(e) => set({ businessHoursOnly: e.target.checked })}
+                    className="rounded border-gray-300 text-[#7A3F91] focus:ring-[#7A3F91]"
+                  />
+                  <span className="text-xs font-medium text-gray-700">Business hours only</span>
+                </label>
+                {!!(d as any).businessHoursOnly && (
+                  <div>
+                    <Label>Outside-hours message</Label>
+                    <textarea
+                      disabled={readOnly}
+                      rows={2}
+                      className={`${inp} resize-none`}
+                      value={(d as any).outsideHoursMessage ?? ""}
+                      onChange={(e) => set({ outsideHoursMessage: e.target.value })}
+                      placeholder="This option is only available during our business hours."
+                    />
+                  </div>
+                )}
+              </SectionBox>
+            )}
+
             {/* ── start_booking_flow (legacy) ── */}
             {at === "start_booking_flow" && (
               <>

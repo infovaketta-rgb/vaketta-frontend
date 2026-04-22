@@ -118,6 +118,9 @@ export interface ActionNodeData {
   // send_review_request
   reviewUrl?:      string;
   reviewMessage?:  string;
+  // business hours gate (handoff_to_staff / notify_staff)
+  businessHoursOnly?:   boolean;
+  outsideHoursMessage?: string;
   [key: string]: unknown;
 }
 
