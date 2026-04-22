@@ -23,7 +23,7 @@ type ChatState = {
   messages: Message[];
   botEnabled: boolean;
 
-  setSelectedGuest: (guestId: string, botEnabled?: boolean, phone?: string | null, name?: string | null) => void;
+  setSelectedGuest: (guestId: string | null, botEnabled?: boolean, phone?: string | null, name?: string | null) => void;
   setSelectedGuestName: (name: string) => void;
   replaceMessages: (msgs: Message[]) => void;
   addMessage: (msg: Message) => void;
@@ -41,13 +41,10 @@ export const useChatStore = create<ChatState>((set) => ({
   botEnabled: true,
 
   setSelectedGuest: (guestId, botEnabled = true, phone = null, name = null) =>
-    set({
-      selectedGuestId: guestId,
-      selectedGuestPhone: phone,
-      selectedGuestName: name,
-      messages: [],
-      botEnabled,
-    }),
+    set(guestId === null
+      ? { selectedGuestId: null, selectedGuestPhone: null, selectedGuestName: null, messages: [], botEnabled: true }
+      : { selectedGuestId: guestId, selectedGuestPhone: phone, selectedGuestName: name, messages: [], botEnabled }
+    ),
 
   setSelectedGuestName: (name) => set({ selectedGuestName: name }),
 

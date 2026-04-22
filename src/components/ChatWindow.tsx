@@ -811,6 +811,17 @@ return () => {
 
       {/* Chat Header */}
       <div className="flex items-center gap-3 px-4 py-2.5 bg-white border-b border-gray-200 shadow-sm">
+        {/* Back button — mobile only */}
+        <button
+          onClick={() => useChatStore.getState().setSelectedGuest(null)}
+          className="md:hidden w-8 h-8 rounded-full hover:bg-gray-100 flex items-center justify-center mr-1 shrink-0"
+          aria-label="Back to conversations"
+        >
+          <svg className="w-5 h-5 text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
+          </svg>
+        </button>
+
         {/* Avatar */}
         <div
           className="w-9 h-9 rounded-full flex items-center justify-center text-white text-sm font-bold shrink-0"

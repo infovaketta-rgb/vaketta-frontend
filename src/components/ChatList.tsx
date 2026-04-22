@@ -149,7 +149,7 @@ export default function ChatList() {
   );
 
   return (
-    <div className="flex flex-col h-full w-80 shrink-0 border-r border-[#E5E0D4] bg-white">
+    <div className="flex flex-col h-full w-full md:w-80 md:shrink-0 border-r border-[#E5E0D4] bg-white">
       {/* Header */}
       <div className="px-4 pt-4 pb-3 border-b border-[#E5E0D4]">
         <h2 className="text-base font-semibold text-[#0C1B33] mb-3">Chats</h2>
