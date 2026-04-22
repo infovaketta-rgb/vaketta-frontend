@@ -12,6 +12,7 @@ const ACTION_META: Record<string, { label: string; icon: string; cls: string }> 
   reset_to_menu:         { label: "Reset to Menu",        icon: "🏠", cls: "bg-gray-100 text-gray-700" },
   set_variable:          { label: "Set Variable",         icon: "📝", cls: "bg-yellow-100 text-yellow-800" },
   send_review_request:   { label: "Request Review",       icon: "⭐", cls: "bg-amber-100 text-amber-800" },
+  view_bookings:         { label: "View Bookings",        icon: "📋", cls: "bg-blue-100 text-blue-800" },
 };
 
 export default function ActionNode({ data, selected }: NodeProps<any>) {

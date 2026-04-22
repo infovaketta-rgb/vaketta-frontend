@@ -636,6 +636,7 @@ export default function NodeInspectorPanel({
                   <option value="notify_staff">🔔 Notify Staff (keep flow)</option>
                   <option value="handoff_to_staff">👤 Handoff to Staff (end flow)</option>
                   <option value="reset_to_menu">🏠 Reset to Menu</option>
+                  <option value="view_bookings">📋 View Guest Bookings</option>
                 </optgroup>
                 <optgroup label="Legacy">
                   <option value="start_booking_flow">📅 Start Booking Flow (legacy)</option>
@@ -741,6 +742,13 @@ export default function NodeInspectorPanel({
             {at === "notify_staff" && (
               <p className="text-[10px] text-gray-500">
                 Flags the guest as "handled by staff" (disables auto-reply) but keeps the flow running. Use <strong>Handoff to Staff</strong> to stop the flow and open a support thread.
+              </p>
+            )}
+
+            {/* ── view_bookings ── */}
+            {at === "view_bookings" && (
+              <p className="text-[10px] text-gray-500">
+                Shows the guest all their bookings with status. No configuration needed — bookings are fetched automatically by guest phone number.
               </p>
             )}
 

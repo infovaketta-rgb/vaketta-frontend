@@ -20,7 +20,8 @@ export type ActionType =
   | "notify_staff"
   | "reset_to_menu"
   | "set_variable"
-  | "send_review_request";
+  | "send_review_request"
+  | "view_bookings";
 
 export type NodeType =
   | "start"
