@@ -490,6 +490,7 @@ export default function BotPage() {
   const [flowsList,     setFlowsList]     = useState<FlowSummary[]>([]);
   const [flowsLoaded,   setFlowsLoaded]   = useState(false);
   const [creatingFlow,  setCreatingFlow]  = useState(false);
+  const [sidebarOpen,   setSidebarOpen]   = useState(false);
 
   // menu item editing
   const [editingItemId, setEditingItemId] = useState<string | null>(null);
@@ -733,8 +734,18 @@ export default function BotPage() {
   return (
     <div className="flex h-full overflow-hidden">
 
+      {/* Overlay (mobile only) */}
+      {sidebarOpen && (
+        <div className="fixed inset-0 z-30 bg-black/40 md:hidden" onClick={() => setSidebarOpen(false)} />
+      )}
+
       {/* ── Left sidebar ──────────────────────────────────────────────── */}
-      <div className="flex w-52 shrink-0 flex-col border-r border-gray-100 bg-white">
+      <div className={`
+        fixed inset-y-0 left-0 z-40 flex w-52 shrink-0 flex-col border-r border-gray-100 bg-white
+        transition-transform duration-200
+        ${sidebarOpen ? "translate-x-0" : "-translate-x-full"}
+        md:relative md:translate-x-0
+      `}>
         {/* status */}
         <div className="border-b border-gray-50 px-4 py-3">
           <div className="flex items-center gap-1.5">
@@ -752,7 +763,7 @@ export default function BotPage() {
         <div className="px-3 pt-3">
           <p className="mb-1 px-1 text-[10px] font-semibold uppercase tracking-wider text-gray-400">Entry</p>
           <button
-            onClick={() => { setSelectedId("__menu__"); setTab("flow"); }}
+            onClick={() => { setSelectedId("__menu__"); setTab("flow"); setSidebarOpen(false); }}
             className={`flex w-full items-center gap-2 rounded-lg px-3 py-2 text-left text-sm transition ${
               selectedId === "__menu__" && tab === "flow" ? "bg-[#7A3F91] text-white" : "text-gray-700 hover:bg-gray-50"
             }`}
@@ -775,6 +786,7 @@ export default function BotPage() {
                     onClick={() => {
                       setSelectedId(item.id);
                       setTab("flow");
+                      setSidebarOpen(false);
                     }}
                     className={`flex w-full items-center gap-2 rounded-lg px-3 py-2 text-left transition ${
                       selectedId === item.id && tab === "flow"
@@ -816,6 +828,14 @@ export default function BotPage() {
 
         {/* tab bar */}
         <div className="flex shrink-0 items-center gap-0 border-b border-gray-100 bg-white px-4">
+          <button
+            onClick={() => setSidebarOpen(true)}
+            className="md:hidden p-2 mr-1 rounded-lg hover:bg-gray-100 text-gray-500"
+          >
+            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" />
+            </svg>
+          </button>
           {TABS.map((t) => (
             <button key={t.id} onClick={() => setTab(t.id)}
               className={`px-4 py-3 text-sm font-medium transition border-b-2 ${
@@ -828,7 +848,7 @@ export default function BotPage() {
 
         {/* ── FLOW PREVIEW ────────────────────────────────────────────── */}
         {tab === "flow" && (
-          <div className="flex-1 overflow-y-auto bg-gray-50 px-6 py-6">
+          <div className="flex-1 overflow-y-auto bg-gray-50 px-4 py-4 md:px-6 md:py-6">
             <div className="mx-auto w-full max-w-md">
               <div className="mb-4 flex items-start justify-between">
                 <div>
@@ -896,7 +916,7 @@ export default function BotPage() {
 
         {/* ── MENU ITEMS ───────────────────────────────────────────────── */}
         {tab === "menu" && (
-          <div className="flex-1 overflow-y-auto p-6 space-y-5">
+          <div className="flex-1 overflow-y-auto p-4 md:p-6 space-y-5">
 
             {/* menu title */}
             <div className="rounded-2xl border border-gray-100 bg-white shadow-sm">
@@ -919,7 +939,39 @@ export default function BotPage() {
               <div className="px-6 py-5 space-y-4">
                 {items.length > 0 ? (
                   <div className="overflow-hidden rounded-xl border border-gray-100">
-                    <table className="w-full text-sm">
+                    {/* Mobile card list */}
+                    <div className="md:hidden flex flex-col divide-y divide-gray-100">
+                      {sortedItems.map((item) => (
+                        <div key={item.id} className="flex items-center justify-between px-4 py-3 gap-3">
+                          <div className="flex items-center gap-2 min-w-0">
+                            <span className={`h-2 w-2 shrink-0 rounded-full ${TYPE_DOT[item.type]}`} />
+                            <div className="min-w-0">
+                              <p className="text-xs font-semibold text-gray-800 truncate">
+                                <span className="font-mono text-gray-400">{item.key}. </span>{item.label}
+                              </p>
+                              <span className={`rounded-full border px-2 py-0.5 text-[10px] font-bold ${TYPE_COLOR[item.type]}`}>
+                                {TYPE_LABEL[item.type]}
+                              </span>
+                            </div>
+                          </div>
+                          <div className="flex items-center gap-2 shrink-0">
+                            <Toggle enabled={item.isActive} onChange={() => handleToggleItem(item)} />
+                            <button onClick={() => { setEditingItemId(item.id); setEditDraft({}); }} className="text-gray-400 hover:text-[#7A3F91]">
+                              <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+                              </svg>
+                            </button>
+                            <button onClick={() => handleDeleteItem(item.id)} className="text-gray-300 hover:text-red-500">
+                              <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                              </svg>
+                            </button>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                    {/* Desktop table */}
+                    <table className="hidden md:table w-full text-sm">
                       <thead className="bg-gray-50 text-left">
                         <tr>
                           {["Key","Label","Type","Reply / Opening Text","Active",""].map((h) => (
@@ -1035,7 +1087,7 @@ export default function BotPage() {
                 {/* Add form */}
                 <div className="rounded-xl border border-dashed border-gray-200 p-4 space-y-3">
                   <p className="text-xs font-semibold text-gray-500">Add Menu Item</p>
-                  <div className="grid grid-cols-4 gap-2">
+                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
                     <div>
                       <label className="block text-[10px] font-medium text-gray-400 mb-1">Key</label>
                       <input value={newItem.key} onChange={(e) => setNewItem((f) => ({ ...f, key: e.target.value }))}
@@ -1107,7 +1159,7 @@ export default function BotPage() {
 
         {/* ── CONFIGURATION ───────────────────────────────────────────── */}
         {tab === "config" && config && (
-          <div className="flex-1 overflow-y-auto p-6 space-y-6">
+          <div className="flex-1 overflow-y-auto p-4 md:p-6 space-y-6">
 
             {/* Auto-reply settings */}
             <div className="rounded-2xl border border-gray-100 bg-white shadow-sm">
@@ -1271,7 +1323,7 @@ export default function BotPage() {
 
                   {/* Hour selectors (hidden when allDay) */}
                   {!config.allDay && (
-                    <div className="grid grid-cols-2 gap-4">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                       {[
                         { key: "businessStartHour", label: "Start Hour" },
                         { key: "businessEndHour",   label: "End Hour"   },
@@ -1289,7 +1341,7 @@ export default function BotPage() {
                   )}
                 </div>
 
-                <div className="grid grid-cols-2 gap-4">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <div>
                     <label className="block text-xs font-medium text-gray-600 mb-1">Timezone</label>
                     <select value={config.timezone}
@@ -1372,7 +1424,7 @@ export default function BotPage() {
         {tab === "flows" && (() => {
           if (!flowsLoaded) { loadFlows(); }
           return (
-            <div className="flex-1 overflow-y-auto p-6 space-y-4">
+            <div className="flex-1 overflow-y-auto p-4 md:p-6 space-y-4">
               <div className="flex items-center justify-between">
                 <div>
                   <h2 className="text-sm font-semibold text-gray-900">Bot Flows</h2>
@@ -1397,7 +1449,44 @@ export default function BotPage() {
                 ) : flowsList.length === 0 ? (
                   <div className="py-12 text-center text-sm text-gray-400">No flows yet. Create one to get started.</div>
                 ) : (
-                  <table className="w-full text-sm">
+                  <>
+                  {/* Mobile card list */}
+                  <div className="md:hidden flex flex-col divide-y divide-gray-100">
+                    {flowsList.map((flow) => (
+                      <div key={flow.id} className="flex items-center justify-between px-4 py-3 gap-3">
+                        <div className="min-w-0">
+                          <p className="text-sm font-medium text-gray-800 truncate">{flow.name}</p>
+                          {flow.isTemplate ? (
+                            <span className="text-[10px] text-purple-600 font-semibold">Global Template</span>
+                          ) : (
+                            <span className="text-[10px] text-gray-400">My Flow</span>
+                          )}
+                        </div>
+                        <div className="flex items-center gap-2 shrink-0">
+                          <button
+                            disabled={flow.isTemplate}
+                            onClick={() => handleToggleFlowActive(flow)}
+                            className={`relative inline-flex h-5 w-9 items-center rounded-full transition-colors disabled:opacity-40 ${flow.isActive ? "bg-[#7A3F91]" : "bg-gray-300"}`}
+                          >
+                            <span className={`inline-block h-4 w-4 transform rounded-full bg-white shadow transition-transform ${flow.isActive ? "translate-x-4" : "translate-x-0.5"}`} />
+                          </button>
+                          <button
+                            onClick={() => router.push(`/dashboard/bot/flows/${flow.id}`)}
+                            className="text-xs font-medium text-[#7A3F91] hover:underline"
+                          >
+                            {flow.isTemplate ? "View" : "Edit"}
+                          </button>
+                          {!flow.isTemplate && (
+                            <button onClick={() => handleDeleteFlow(flow.id)} className="text-xs text-red-400 hover:text-red-600">
+                              Delete
+                            </button>
+                          )}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                  {/* Desktop table */}
+                  <table className="hidden md:table w-full text-sm">
                     <thead className="border-b border-gray-100 bg-gray-50 text-xs font-semibold text-gray-500 uppercase tracking-wide">
                       <tr>
                         <th className="px-5 py-3 text-left">Name</th>
@@ -1449,6 +1538,7 @@ export default function BotPage() {
                       ))}
                     </tbody>
                   </table>
+                  </>
                 )}
               </div>
             </div>
