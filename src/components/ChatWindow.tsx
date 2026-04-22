@@ -395,6 +395,11 @@ export default function ChatWindow() {
   const botEnabled = useChatStore((s) => s.botEnabled);
   const setBotEnabledStore = useChatStore((s) => s.setBotEnabled);
   const selectedGuestPhone = useChatStore((s) => s.selectedGuestPhone);
+  const selectedGuestName  = useChatStore((s) => s.selectedGuestName);
+  const setSelectedGuestName = useChatStore((s) => s.setSelectedGuestName);
+
+  const [editingName, setEditingName] = useState(false);
+  const [nameInput, setNameInput]     = useState("");
 
   // Delete state
   const [deleteTarget, setDeleteTarget] = useState<{ id: string; isOut: boolean } | null>(null);
@@ -537,6 +542,21 @@ return () => {
   }
 
   // Bot toggle
+  async function saveName() {
+    setEditingName(false);
+    const trimmed = nameInput.trim();
+    if (!trimmed || !guestId || trimmed === selectedGuestName) return;
+    try {
+      await apiFetch(`/conversations/${guestId}`, {
+        method: "PATCH",
+        body: JSON.stringify({ name: trimmed }),
+      });
+      setSelectedGuestName(trimmed);
+    } catch {
+      // silent — store name unchanged
+    }
+  }
+
   async function toggleBot() {
     if (!guestId || togglingBot) return;
     const next = !botEnabled;
@@ -801,9 +821,27 @@ return () => {
 
         {/* Name / status */}
         <div className="flex-1 min-w-0">
-          <p className="text-sm font-semibold text-gray-900 truncate">
-            {selectedGuestPhone ? formatPhone(selectedGuestPhone) : "Guest"}
-          </p>
+          {editingName ? (
+            <input
+              autoFocus
+              value={nameInput}
+              onChange={(e) => setNameInput(e.target.value)}
+              onBlur={saveName}
+              onKeyDown={(e) => {
+                if (e.key === "Enter") saveName();
+                if (e.key === "Escape") setEditingName(false);
+              }}
+              className="w-full bg-transparent text-sm font-semibold text-gray-900 border-b border-[#1B52A8] outline-none"
+            />
+          ) : (
+            <p
+              className="text-sm font-semibold text-gray-900 truncate cursor-pointer hover:text-[#1B52A8] transition"
+              title="Click to edit name"
+              onClick={() => { setNameInput(selectedGuestName ?? ""); setEditingName(true); }}
+            >
+              {selectedGuestName || (selectedGuestPhone ? formatPhone(selectedGuestPhone) : "Guest")}
+            </p>
+          )}
           <p className="text-xs text-gray-500">WhatsApp</p>
         </div>
 

@@ -19,10 +19,12 @@ export type Message = {
 type ChatState = {
   selectedGuestId: string | null;
   selectedGuestPhone: string | null;
+  selectedGuestName: string | null;
   messages: Message[];
   botEnabled: boolean;
 
-  setSelectedGuest: (guestId: string, botEnabled?: boolean, phone?: string | null) => void;
+  setSelectedGuest: (guestId: string, botEnabled?: boolean, phone?: string | null, name?: string | null) => void;
+  setSelectedGuestName: (name: string) => void;
   replaceMessages: (msgs: Message[]) => void;
   addMessage: (msg: Message) => void;
   markMessagesRead: (guestId: string) => void;
@@ -34,16 +36,20 @@ type ChatState = {
 export const useChatStore = create<ChatState>((set) => ({
   selectedGuestId: null,
   selectedGuestPhone: null,
+  selectedGuestName: null,
   messages: [],
   botEnabled: true,
 
-  setSelectedGuest: (guestId, botEnabled = true, phone = null) =>
+  setSelectedGuest: (guestId, botEnabled = true, phone = null, name = null) =>
     set({
       selectedGuestId: guestId,
       selectedGuestPhone: phone,
-      messages: [], // reset when switching conversation
+      selectedGuestName: name,
+      messages: [],
       botEnabled,
     }),
+
+  setSelectedGuestName: (name) => set({ selectedGuestName: name }),
 
   // ✅ ONLY used after API fetch
   replaceMessages: (msgs) =>

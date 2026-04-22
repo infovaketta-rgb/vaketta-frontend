@@ -4,15 +4,17 @@ import { useEffect, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { apiFetch } from "@/lib/api";
 import { useMounted } from "@/lib/useMounted";
+import { useToastStore } from "@/store/toastStore";
 import { formatCurrency, formatDate } from "@/lib/locale";
 
 const inputClass =
   "w-full rounded-lg border border-[#E5E0D4] px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#1B52A8]/25 focus:border-[#1B52A8]";
 
 export default function BookingDetailPage() {
-  const mounted   = useMounted();
-  const router    = useRouter();
-  const { id }    = useParams() as { id: string };
+  const mounted       = useMounted();
+  const router        = useRouter();
+  const { id }        = useParams() as { id: string };
+  const { addToast }  = useToastStore();
 
   const [booking,   setBooking]   = useState<any | null>(null);
   const [loading,   setLoading]   = useState(true);
@@ -87,7 +89,7 @@ export default function BookingDetailPage() {
       });
       setBooking((prev: any) => ({ ...prev, status }));
     } catch (e: any) {
-      alert(e.message || "Failed to update status");
+      addToast(e.message || "Failed to update status", "error");
     } finally {
       setActioning(false);
     }

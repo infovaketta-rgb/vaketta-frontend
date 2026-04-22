@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { apiFetch } from "@/lib/api";
 import { useMounted } from "@/lib/useMounted";
+import { useToastStore } from "@/store/toastStore";
 
 // ── Constants ──────────────────────────────────────────────────────────────────
 
@@ -83,6 +84,7 @@ function cellDot(cell: CalendarCell): string {
 
 export default function AvailabilityPage() {
   const mounted = useMounted();
+  const { addToast } = useToastStore();
 
   const [windowStart, setWindowStart] = useState<Date>(() => {
     const d = new Date(); d.setHours(0,0,0,0); return d;
@@ -198,7 +200,7 @@ export default function AvailabilityPage() {
       });
       setEditModal(null);
     } catch (e: any) {
-      alert(e.message);
+      addToast(e.message || "Action failed", "error");
     } finally {
       setSaving(false);
     }

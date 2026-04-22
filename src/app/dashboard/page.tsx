@@ -3,6 +3,8 @@
 import { useEffect, useState } from "react";
 import { apiFetch } from "@/lib/api";
 import { useMounted } from "@/lib/useMounted";
+import { SkeletonStatCard, SkeletonTableRow } from "@/components/Skeleton";
+import ErrorBoundary from "@/components/ErrorBoundary";
 import BookingsBarChart from "@/components/dashboard/BookingsBarChart";
 import RecentBookingsTable from "@/components/dashboard/RecentBookingsTable";
 import RevenueLineChart from "@/components/dashboard/RevenueLineChart";
@@ -47,12 +49,16 @@ export default function DashboardPage() {
 
   if (loading) {
     return (
-      <div className="flex min-h-[50vh] items-center justify-center bg-[#F4F2ED]">
-        <div className="flex flex-col items-center gap-3">
-          <div className="h-10 w-10 animate-spin rounded-full border-2 border-[#1B52A8] border-t-transparent" />
-          <p className="text-sm font-medium text-[#0C1B33]/60">
-            Loading analytics…
-          </p>
+      <div className="p-6 space-y-6 bg-[#F4F2ED] min-h-screen">
+        <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
+          {[...Array(4)].map((_, i) => <SkeletonStatCard key={i} />)}
+        </div>
+        <div className="rounded-2xl border border-[#E5E0D4] bg-white overflow-hidden">
+          <table className="w-full">
+            <tbody>
+              {[...Array(6)].map((_, i) => <SkeletonTableRow key={i} />)}
+            </tbody>
+          </table>
         </div>
       </div>
     );
@@ -107,30 +113,32 @@ export default function DashboardPage() {
           />
         </section>
 
-        <section className="grid gap-6 lg:grid-cols-2">
-          <div className="rounded-2xl border border-[#E5E0D4] bg-white p-6 shadow-sm">
-            <h2 className="text-base font-semibold text-[#0C1B33]">
-              Revenue (7 days)
-            </h2>
-            <p className="mt-0.5 text-xs text-[#0C1B33]/45">
-              Confirmed booking totals by day
-            </p>
-            <div className="mt-4">
-              <RevenueLineChart data={data.revenueLast7Days} />
+        <ErrorBoundary>
+          <section className="grid gap-6 lg:grid-cols-2">
+            <div className="rounded-2xl border border-[#E5E0D4] bg-white p-6 shadow-sm">
+              <h2 className="text-base font-semibold text-[#0C1B33]">
+                Revenue (7 days)
+              </h2>
+              <p className="mt-0.5 text-xs text-[#0C1B33]/45">
+                Confirmed booking totals by day
+              </p>
+              <div className="mt-4">
+                <RevenueLineChart data={data.revenueLast7Days} />
+              </div>
             </div>
-          </div>
-          <div className="rounded-2xl border border-[#E5E0D4] bg-white p-6 shadow-sm">
-            <h2 className="text-base font-semibold text-[#0C1B33]">
-              Booking volume (7 days)
-            </h2>
-            <p className="mt-0.5 text-xs text-[#0C1B33]/45">
-              New bookings created per day
-            </p>
-            <div className="mt-4">
-              <BookingsBarChart data={data.bookingsLast7Days} />
+            <div className="rounded-2xl border border-[#E5E0D4] bg-white p-6 shadow-sm">
+              <h2 className="text-base font-semibold text-[#0C1B33]">
+                Booking volume (7 days)
+              </h2>
+              <p className="mt-0.5 text-xs text-[#0C1B33]/45">
+                New bookings created per day
+              </p>
+              <div className="mt-4">
+                <BookingsBarChart data={data.bookingsLast7Days} />
+              </div>
             </div>
-          </div>
-        </section>
+          </section>
+        </ErrorBoundary>
 
         <section>
           <h2 className="mb-4 text-base font-semibold text-[#0C1B33]">

@@ -2,9 +2,16 @@
 
 import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
+import dynamic from "next/dynamic";
 import { apiFetch } from "@/lib/api";
 import { useMounted } from "@/lib/useMounted";
-import BookingCalendar from "@/components/BookingCalendar";
+import { SkeletonTableRow } from "@/components/Skeleton";
+import { useToastStore } from "@/store/toastStore";
+
+const BookingCalendar = dynamic(() => import("@/components/BookingCalendar"), {
+  ssr: false,
+  loading: () => <div className="h-64 animate-pulse rounded-xl bg-[#F2EAF7]" />,
+});
 import { formatCurrency, formatDate } from "@/lib/locale";
 
 const inputClass =
@@ -13,8 +20,10 @@ const inputClass =
 export default function BookingsPage() {
   const mounted = useMounted();
   const router  = useRouter();
+  const { addToast } = useToastStore();
   const [bookings, setBookings] = useState<any[]>([]);
   const [loadError, setLoadError] = useState("");
+  const [loading, setLoading]   = useState(true);
   const [openMenuId, setOpenMenuId] = useState<string | null>(null);
   const [editingBooking, setEditingBooking] = useState<any | null>(null);
   const [roomTypes, setRoomTypes] = useState<any[]>([]);
@@ -25,20 +34,30 @@ export default function BookingsPage() {
   const [editError, setEditError] = useState("");
   const [editLoading, setEditLoading] = useState(false);
   const [view, setView] = useState<"list" | "calendar">("list");
+  const [page, setPage]   = useState(1);
+  const [total, setTotal] = useState(0);
+  const [pages, setPages] = useState(1);
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+  const [bulkStatus, setBulkStatus]   = useState("CONFIRMED");
   const menuRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     if (!mounted) return;
+    setLoading(true);
     Promise.all([
-      apiFetch("/bookings"),
+      apiFetch(`/bookings?page=${page}&limit=50`),
       apiFetch("/room-types"),
     ]).then(([b, r]) => {
-      setBookings(b);
+      setBookings(Array.isArray(b) ? b : (b.data ?? []));
+      if (!Array.isArray(b)) {
+        setTotal(b.total ?? 0);
+        setPages(b.pages ?? 1);
+      }
       setRoomTypes(r);
     }).catch((err: any) => {
       setLoadError(err.message || "Failed to load bookings.");
-    });
-  }, [mounted]);
+    }).finally(() => setLoading(false));
+  }, [mounted, page]);
 
   // Close menu on outside click
   useEffect(() => {
@@ -115,7 +134,27 @@ async function updateStatus(id: string, status: string) {
       )}
       <div className="flex items-center justify-between mb-6">
         <h1 className="text-2xl font-bold text-[#0C1B33]">Bookings</h1>
-        <div className="flex rounded-lg border border-[#E5E0D4] overflow-hidden text-sm bg-white">
+        <div className="flex items-center gap-2">
+          <button
+            onClick={() => {
+              const token = localStorage.getItem("TOKEN") ?? "";
+              const url = `${process.env.NEXT_PUBLIC_API_BASE ?? ""}/bookings/export`;
+              fetch(url, { headers: { Authorization: `Bearer ${token}` } })
+                .then((r) => r.blob())
+                .then((blob) => {
+                  const a = document.createElement("a");
+                  a.href = URL.createObjectURL(blob);
+                  a.download = `bookings-${Date.now()}.csv`;
+                  a.click();
+                  URL.revokeObjectURL(a.href);
+                })
+                .catch(() => addToast("Export failed", "error"));
+            }}
+            className="rounded-lg border border-[#E5E0D4] bg-white px-3 py-1.5 text-sm font-medium text-[#0C1B33] hover:bg-[#F4F2ED] transition"
+          >
+            Export CSV
+          </button>
+          <div className="flex rounded-lg border border-[#E5E0D4] overflow-hidden text-sm bg-white">
           <button
             onClick={() => setView("list")}
             className={`px-3 py-1.5 transition ${view === "list" ? "bg-[#1B52A8] text-white" : "text-[#0C1B33]/60 hover:bg-[#F4F2ED]"}`}
@@ -128,6 +167,7 @@ async function updateStatus(id: string, status: string) {
           >
             Calendar
           </button>
+        </div>
         </div>
       </div>
 
@@ -144,26 +184,37 @@ async function updateStatus(id: string, status: string) {
           <table className="w-full text-sm">
             <thead className="border-b border-[#E5E0D4] bg-[#F4F2ED]">
               <tr className="text-left text-[#0C1B33]/55 text-xs uppercase tracking-wider font-semibold">
-                <th className="px-6 py-3 rounded-tl-xl">Reference</th>
-                <th className="px-6 py-3">Guest</th>
-                <th className="px-6 py-3">Room</th>
-                <th className="px-6 py-3">Check In</th>
-                <th className="px-6 py-3">Check Out</th>
-                <th className="px-6 py-3">Total</th>
-                <th className="px-6 py-3">Advance</th>
-                <th className="px-6 py-3">Status</th>
-                <th className="px-6 py-3 rounded-tr-xl" />
+                <th className="px-3 py-3 rounded-tl-xl w-8">
+                  <input
+                    type="checkbox"
+                    className="rounded"
+                    checked={bookings.length > 0 && selectedIds.size === bookings.length}
+                    onChange={(e) =>
+                      setSelectedIds(e.target.checked ? new Set(bookings.map((b: any) => b.id)) : new Set())
+                    }
+                  />
+                </th>
+                <th className="px-4 py-3">Reference</th>
+                <th className="px-4 py-3">Guest</th>
+                <th className="px-4 py-3">Room</th>
+                <th className="px-4 py-3">Check In</th>
+                <th className="px-4 py-3">Check Out</th>
+                <th className="px-4 py-3">Total</th>
+                <th className="px-4 py-3">Advance</th>
+                <th className="px-4 py-3">Status</th>
+                <th className="px-4 py-3 rounded-tr-xl" />
               </tr>
             </thead>
             <tbody className="divide-y divide-[#E5E0D4]">
-              {bookings.length === 0 && (
+              {loading && [...Array(6)].map((_, i) => <SkeletonTableRow key={i} />)}
+              {!loading && bookings.length === 0 && (
                 <tr>
                   <td colSpan={9} className="px-6 py-10 text-center text-[#0C1B33]/40">
                     No bookings yet.
                   </td>
                 </tr>
               )}
-              {bookings.map((b) => (
+              {!loading && bookings.map((b) => (
                 <tr
                   key={b.id}
                   onClick={(e) => {
@@ -172,7 +223,19 @@ async function updateStatus(id: string, status: string) {
                   }}
                   className="hover:bg-[#F4F2ED]/60 transition cursor-pointer"
                 >
-                  <td className="px-6 py-3">
+                  <td className="px-3 py-3" data-no-nav>
+                    <input
+                      type="checkbox"
+                      className="rounded"
+                      checked={selectedIds.has(b.id)}
+                      onChange={(e) => {
+                        const next = new Set(selectedIds);
+                        e.target.checked ? next.add(b.id) : next.delete(b.id);
+                        setSelectedIds(next);
+                      }}
+                    />
+                  </td>
+                  <td className="px-4 py-3">
                     {b.referenceNumber ? (
                       <span className="font-mono text-xs font-semibold text-[#1B52A8] bg-[#1B52A8]/8 px-2 py-1 rounded-md">
                         {b.referenceNumber}
@@ -245,6 +308,31 @@ async function updateStatus(id: string, status: string) {
               ))}
             </tbody>
           </table>
+
+          {/* Pagination */}
+          {pages > 1 && (
+            <div className="flex items-center justify-between px-4 py-3 border-t border-[#E5E0D4]">
+              <p className="text-xs text-slate-500">
+                {total} booking{total !== 1 ? "s" : ""} · page {page} of {pages}
+              </p>
+              <div className="flex gap-2">
+                <button
+                  onClick={() => setPage((p) => Math.max(1, p - 1))}
+                  disabled={page === 1}
+                  className="rounded-lg border border-[#E5E0D4] px-3 py-1.5 text-xs font-medium text-[#0C1B33] hover:bg-[#F2EAF7] disabled:opacity-40 disabled:cursor-not-allowed transition"
+                >
+                  Previous
+                </button>
+                <button
+                  onClick={() => setPage((p) => Math.min(pages, p + 1))}
+                  disabled={page === pages}
+                  className="rounded-lg border border-[#E5E0D4] px-3 py-1.5 text-xs font-medium text-[#0C1B33] hover:bg-[#F2EAF7] disabled:opacity-40 disabled:cursor-not-allowed transition"
+                >
+                  Next
+                </button>
+              </div>
+            </div>
+          )}
         </div>
       )}
 
@@ -356,6 +444,48 @@ async function updateStatus(id: string, status: string) {
               </div>
             </form>
           </div>
+        </div>
+      )}
+
+      {/* Bulk action bar */}
+      {selectedIds.size > 0 && (
+        <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-50 flex items-center gap-3 rounded-2xl border border-[#E5E0D4] bg-white px-5 py-3 shadow-xl">
+          <span className="text-sm font-medium text-[#0C1B33]">{selectedIds.size} selected</span>
+          <select
+            value={bulkStatus}
+            onChange={(e) => setBulkStatus(e.target.value)}
+            className="rounded-lg border border-[#E5E0D4] px-2 py-1.5 text-sm text-[#0C1B33] focus:outline-none focus:ring-2 focus:ring-[#1B52A8]/25"
+          >
+            {["CONFIRMED","PENDING","HOLD","CANCELLED"].map((s) => (
+              <option key={s} value={s}>{s}</option>
+            ))}
+          </select>
+          <button
+            onClick={async () => {
+              try {
+                await apiFetch("/bookings/bulk-status", {
+                  method: "POST",
+                  body: JSON.stringify({ ids: Array.from(selectedIds), status: bulkStatus }),
+                });
+                setBookings((prev: any[]) =>
+                  prev.map((b) => selectedIds.has(b.id) ? { ...b, status: bulkStatus } : b)
+                );
+                setSelectedIds(new Set());
+                addToast(`${selectedIds.size} bookings updated to ${bulkStatus}`, "success");
+              } catch {
+                addToast("Bulk update failed", "error");
+              }
+            }}
+            className="rounded-lg bg-[#1B52A8] px-4 py-1.5 text-sm font-medium text-white hover:bg-[#1B52A8]/90 transition"
+          >
+            Apply
+          </button>
+          <button
+            onClick={() => setSelectedIds(new Set())}
+            className="text-sm text-slate-400 hover:text-slate-600 transition"
+          >
+            Clear
+          </button>
         </div>
       )}
     </div>

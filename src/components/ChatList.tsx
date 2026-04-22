@@ -5,10 +5,12 @@ import { apiFetch } from "@/lib/api";
 import { getSocket } from "@/lib/socket";
 import { useChatStore } from "@/store/chatStore";
 import { useMounted } from "@/lib/useMounted";
+import { SkeletonChatRow } from "@/components/Skeleton";
 
 type Conversation = {
   guestId: string;
   phone: string;
+  name: string | null;
   lastHandledByStaff: boolean;
   lastMessage: string | null;
   lastMessageType: string | null;
@@ -74,6 +76,7 @@ export default function ChatList() {
   const mounted = useMounted();
   const [conversations, setConversations] = useState<Conversation[]>([]);
   const [search, setSearch] = useState("");
+  const [loading, setLoading] = useState(true);
   const selectedGuestId = useChatStore((s) => s.selectedGuestId);
   const setSelectedGuest = useChatStore((s) => s.setSelectedGuest);
 
@@ -82,7 +85,8 @@ export default function ChatList() {
     if (!mounted) return;
     apiFetch("/conversations")
       .then(setConversations)
-      .catch(console.error);
+      .catch(console.error)
+      .finally(() => setLoading(false));
   }, [mounted]);
 
   // Socket: update conversation list in real-time
@@ -176,7 +180,8 @@ export default function ChatList() {
 
       {/* List */}
       <div className="flex-1 overflow-y-auto">
-        {filtered.length === 0 && (
+        {loading && [...Array(6)].map((_, i) => <SkeletonChatRow key={i} />)}
+        {!loading && filtered.length === 0 && (
           <div className="flex flex-col items-center justify-center h-40 text-slate-400 text-sm gap-2">
             <svg className="w-8 h-8 opacity-40" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M8 10h.01M12 10h.01M16 10h.01M21 16c0 1.1-.9 2-2 2H7l-4 4V6c0-1.1.9-2 2-2h14c1.1 0 2 .9 2 2v10z" />
@@ -185,14 +190,14 @@ export default function ChatList() {
           </div>
         )}
 
-        {filtered.map((c) => {
+        {!loading && filtered.map((c) => {
           const isActive = c.guestId === selectedGuestId;
           const avatarColor = getAvatarColor(c.phone);
           const preview = getLastMessagePreview(c.lastMessage, c.lastMessageType);
           return (
             <div
               key={c.guestId}
-              onClick={() => { if (c.guestId !== selectedGuestId) setSelectedGuest(c.guestId, !c.lastHandledByStaff, c.phone); }}
+              onClick={() => { if (c.guestId !== selectedGuestId) setSelectedGuest(c.guestId, !c.lastHandledByStaff, c.phone, c.name); }}
               className={`flex items-center gap-3 px-4 py-3 cursor-pointer transition-colors border-b border-[#E5E0D4]/60 ${
                 isActive
                   ? "bg-blue-50 border-l-2 border-l-[#1B52A8]"

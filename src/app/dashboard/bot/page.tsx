@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { apiFetch } from "@/lib/api";
 import { useMounted } from "@/lib/useMounted";
+import { useToastStore } from "@/store/toastStore";
 import type { FlowSummary } from "./flows/types";
 
 // ── types ──────────────────────────────────────────────────────────────────
@@ -461,6 +462,7 @@ type Tab = "flow" | "menu" | "config" | "flows";
 export default function BotPage() {
   const mounted = useMounted();
   const router  = useRouter();
+  const { addToast } = useToastStore();
 
   const [settings, setSettings]       = useState<Settings | null>(null);
   const [rooms, setRooms]             = useState<RoomType[]>([]);
@@ -1221,7 +1223,7 @@ export default function BotPage() {
                             setFlowsList((prev) => [...prev, created]);
                             setConfig((c) => c && ({ ...c, bookingFlowId: created.id }));
                           } catch (err: any) {
-                            alert(err.message || "Failed to create default booking flow.");
+                            addToast(err.message || "Failed to create default booking flow.", "error");
                           }
                         }}
                       >

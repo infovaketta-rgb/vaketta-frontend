@@ -41,7 +41,7 @@ function getInitials(name: string | null): string {
 
 // ── component ──────────────────────────────────────────────────────────────
 
-export default function TopBar() {
+export default function TopBar({ onMenuClick }: { onMenuClick?: () => void }) {
   const mounted    = useMounted();
   const pathname   = usePathname();
   const router     = useRouter();
@@ -144,8 +144,19 @@ export default function TopBar() {
   return (
     <header className="sticky top-0 z-30 flex h-14 shrink-0 items-center justify-between border-b border-[#E5E0D4] bg-white px-5 shadow-sm">
 
-      {/* Left — page title */}
-      <h1 className="text-base font-semibold text-[#0C1B33]">{pageTitle}</h1>
+      {/* Left — hamburger (mobile only) + page title */}
+      <div className="flex items-center gap-3">
+        <button
+          onClick={onMenuClick}
+          className="flex h-9 w-9 items-center justify-center rounded-lg text-slate-500 transition hover:bg-[#F4F2ED] md:hidden"
+          aria-label="Open menu"
+        >
+          <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" />
+          </svg>
+        </button>
+        <h1 className="text-base font-semibold text-[#0C1B33]">{pageTitle}</h1>
+      </div>
 
       {/* Right — actions */}
       <div className="flex items-center gap-3">

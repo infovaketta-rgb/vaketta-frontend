@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
+import Image from "next/image";
 import { apiFetch } from "@/lib/api";
 import { useMounted } from "@/lib/useMounted";
 
@@ -344,9 +345,7 @@ export default function RoomTypeDetailPage() {
                       photo.isMain ? "border-[#7A3F91]" : "border-transparent hover:border-gray-200"
                     } ${draggedPhotoId === photo.id ? "opacity-50" : ""}`}>
 
-                    {/* eslint-disable-next-line @next/next/no-img-element */}
-                    <img src={photo.url} alt="Room photo"
-                      className="w-full h-28 object-cover" />
+                    <Image src={photo.url} alt="Room photo" fill className="object-cover" sizes="160px" />
 
                     {/* Main badge */}
                     {photo.isMain && (

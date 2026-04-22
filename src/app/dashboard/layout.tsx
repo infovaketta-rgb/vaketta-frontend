@@ -2,7 +2,9 @@
 
 import Sidebar from "@/components/Sidebar";
 import TopBar from "@/components/TopBar";
-import { useEffect } from "react";
+import ToastContainer from "@/components/Toast";
+import { useToastStore } from "@/store/toastStore";
+import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { isAuthenticated } from "@/lib/auth";
 import { getSocket } from "@/lib/socket";  // ← add this
@@ -13,6 +15,8 @@ export default function DashboardLayout({
   children: React.ReactNode;
 }) {
   const router = useRouter();
+  const [sidebarOpen, setSidebarOpen] = useState(false);
+  const { addToast } = useToastStore();
 
   useEffect(() => {
     if (!isAuthenticated()) {
@@ -40,19 +44,28 @@ export default function DashboardLayout({
       }
     };
 
+    const onBookingNew = ({ booking }: { booking: any }) => {
+      addToast(`New booking from ${booking.guestName}`, "success");
+    };
+
     socket.on("staff:notification", onStaffNotification);
-    return () => { socket.off("staff:notification", onStaffNotification); };
+    socket.on("booking:new", onBookingNew);
+    return () => {
+      socket.off("staff:notification", onStaffNotification);
+      socket.off("booking:new", onBookingNew);
+    };
   }, []);
 
   return (
     <div className="flex h-screen min-h-0 w-full overflow-hidden">
-      <Sidebar />
+      <Sidebar open={sidebarOpen} onClose={() => setSidebarOpen(false)} />
       <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
-        <TopBar />
+        <TopBar onMenuClick={() => setSidebarOpen(true)} />
         <main className="min-h-0 flex-1 overflow-y-auto overflow-x-hidden">
           {children}
         </main>
       </div>
+      <ToastContainer />
     </div>
   );
 }

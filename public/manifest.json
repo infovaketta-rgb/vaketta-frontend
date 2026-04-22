@@ -1,0 +1,17 @@
+{
+  "name": "Vaketta PMS",
+  "short_name": "Vaketta",
+  "description": "AI-Powered Hotel Automation Platform",
+  "start_url": "/dashboard",
+  "display": "standalone",
+  "background_color": "#0C1B33",
+  "theme_color": "#7A3F91",
+  "icons": [
+    {
+      "src": "/vchat icon.png",
+      "sizes": "any",
+      "type": "image/png",
+      "purpose": "any maskable"
+    }
+  ]
+}

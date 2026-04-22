@@ -11,6 +11,7 @@ export const metadata = {
     shortcut: "/vchat icon.png",
     apple: "/vchat icon.png",
   },
+  manifest: "/manifest.json",
 };
 
 export default function RootLayout({

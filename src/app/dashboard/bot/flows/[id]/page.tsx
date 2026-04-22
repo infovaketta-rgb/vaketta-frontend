@@ -33,6 +33,7 @@ import ShowMenuNode          from "../nodes/ShowMenuNode";
 import NodePalette, { SYSTEM_VARS } from "../NodePalette";
 import CanvasToolbar         from "../CanvasToolbar";
 import NodeInspectorPanel    from "../NodeInspectorPanel";
+import ErrorBoundary         from "@/components/ErrorBoundary";
 
 // ── Initial node defaults ─────────────────────────────────────────────────────
 
@@ -235,6 +236,7 @@ export default function FlowCanvasPage() {
   ]));
 
   return (
+    <ErrorBoundary>
     <div className="flex h-full flex-col overflow-hidden">
       <CanvasToolbar
         name={flowName}
@@ -304,5 +306,6 @@ export default function FlowCanvasPage() {
         />
       </div>
     </div>
+    </ErrorBoundary>
   );
 }
