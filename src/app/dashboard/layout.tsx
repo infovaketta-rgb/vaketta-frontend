@@ -9,6 +9,15 @@ import { useRouter } from "next/navigation";
 import { isAuthenticated } from "@/lib/auth";
 import { getSocket } from "@/lib/socket";  // ← add this
 
+function urlBase64ToUint8Array(base64String: string): Uint8Array {
+  const padding = "=".repeat((4 - (base64String.length % 4)) % 4);
+  const base64 = (base64String + padding).replace(/-/g, "+").replace(/_/g, "/");
+  const raw = atob(base64);
+  const buffer = new Uint8Array(raw.length);
+  for (let i = 0; i < raw.length; i++) buffer[i] = raw.charCodeAt(i);
+  return buffer;
+}
+
 export default function DashboardLayout({
   children,
 }: {
@@ -25,10 +34,37 @@ export default function DashboardLayout({
   }, []);
 
   useEffect(() => {
-  if (typeof window !== "undefined" && "Notification" in window && Notification.permission === "default") {
-    Notification.requestPermission();
-  }
-}, []);
+    if (typeof window === "undefined") return;
+    if (!("serviceWorker" in navigator) || !("PushManager" in window)) return;
+
+    async function setupPush() {
+      const permission = await Notification.requestPermission();
+      if (permission !== "granted") return;
+
+      const reg = await navigator.serviceWorker.register("/sw.js");
+
+      let sub = await reg.pushManager.getSubscription();
+      if (!sub) {
+        const res = await fetch(`${process.env.NEXT_PUBLIC_API_BASE}/push/vapid-public-key`);
+        if (!res.ok) return;
+        const { key } = await res.json();
+        sub = await reg.pushManager.subscribe({
+          userVisibleOnly: true,
+          applicationServerKey: urlBase64ToUint8Array(key),
+        });
+      }
+
+      const token = localStorage.getItem("TOKEN");
+      if (!token) return;
+      await fetch(`${process.env.NEXT_PUBLIC_API_BASE}/push/subscribe`, {
+        method:  "POST",
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+        body:    JSON.stringify(sub.toJSON()),
+      });
+    }
+
+    setupPush().catch(() => {});
+  }, []);
 
 // ← add this
   useEffect(() => {
