@@ -341,7 +341,7 @@ export default function RoomTypeDetailPage() {
                     onDragStart={() => handleDragStart(photo.id)}
                     onDragOver={(e) => e.preventDefault()}
                     onDrop={() => handleDrop(photo.id)}
-                    className={`relative rounded-xl overflow-hidden group cursor-grab active:cursor-grabbing border-2 transition ${
+                    className={`relative rounded-xl overflow-hidden group cursor-grab active:cursor-grabbing h-32 border-2 transition ${
                       photo.isMain ? "border-[#7A3F91]" : "border-transparent hover:border-gray-200"
                     } ${draggedPhotoId === photo.id ? "opacity-50" : ""}`}>
 
