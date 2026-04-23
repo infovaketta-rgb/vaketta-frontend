@@ -155,7 +155,7 @@ export default function TopBar({ onMenuClick }: { onMenuClick?: () => void }) {
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" />
           </svg>
         </button>
-        <h1 className="text-base font-semibold text-[#0C1B33]">{pageTitle}</h1>
+        <h1 className="text-base font-semibold text-[#0C1B33] truncate max-w-32 sm:max-w-none">{pageTitle}</h1>
       </div>
 
       {/* Right — actions */}
@@ -179,7 +179,7 @@ export default function TopBar({ onMenuClick }: { onMenuClick?: () => void }) {
         </button>
 
         {/* Hotel identity pill */}
-        <div className="flex items-center gap-2 rounded-full border border-[#E5E0D4] bg-[#F4F2ED] px-3 py-1.5">
+        <div className="hidden sm:flex items-center gap-2 rounded-full border border-[#E5E0D4] bg-[#F4F2ED] px-3 py-1.5">
           {/* Auto-reply dot */}
           <span
             title={autoReply === null ? "Loading…" : autoReply ? "Auto-reply ON" : "Auto-reply OFF"}
@@ -204,10 +204,10 @@ export default function TopBar({ onMenuClick }: { onMenuClick?: () => void }) {
               {getInitials(userName)}
             </div>
             <div className="flex items-center gap-1.5">
-              <span className="max-w-22 truncate text-xs font-medium text-[#0C1B33]">
+              <span className="max-w-16 sm:max-w-22 truncate text-xs font-medium text-[#0C1B33]">
                 {userName ?? "User"}
               </span>
-              <span className={`rounded-full px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-wide ${roleStyle}`}>
+              <span className={`hidden sm:inline-block rounded-full px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-wide ${roleStyle}`}>
                 {role}
               </span>
             </div>
