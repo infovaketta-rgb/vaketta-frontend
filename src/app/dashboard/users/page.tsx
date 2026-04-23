@@ -58,8 +58,8 @@ export default function UsersPage() {
   }
 
   return (
-    <div className="p-8 h-full overflow-y-auto">
-      <div className="flex items-center justify-between mb-6">
+    <div className="p-4 md:p-8 h-full overflow-y-auto">
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between mb-6">
         <h1 className="text-2xl font-bold text-[#2B0D3E]">User Management</h1>
         <button
           onClick={() => { setShowForm((v) => !v); setError(""); setSuccess(""); }}
@@ -136,7 +136,33 @@ export default function UsersPage() {
         </div>
       )}
 
-      <div className="bg-white rounded-xl shadow p-6">
+      {/* Mobile card list */}
+      <div className="md:hidden bg-white rounded-xl shadow divide-y divide-gray-100">
+        {users.length === 0 ? (
+          <p className="py-8 text-center text-sm text-gray-400">No users found.</p>
+        ) : (
+          users.map((u) => (
+            <div key={u.id} className="flex items-center justify-between px-4 py-3 gap-3">
+              <div className="min-w-0">
+                <p className="text-sm font-medium text-[#2B0D3E] truncate">{u.name}</p>
+                <p className="text-xs text-gray-500 truncate">{u.email}</p>
+                <p className="text-[10px] text-gray-400 mt-0.5">{new Date(u.createdAt).toLocaleDateString()}</p>
+              </div>
+              <div className="flex flex-col items-end gap-1 shrink-0">
+                <span className={`px-2.5 py-1 rounded-full text-xs font-medium ${roleBadge[u.role] ?? "bg-gray-100 text-gray-600"}`}>
+                  {u.role}
+                </span>
+                <span className={`px-2.5 py-1 rounded-full text-xs font-medium ${u.isActive ? "bg-green-100 text-green-700" : "bg-red-100 text-red-600"}`}>
+                  {u.isActive ? "Active" : "Inactive"}
+                </span>
+              </div>
+            </div>
+          ))
+        )}
+      </div>
+
+      {/* Desktop table */}
+      <div className="hidden md:block bg-white rounded-xl shadow p-6">
         <table className="w-full text-sm">
           <thead className="border-b">
             <tr className="text-left text-gray-600">

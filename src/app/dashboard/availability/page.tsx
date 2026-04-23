@@ -8,8 +8,8 @@ import { useToastStore } from "@/store/toastStore";
 // ── Constants ──────────────────────────────────────────────────────────────────
 
 const DAYS = 14;
-const COL_W  = 80;   // px per day column
-const LEFT_W = 180;  // px for room-type name column
+const COL_W  = 72;   // px per day column
+const LEFT_W = 140;  // px for room-type name column
 
 const MONTH_SHORT = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
 const DAY_SHORT   = ["Sun","Mon","Tue","Wed","Thu","Fri","Sat"];
@@ -252,7 +252,7 @@ export default function AvailabilityPage() {
   const inputCls = "w-full rounded-lg border border-gray-200 px-2.5 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-[#7A3F91]";
 
   return (
-    <div className="flex h-full flex-col gap-4 overflow-y-auto p-6">
+    <div className="flex h-full flex-col gap-4 overflow-y-auto p-4 md:p-6">
 
       {/* ── Page header ── */}
       <div className="flex flex-wrap items-start justify-between gap-4">
@@ -264,7 +264,7 @@ export default function AvailabilityPage() {
         </div>
 
         {/* Automation toggle */}
-        <div className="flex items-center gap-3 rounded-xl border border-gray-200 bg-white px-4 py-3 shadow-sm">
+        <div className="flex items-center gap-3 rounded-xl border border-gray-200 bg-white px-4 py-3 shadow-sm w-full sm:w-auto justify-between">
           <div>
             <p className="text-sm font-semibold text-[#2B0D3E]">Bot Availability Check</p>
             <p className="text-xs text-gray-400 mt-0.5">
@@ -303,7 +303,7 @@ export default function AvailabilityPage() {
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
             </svg>
           </button>
-          <span className="min-w-64 text-center text-sm font-semibold text-[#2B0D3E]">{rangeLabel}</span>
+          <span className="min-w-0 sm:min-w-64 text-center text-sm font-semibold text-[#2B0D3E]">{rangeLabel}</span>
           <button
             onClick={nextWindow}
             className="flex h-8 w-8 items-center justify-center rounded-full text-gray-500 hover:bg-gray-100 transition"
@@ -323,9 +323,9 @@ export default function AvailabilityPage() {
         {/* Legend + bulk button */}
         <div className="flex items-center gap-4">
           <div className="flex items-center gap-3 text-xs text-gray-500">
-            <span className="flex items-center gap-1.5"><span className="h-2.5 w-2.5 rounded-full bg-emerald-400" /> All available</span>
-            <span className="flex items-center gap-1.5"><span className="h-2.5 w-2.5 rounded-full bg-amber-400" />  Partial</span>
-            <span className="flex items-center gap-1.5"><span className="h-2.5 w-2.5 rounded-full bg-red-400" />    Sold out</span>
+            <span className="flex items-center gap-1.5"><span className="h-2.5 w-2.5 rounded-full bg-emerald-400" /><span className="hidden sm:inline">All available</span></span>
+            <span className="flex items-center gap-1.5"><span className="h-2.5 w-2.5 rounded-full bg-amber-400" /><span className="hidden sm:inline">Partial</span></span>
+            <span className="flex items-center gap-1.5"><span className="h-2.5 w-2.5 rounded-full bg-red-400" /><span className="hidden sm:inline">Sold out</span></span>
           </div>
           <button
             onClick={() => { setBulkOpen(true); setBulkError(""); }}
@@ -342,7 +342,7 @@ export default function AvailabilityPage() {
           <div className="h-8 w-8 animate-spin rounded-full border-4 border-gray-200 border-t-[#7A3F91]" />
         </div>
       ) : (
-        <div className="overflow-x-auto rounded-xl border border-gray-200 bg-white shadow-sm">
+        <div className="overflow-x-auto -mx-4 md:mx-0 rounded-none md:rounded-xl border border-gray-200 bg-white shadow-sm">
           <div style={{ minWidth: LEFT_W + DAYS * COL_W }}>
 
             {/* Header row */}
@@ -447,6 +447,7 @@ export default function AvailabilityPage() {
         </div>
       )}
 
+      <p className="text-[10px] text-gray-400 text-center md:hidden">← Scroll to see all dates →</p>
       <p className="text-[10px] text-gray-400 text-right">
         Purple dot = custom override · Click any cell to edit · Use Bulk Edit for date ranges
       </p>
@@ -548,7 +549,7 @@ export default function AvailabilityPage() {
                 </select>
               </div>
 
-              <div className="grid grid-cols-2 gap-2">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
                 <div>
                   <label className="block text-[11px] font-semibold uppercase tracking-wide text-gray-500 mb-1">From date</label>
                   <input type="date" className={inputCls}
