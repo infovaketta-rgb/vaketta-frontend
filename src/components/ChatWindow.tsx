@@ -9,6 +9,20 @@ import BookingForm from "./BookingForm";
 
 const API_BASE = process.env.NEXT_PUBLIC_API_BASE ?? "";
 
+const FRONTEND_LIMITS: Record<string, number> = {
+  "image/":       5  * 1024 * 1024,
+  "audio/":       16 * 1024 * 1024,
+  "video/":       16 * 1024 * 1024,
+  "application/": 100 * 1024 * 1024,
+};
+
+function getMediaSizeLimit(mimeType: string): number {
+  for (const [prefix, limit] of Object.entries(FRONTEND_LIMITS)) {
+    if (mimeType.startsWith(prefix)) return limit;
+  }
+  return 5 * 1024 * 1024;
+}
+
 // ── Audio Player ──────────────────────────────────────────────────────────────
 
 // Decorative waveform heights (30 bars, varied like a real voice message)
@@ -615,8 +629,9 @@ return () => {
   // Stage a file for preview — validates then shows preview modal
   function stageMediaFile(file: File) {
     if (!guestId) return;
-    if (file.size > 10 * 1024 * 1024) {
-      setSendError("File too large. Maximum size is 10 MB.");
+    const limit = getMediaSizeLimit(file.type);
+    if (file.size > limit) {
+      setSendError(`File too large. Max ${limit / (1024 * 1024)} MB for this file type.`);
       setTimeout(() => setSendError(""), 4000);
       if (fileInputRef.current) fileInputRef.current.value = "";
       return;
