@@ -1403,10 +1403,17 @@ return () => {
             setSendError("");
             setUploadingMedia(true);
             try {
-              const res  = await fetch(item.mediaUrl);
-              const blob = await res.blob();
-              const file = new File([blob], item.fileName, { type: item.mimeType });
-              await uploadMedia(file);
+              const result = await apiFetch("/messages/send-media-url", {
+                method: "POST",
+                body: JSON.stringify({
+                  guestId,
+                  mediaUrl:    item.mediaUrl,
+                  mimeType:    item.mimeType,
+                  fileName:    item.fileName,
+                  messageType: item.messageType,
+                }),
+              });
+              if (result?.id) addMessage({ ...result, guestId });
             } catch (e: any) {
               setSendError("Failed to send from gallery.");
               setTimeout(() => setSendError(""), 4000);
