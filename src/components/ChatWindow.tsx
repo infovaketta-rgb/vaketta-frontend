@@ -625,6 +625,31 @@ return () => {
     if (!guestId) return;
     setSendError("");
     setUploadingMedia(true);
+
+    // Optimistic bubble — show the media immediately using a local blob URL
+    const tempId = `tmp_${Date.now()}`;
+    const blobUrl = URL.createObjectURL(file);
+    const mimeBase = file.type.split(";")[0]!.trim();
+    const messageType = mimeBase.startsWith("image/") ? "image"
+                      : mimeBase.startsWith("video/") ? "video"
+                      : mimeBase.startsWith("audio/") ? "audio"
+                      : "document";
+    addMessage({
+      id:          tempId,
+      direction:   "OUT",
+      body:        caption?.trim() || null,
+      messageType,
+      mediaUrl:    blobUrl,
+      mimeType:    mimeBase,
+      fileName:    file.name,
+      timestamp:   new Date().toISOString(),
+      status:      "SENDING",
+      guestId,
+      deleted:     false,
+      deletedBy:   null,
+      jobId:       null,
+    });
+
     try {
       const token = typeof window !== "undefined" ? localStorage.getItem("TOKEN") : null;
       const form = new FormData();
@@ -638,12 +663,17 @@ return () => {
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data?.error ?? "Upload failed");
-      if (data?.id) addMessage({ ...data, guestId });
+      if (data?.id) {
+        addMessage({ ...data, guestId });
+        updateMessageStatus(tempId, "REPLACED");
+      }
     } catch (e: any) {
       console.error("Media send failed", e);
+      updateMessageStatus(tempId, "FAILED");
       setSendError(e?.message ?? "Failed to send file. Please try again.");
       setTimeout(() => setSendError(""), 4000);
     } finally {
+      URL.revokeObjectURL(blobUrl);
       setUploadingMedia(false);
     }
   }
