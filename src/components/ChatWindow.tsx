@@ -6,6 +6,7 @@ import { getSocket } from "@/lib/socket";
 import { useChatStore } from "@/store/chatStore";
 import { useMounted } from "@/lib/useMounted";
 import BookingForm from "./BookingForm";
+import MediaPickerModal from "./MediaPickerModal";
 
 const API_BASE = process.env.NEXT_PUBLIC_API_BASE ?? "";
 
@@ -441,6 +442,8 @@ export default function ChatWindow() {
   const [sendError, setSendError] = useState("");
   const [uploadingMedia, setUploadingMedia] = useState(false);
   const [isRecording, setIsRecording] = useState(false);
+  const [attachMenuOpen,  setAttachMenuOpen]  = useState(false);
+  const [mediaPickerOpen, setMediaPickerOpen] = useState(false);
   const [lightboxSrc, setLightboxSrc] = useState<string | null>(null);
 
   // Media preview state — file staged here before confirm-send
@@ -450,7 +453,8 @@ export default function ChatWindow() {
     caption: string;
   } | null>(null);
 
-  const fileInputRef = useRef<HTMLInputElement>(null);
+  const fileInputRef    = useRef<HTMLInputElement>(null);
+  const attachMenuRef   = useRef<HTMLDivElement>(null);
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const audioChunksRef = useRef<Blob[]>([]);
   const bottomRef = useRef<HTMLDivElement>(null);
@@ -558,6 +562,17 @@ return () => {
   socket.off("message:media_ready", onMediaReady);
 };
   }, [mounted]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Close attachment menu on outside click
+  useEffect(() => {
+    function handleClick(e: MouseEvent) {
+      if (attachMenuRef.current && !attachMenuRef.current.contains(e.target as Node)) {
+        setAttachMenuOpen(false);
+      }
+    }
+    document.addEventListener("mousedown", handleClick);
+    return () => document.removeEventListener("mousedown", handleClick);
+  }, []);
 
   // Delete message — soft-delete in DB, bubble becomes tombstone
   async function handleDelete(messageId: string) {
@@ -1212,25 +1227,60 @@ return () => {
           }}
         />
 
-        {/* Attachment button */}
-        <button
-          onClick={() => fileInputRef.current?.click()}
-          disabled={uploadingMedia || isRecording}
-          title="Send photo, video, audio or document"
-          className="w-9 h-9 rounded-full bg-gray-100 hover:bg-gray-200 disabled:opacity-50 flex items-center justify-center shrink-0 transition-colors"
-        >
-          {uploadingMedia ? (
-            <svg className="w-4 h-4 text-gray-500 animate-spin" fill="none" viewBox="0 0 24 24">
-              <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
-              <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8H4z" />
-            </svg>
-          ) : (
-            <svg className="w-4 h-4 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
-                d="M15.172 7l-6.586 6.586a2 2 0 102.828 2.828l6.414-6.586a4 4 0 00-5.656-5.656l-6.415 6.585a6 6 0 108.486 8.486L20.5 13" />
-            </svg>
+        {/* Attachment button + popup */}
+        <div className="relative" ref={attachMenuRef}>
+          <button
+            onClick={() => setAttachMenuOpen((o) => !o)}
+            disabled={uploadingMedia || isRecording}
+            className="w-9 h-9 rounded-full bg-gray-100 hover:bg-gray-200 disabled:opacity-50 flex items-center justify-center shrink-0 transition-colors"
+          >
+            {uploadingMedia ? (
+              <svg className="w-4 h-4 text-gray-500 animate-spin" fill="none" viewBox="0 0 24 24">
+                <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8H4z" />
+              </svg>
+            ) : (
+              <svg className="w-4 h-4 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
+                  d="M15.172 7l-6.586 6.586a2 2 0 102.828 2.828l6.414-6.586a4 4 0 00-5.656-5.656l-6.415 6.585a6 6 0 108.486 8.486L20.5 13" />
+              </svg>
+            )}
+          </button>
+
+          {attachMenuOpen && (
+            <div className="absolute bottom-12 left-0 z-50 bg-white rounded-2xl shadow-xl border border-gray-100 p-3 flex flex-col gap-1 w-48">
+              {[
+                { label: "Photo",    accept: "image/*",                                                icon: "🖼️" },
+                { label: "Video",    accept: "video/*",                                                icon: "🎥" },
+                { label: "Audio",    accept: "audio/*",                                                icon: "🎵" },
+                { label: "Document", accept: ".pdf,.doc,.docx,.xls,.xlsx",                             icon: "📄" },
+                { label: "Any File", accept: "image/*,video/*,audio/*,.pdf,.doc,.docx,.xls,.xlsx",     icon: "📎" },
+              ].map((opt) => (
+                <button
+                  key={opt.label}
+                  onClick={() => {
+                    setAttachMenuOpen(false);
+                    if (fileInputRef.current) {
+                      fileInputRef.current.accept = opt.accept;
+                      fileInputRef.current.click();
+                    }
+                  }}
+                  className="flex items-center gap-3 px-3 py-2.5 rounded-xl hover:bg-gray-50 transition text-left text-sm text-gray-700 font-medium"
+                >
+                  <span className="text-lg">{opt.icon}</span>
+                  {opt.label}
+                </button>
+              ))}
+              <button
+                onClick={() => { setAttachMenuOpen(false); setMediaPickerOpen(true); }}
+                className="flex items-center gap-3 px-3 py-2.5 rounded-xl hover:bg-gray-50 transition text-left text-sm text-gray-700 font-medium"
+              >
+                <span className="text-lg">🗂️</span>
+                From Gallery
+              </button>
+            </div>
           )}
-        </button>
+        </div>
 
         {/* Text input */}
         <input
@@ -1340,6 +1390,30 @@ return () => {
           messageId={deleteTarget.id}
           onClose={() => setDeleteTarget(null)}
           onDelete={handleDelete}
+        />
+      )}
+
+      {/* Media picker modal */}
+      {mediaPickerOpen && (
+        <MediaPickerModal
+          onClose={() => setMediaPickerOpen(false)}
+          onSelect={async (item) => {
+            setMediaPickerOpen(false);
+            if (!guestId) return;
+            setSendError("");
+            setUploadingMedia(true);
+            try {
+              const res  = await fetch(item.mediaUrl);
+              const blob = await res.blob();
+              const file = new File([blob], item.fileName, { type: item.mimeType });
+              await uploadMedia(file);
+            } catch (e: any) {
+              setSendError("Failed to send from gallery.");
+              setTimeout(() => setSendError(""), 4000);
+            } finally {
+              setUploadingMedia(false);
+            }
+          }}
         />
       )}
     </div>
