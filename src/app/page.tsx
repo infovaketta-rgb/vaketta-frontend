@@ -167,7 +167,7 @@ function DashboardMockup() {
           <div className="h-3 w-3 rounded-full bg-red-400/70" />
           <div className="h-3 w-3 rounded-full bg-yellow-400/70" />
           <div className="h-3 w-3 rounded-full bg-emerald-400/70" />
-          <span className="ml-3 text-xs text-white/30 font-mono">Vaketta PMS — Dashboard</span>
+          <span className="ml-3 text-xs text-white/30 font-mono">Vaketta Chat — Dashboard</span>
         </div>
         <div className="p-4 space-y-3">
           {/* Stat row */}

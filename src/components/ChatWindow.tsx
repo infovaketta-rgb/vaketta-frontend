@@ -215,6 +215,20 @@ function MediaBubble({ mediaUrl, mimeType, fileName, body, isOut, onImageClick }
   isOut:    boolean;
   onImageClick: (src: string) => void;
 }) {
+  if (mediaUrl.startsWith("pending://")) {
+    return (
+      <div className="flex items-center gap-2 py-2 px-1">
+        <div className="w-8 h-8 rounded-full bg-gray-200 flex items-center justify-center shrink-0">
+          <svg className="w-4 h-4 text-gray-400 animate-spin" fill="none" viewBox="0 0 24 24">
+            <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+            <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8H4z" />
+          </svg>
+        </div>
+        <span className="text-xs text-gray-400 italic">Uploading media…</span>
+      </div>
+    );
+  }
+
   const src = mediaUrl.startsWith("meta://")
     ? null
     : mediaUrl.startsWith("http")
@@ -518,14 +532,22 @@ export default function ChatWindow() {
   useChatStore.getState().removeMessage(messageId);
 };
 
-
+    const onMediaReady = ({ messageId, mediaUrl, mimeType, fileName }: {
+      messageId: string; mediaUrl: string; mimeType: string; fileName: string;
+    }) => {
+      useChatStore.setState((s) => ({
+        messages: s.messages.map((m) =>
+          m.id === messageId ? { ...m, mediaUrl, mimeType, fileName } : m
+        ),
+      }));
+    };
 
 socket.on("message:new", onNewMessage);
 socket.on("message:read", onRead);
 socket.on("message:status", onStatus);
 socket.on("message:deleted", onDeleted);
 socket.on("message:undo", onUndo);
-
+socket.on("message:media_ready", onMediaReady);
 
 return () => {
   socket.off("message:new", onNewMessage);
@@ -533,7 +555,7 @@ return () => {
   socket.off("message:status", onStatus);
   socket.off("message:deleted", onDeleted);
   socket.off("message:undo", onUndo);
-  
+  socket.off("message:media_ready", onMediaReady);
 };
   }, [mounted]); // eslint-disable-line react-hooks/exhaustive-deps
 

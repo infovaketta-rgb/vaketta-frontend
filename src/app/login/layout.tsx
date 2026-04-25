@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 
 export const metadata: Metadata = {
-  title: "Sign In — Vaketta PMS",
+  title: "Sign In — Vaketta Chat",
   description: "Sign in to your Vaketta hotel management dashboard.",
 };
 
