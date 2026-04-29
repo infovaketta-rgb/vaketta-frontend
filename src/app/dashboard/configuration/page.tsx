@@ -432,7 +432,8 @@ export default function ConfigurationPage() {
   }
 
   function handleIgConnect() {
-    if (!ig.embedUrl) {
+    const url = ig.embedUrl || process.env.NEXT_PUBLIC_INSTAGRAM_EMBED_URL || "";
+    if (!url) {
       setIgOAuthError("Instagram OAuth URL is not configured. Contact your administrator.");
       return;
     }
@@ -442,7 +443,7 @@ export default function ConfigurationPage() {
     const left = Math.round(window.screenX + (window.outerWidth  - w) / 2);
     const top  = Math.round(window.screenY + (window.outerHeight - h) / 2);
     const popup = window.open(
-      ig.embedUrl,
+      url,
       "ig-oauth",
       `width=${w},height=${h},left=${left},top=${top},scrollbars=yes,resizable=yes`
     );
