@@ -31,6 +31,7 @@ type InstagramConfig = {
   accessToken:   string;
   igAccountId:   string;
   connected:     boolean;
+  embedUrl:      string;
 };
 
 // ── helpers ────────────────────────────────────────────────────────────────────
@@ -120,7 +121,9 @@ export default function ConfigurationPage() {
   const [fbError,      setFbError]      = useState("");
 
   // Instagram integration state
-  const [ig, setIg]               = useState<InstagramConfig>({ accessToken: "", igAccountId: "", connected: false });
+  const [ig, setIg]               = useState<InstagramConfig>({ accessToken: "", igAccountId: "", connected: false, embedUrl: "" });
+  const [igConnecting, setIgConnecting] = useState(false);
+  const [igOAuthError, setIgOAuthError] = useState("");
   const [igSaving,  setIgSaving]  = useState(false);
   const [igSaved,   setIgSaved]   = useState(false);
   const [igError,   setIgError]   = useState("");
@@ -184,6 +187,7 @@ export default function ConfigurationPage() {
         accessToken: data.accessToken ?? "",
         igAccountId: data.igAccountId ?? "",
         connected:   data.connected   ?? false,
+        embedUrl:    data.embedUrl    ?? "",
       }))
       .catch(() => {});
   }, [mounted]);
@@ -412,11 +416,12 @@ export default function ConfigurationPage() {
           igAccountId: ig.igAccountId.trim() || null,
         }),
       });
-      setIg({
+      setIg((prev) => ({
+        ...prev,
         accessToken: updated.accessToken ?? "",
         igAccountId: updated.igAccountId ?? "",
         connected:   updated.connected   ?? false,
-      });
+      }));
       setIgSaved(true);
       setTimeout(() => setIgSaved(false), 3000);
     } catch (err: any) {
@@ -424,6 +429,72 @@ export default function ConfigurationPage() {
     } finally {
       setIgSaving(false);
     }
+  }
+
+  function handleIgConnect() {
+    if (!ig.embedUrl) {
+      setIgOAuthError("Instagram OAuth URL is not configured. Contact your administrator.");
+      return;
+    }
+    setIgOAuthError("");
+
+    const w = 600, h = 700;
+    const left = Math.round(window.screenX + (window.outerWidth  - w) / 2);
+    const top  = Math.round(window.screenY + (window.outerHeight - h) / 2);
+    const popup = window.open(
+      ig.embedUrl,
+      "ig-oauth",
+      `width=${w},height=${h},left=${left},top=${top},scrollbars=yes,resizable=yes`
+    );
+
+    if (!popup) {
+      setIgOAuthError("Popup was blocked. Please allow popups for this site and try again.");
+      return;
+    }
+
+    setIgConnecting(true);
+
+    const timer = setInterval(() => {
+      if (popup.closed) {
+        clearInterval(timer);
+        setIgConnecting(false);
+        return;
+      }
+      try {
+        const href = popup.location?.href ?? "";
+        const isRedirected = href.includes("vaketta.com") || href.includes("localhost");
+        if (!isRedirected) return;
+
+        const code = new URLSearchParams(popup.location.search).get("code");
+        clearInterval(timer);
+        popup.close();
+
+        if (!code) {
+          setIgConnecting(false);
+          setIgOAuthError("Instagram authorisation was cancelled. Please try again.");
+          return;
+        }
+
+        apiFetch("/hotel-settings/instagram/oauth-exchange", {
+          method: "POST",
+          body:   JSON.stringify({ code }),
+        })
+          .then((data: any) => {
+            setIg((prev) => ({
+              ...prev,
+              igAccountId: data.igAccountId ?? prev.igAccountId,
+              connected:   true,
+            }));
+            setIgAdvancedOpen(true);
+          })
+          .catch((e: any) => {
+            setIgOAuthError(e.message ?? "Failed to exchange Instagram token.");
+          })
+          .finally(() => setIgConnecting(false));
+      } catch {
+        // Cross-origin — popup still on instagram.com, keep polling
+      }
+    }, 500);
   }
 
   async function copyText(text: string, setCopiedFn: (v: boolean) => void) {
@@ -974,6 +1045,40 @@ export default function ConfigurationPage() {
             </div>
 
             <div className="px-6 py-5 space-y-4">
+
+              {/* ── Connect via Instagram ── */}
+              <div className="flex flex-col gap-2">
+                <div className="flex items-center justify-between rounded-xl border px-4 py-3"
+                  style={{ borderColor: "#d6249f33", background: "linear-gradient(to right, #fdf0fa, #fff8f0)" }}>
+                  <div>
+                    <p className="text-sm font-medium text-gray-800">
+                      Connect Instagram <span className="text-xs font-normal text-green-600">(Recommended)</span>
+                    </p>
+                    <p className="text-xs text-gray-400 mt-0.5">
+                      Use Instagram login to connect your Business account automatically.
+                    </p>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={handleIgConnect}
+                    disabled={igConnecting}
+                    className="flex items-center gap-2 rounded-lg px-4 py-2 text-sm font-semibold text-white hover:opacity-90 disabled:opacity-60 disabled:cursor-not-allowed shrink-0 ml-4 transition"
+                    style={{ background: "radial-gradient(circle at 30% 107%, #fdf497 0%, #fdf497 5%, #fd5949 45%, #d6249f 60%, #285AEB 90%)" }}
+                  >
+                    {igConnecting ? (
+                      <span className="h-4 w-4 animate-spin rounded-full border-2 border-white border-t-transparent" />
+                    ) : (
+                      <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 24 24">
+                        <path d="M12 2.163c3.204 0 3.584.012 4.85.07 3.252.148 4.771 1.691 4.919 4.919.058 1.265.069 1.645.069 4.849 0 3.205-.012 3.584-.069 4.849-.149 3.225-1.664 4.771-4.919 4.919-1.266.058-1.644.07-4.85.07-3.204 0-3.584-.012-4.849-.07-3.26-.149-4.771-1.699-4.919-4.92-.058-1.265-.07-1.644-.07-4.849 0-3.204.013-3.583.07-4.849.149-3.227 1.664-4.771 4.919-4.919 1.266-.057 1.645-.069 4.849-.069zM12 0C8.741 0 8.333.014 7.053.072 2.695.272.273 2.69.073 7.052.014 8.333 0 8.741 0 12c0 3.259.014 3.668.072 4.948.2 4.358 2.618 6.78 6.98 6.98C8.333 23.986 8.741 24 12 24c3.259 0 3.668-.014 4.948-.072 4.354-.2 6.782-2.618 6.979-6.98.059-1.28.073-1.689.073-4.948 0-3.259-.014-3.667-.072-4.947-.196-4.354-2.617-6.78-6.979-6.98C15.668.014 15.259 0 12 0zm0 5.838a6.162 6.162 0 1 0 0 12.324 6.162 6.162 0 0 0 0-12.324zM12 16a4 4 0 1 1 0-8 4 4 0 0 1 0 8zm6.406-11.845a1.44 1.44 0 1 0 0 2.881 1.44 1.44 0 0 0 0-2.881z"/>
+                      </svg>
+                    )}
+                    {igConnecting ? "Connecting…" : "Connect via Instagram"}
+                  </button>
+                </div>
+                {igOAuthError && (
+                  <p className="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-xs text-red-700">{igOAuthError}</p>
+                )}
+              </div>
 
               {/* Collapsible credentials panel */}
               <div className="rounded-xl border border-gray-200 overflow-hidden">
