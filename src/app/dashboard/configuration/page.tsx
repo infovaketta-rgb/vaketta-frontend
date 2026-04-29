@@ -122,8 +122,11 @@ export default function ConfigurationPage() {
 
   // Instagram integration state
   const [ig, setIg]               = useState<InstagramConfig>({ accessToken: "", igAccountId: "", connected: false, embedUrl: "" });
-  const [igConnecting, setIgConnecting] = useState(false);
-  const [igOAuthError, setIgOAuthError] = useState("");
+  const [igConnecting,  setIgConnecting]  = useState(false);
+  const [igOAuthError,  setIgOAuthError]  = useState("");
+  const [igSubStatus,   setIgSubStatus]   = useState<boolean | null>(null);
+  const [igSubLoading,  setIgSubLoading]  = useState(false);
+  const [igSubError,    setIgSubError]    = useState("");
   const [igSaving,  setIgSaving]  = useState(false);
   const [igSaved,   setIgSaved]   = useState(false);
   const [igError,   setIgError]   = useState("");
@@ -183,12 +186,20 @@ export default function ConfigurationPage() {
       .catch(() => {});
 
     apiFetch("/hotel-settings/instagram")
-      .then((data: any) => setIg({
-        accessToken: data.accessToken ?? "",
-        igAccountId: data.igAccountId ?? "",
-        connected:   data.connected   ?? false,
-        embedUrl:    data.embedUrl    ?? "",
-      }))
+      .then((data: any) => {
+        const connected = data.connected ?? false;
+        setIg({
+          accessToken: data.accessToken ?? "",
+          igAccountId: data.igAccountId ?? "",
+          connected,
+          embedUrl:    data.embedUrl    ?? "",
+        });
+        if (connected) {
+          apiFetch("/hotel-settings/instagram/subscribe/status")
+            .then((s: any) => setIgSubStatus(s.subscribed ?? false))
+            .catch(() => {});
+        }
+      })
       .catch(() => {});
   }, [mounted]);
 
@@ -496,6 +507,32 @@ export default function ConfigurationPage() {
         // Cross-origin — popup still on instagram.com, keep polling
       }
     }, 500);
+  }
+
+  async function handleIgSubscribe() {
+    setIgSubLoading(true);
+    setIgSubError("");
+    try {
+      await apiFetch("/hotel-settings/instagram/subscribe", { method: "POST" });
+      setIgSubStatus(true);
+    } catch (err: any) {
+      setIgSubError(err.message || "Failed to subscribe.");
+    } finally {
+      setIgSubLoading(false);
+    }
+  }
+
+  async function handleIgUnsubscribe() {
+    setIgSubLoading(true);
+    setIgSubError("");
+    try {
+      await apiFetch("/hotel-settings/instagram/subscribe", { method: "DELETE" });
+      setIgSubStatus(false);
+    } catch (err: any) {
+      setIgSubError(err.message || "Failed to unsubscribe.");
+    } finally {
+      setIgSubLoading(false);
+    }
   }
 
   async function copyText(text: string, setCopiedFn: (v: boolean) => void) {
@@ -1080,6 +1117,64 @@ export default function ConfigurationPage() {
                   <p className="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-xs text-red-700">{igOAuthError}</p>
                 )}
               </div>
+
+              {/* ── Webhook Subscription ── */}
+              {ig.connected && (
+                <div className="rounded-xl border border-gray-200 overflow-hidden">
+                  <div className="flex items-center justify-between px-4 py-3 gap-3">
+                    <div className="flex items-center gap-2 min-w-0">
+                      <svg className="w-4 h-4 shrink-0 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9"/>
+                      </svg>
+                      <div>
+                        <p className="text-sm font-medium text-gray-700">Webhook Subscription</p>
+                        <p className="text-xs text-gray-400 mt-0.5">Receive Instagram DMs in real time via Meta webhook.</p>
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-2 shrink-0">
+                      {igSubStatus === null ? (
+                        <span className="text-xs text-gray-400">Checking…</span>
+                      ) : (
+                        <span className={`flex items-center gap-1.5 text-xs font-medium px-2.5 py-1 rounded-full border ${
+                          igSubStatus
+                            ? "text-green-700 bg-green-50 border-green-200"
+                            : "text-red-600 bg-red-50 border-red-200"
+                        }`}>
+                          <span className={`w-1.5 h-1.5 rounded-full ${igSubStatus ? "bg-green-500" : "bg-red-400"}`} />
+                          {igSubStatus ? "Subscribed" : "Not subscribed"}
+                        </span>
+                      )}
+                      {igSubStatus ? (
+                        <button
+                          type="button"
+                          onClick={handleIgUnsubscribe}
+                          disabled={igSubLoading}
+                          className="flex items-center gap-1.5 rounded-lg border border-red-200 bg-red-50 px-3 py-1.5 text-xs font-semibold text-red-700 hover:bg-red-100 disabled:opacity-50 transition"
+                        >
+                          {igSubLoading && <span className="h-3 w-3 animate-spin rounded-full border-2 border-red-400 border-t-transparent" />}
+                          {igSubLoading ? "…" : "Unsubscribe"}
+                        </button>
+                      ) : (
+                        <button
+                          type="button"
+                          onClick={handleIgSubscribe}
+                          disabled={igSubLoading}
+                          className="flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-semibold text-white disabled:opacity-50 transition hover:opacity-90"
+                          style={{ background: "radial-gradient(circle at 30% 107%, #fdf497 0%, #fdf497 5%, #fd5949 45%, #d6249f 60%, #285AEB 90%)" }}
+                        >
+                          {igSubLoading && <span className="h-3 w-3 animate-spin rounded-full border-2 border-white border-t-transparent" />}
+                          {igSubLoading ? "…" : "Subscribe"}
+                        </button>
+                      )}
+                    </div>
+                  </div>
+                  {igSubError && (
+                    <div className="border-t border-red-100 bg-red-50 px-4 py-2 text-xs text-red-700">
+                      {igSubError}
+                    </div>
+                  )}
+                </div>
+              )}
 
               {/* Collapsible credentials panel */}
               <div className="rounded-xl border border-gray-200 overflow-hidden">
