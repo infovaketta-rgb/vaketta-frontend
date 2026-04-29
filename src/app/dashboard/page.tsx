@@ -50,7 +50,7 @@ export default function DashboardPage() {
   if (loading) {
     return (
       <div className="p-6 space-y-6 bg-[#F4F2ED] min-h-screen">
-        <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
+        <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
           {[...Array(4)].map((_, i) => <SkeletonStatCard key={i} />)}
         </div>
         <div className="rounded-2xl border border-[#E5E0D4] bg-white overflow-hidden">
@@ -87,7 +87,7 @@ export default function DashboardPage() {
       </div>
 
       <div className="space-y-8 px-6 py-8 lg:px-10">
-        <section className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+        <section className="grid grid-cols-2 gap-3 xl:grid-cols-4">
           <StatCard
             title="Today revenue"
             stat={data.stats.todayRevenue}
