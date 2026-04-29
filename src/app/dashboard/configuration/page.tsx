@@ -492,6 +492,7 @@ export default function ConfigurationPage() {
           body:   JSON.stringify({ code }),
         })
           .then((data: any) => {
+            console.log(`[Instagram OAuth] redirect_uri used in exchange: "${data.redirectUri}"`);
             setIg((prev) => ({
               ...prev,
               igAccountId: data.igAccountId ?? prev.igAccountId,
