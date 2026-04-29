@@ -38,7 +38,7 @@ export default function DataDeletionAdminPage() {
 
   useEffect(() => {
     if (!mounted) return;
-    fetch(`${API_BASE}/admin/data-deletion`, { headers: { "ngrok-skip-browser-warning": "true" } })
+    fetch(`${API_BASE}/admin/data-deletion`, { headers: { ...(process.env.NODE_ENV === "development" ? { "ngrok-skip-browser-warning": "true" } : {}) } })
       .then((r) => r.json())
       .then((data) => {
         setEffectiveDate(data.effectiveDate ?? "");

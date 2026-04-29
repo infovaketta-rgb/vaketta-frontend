@@ -1,5 +1,6 @@
 "use client";
 import { useState } from "react";
+import { logout } from "@/lib/auth";
 
 export default function Login() {
   const [email, setEmail]       = useState("");
@@ -9,13 +10,17 @@ export default function Login() {
 
   async function handleLogin() {
     setError("");
+    logout();
     setLoading(true);
     try {
       const res = await fetch(
         `${process.env.NEXT_PUBLIC_API_BASE ?? ""}/auth/login`,
         {
           method: "POST",
-          headers: { "Content-Type": "application/json", "ngrok-skip-browser-warning": "true" },
+          headers: {
+            "Content-Type": "application/json",
+            ...(process.env.NODE_ENV === "development" ? { "ngrok-skip-browser-warning": "true" } : {}),
+          },
           body: JSON.stringify({ email, password }),
         }
       );

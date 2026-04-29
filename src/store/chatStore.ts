@@ -31,6 +31,7 @@ type ChatState = {
   updateMessageStatus: (messageId: string, status: string) => void;
   removeMessage: (messageId: string) => void;
   setBotEnabled: (enabled: boolean) => void;
+  resetStore: () => void;
 };
 
 export const useChatStore = create<ChatState>((set) => ({
@@ -100,4 +101,12 @@ export const useChatStore = create<ChatState>((set) => ({
     })),
 
   setBotEnabled: (enabled) => set({ botEnabled: enabled }),
+
+  resetStore: () => set({
+    selectedGuestId:   null,
+    selectedGuestPhone: null,
+    selectedGuestName:  null,
+    messages:           [],
+    botEnabled:         true,
+  }),
 }));

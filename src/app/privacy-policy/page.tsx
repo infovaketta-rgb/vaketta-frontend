@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 
-const API_BASE = process.env.NEXT_PUBLIC_API_BASE ?? "http://localhost:5000";
+const API_BASE = process.env.NEXT_PUBLIC_API_BASE ?? "";
 
 type Policy = {
   effectiveDate: string;
@@ -16,7 +16,7 @@ export default function PrivacyPolicyPage() {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    fetch(`${API_BASE}/admin/privacy-policy`, { headers: { "ngrok-skip-browser-warning": "true" } })
+    fetch(`${API_BASE}/admin/privacy-policy`, { headers: { ...(process.env.NODE_ENV === "development" ? { "ngrok-skip-browser-warning": "true" } : {}) } })
       .then((r) => r.json())
       .then((data) => { setPolicy(data); setLoading(false); })
       .catch(() => setLoading(false));

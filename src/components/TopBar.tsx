@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import { usePathname, useRouter } from "next/navigation";
 import { getHotelName, getUserName, getUserRole } from "@/lib/auth";
+import { useChatStore } from "@/store/chatStore";
 import { apiFetch } from "@/lib/api";
 import { getSocket, resetSocket } from "@/lib/socket";
 import { useMounted } from "@/lib/useMounted";
@@ -129,10 +130,11 @@ export default function TopBar({ onMenuClick }: { onMenuClick?: () => void }) {
     if (token) {
       fetch(
         `${process.env.NEXT_PUBLIC_API_BASE ?? ""}/auth/logout`,
-        { method: "POST", headers: { Authorization: `Bearer ${token}`, "ngrok-skip-browser-warning": "true" } }
+        { method: "POST", headers: { Authorization: `Bearer ${token}`, ...(process.env.NODE_ENV === "development" ? { "ngrok-skip-browser-warning": "true" } : {}) } }
       ).catch(() => {});
     }
     resetSocket();
+    useChatStore.getState().resetStore();
     localStorage.clear();
     router.push("/login");
   }

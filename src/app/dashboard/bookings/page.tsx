@@ -79,8 +79,9 @@ async function updateStatus(id: string, status: string) {
     setBookings((prev) =>
       prev.map((b) => (b.id === id ? { ...b, status } : b))
     );
-  } catch (err) {
+  } catch (err: any) {
     console.error(err);
+    addToast(err?.message || "Failed to update booking status", "error");
   }
   setOpenMenuId(null);
 }
@@ -103,6 +104,22 @@ async function updateStatus(id: string, status: string) {
     e.preventDefault();
     if (!editingBooking) return;
     setEditError("");
+
+    const ci = new Date(editForm.checkIn);
+    const co = new Date(editForm.checkOut);
+    if (!editForm.checkIn || !editForm.checkOut || isNaN(ci.getTime()) || isNaN(co.getTime())) {
+      setEditError("Check-in and check-out dates are required.");
+      return;
+    }
+    if (co <= ci) {
+      setEditError("Check-out must be after check-in.");
+      return;
+    }
+    if (Number(editForm.pricePerNight) < 0 || Number(editForm.advancePaid) < 0) {
+      setEditError("Prices cannot be negative.");
+      return;
+    }
+
     setEditLoading(true);
     try {
       const updated = await apiFetch(`/bookings/${editingBooking.id}`, {

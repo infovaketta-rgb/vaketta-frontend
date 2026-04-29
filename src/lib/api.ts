@@ -1,3 +1,5 @@
+import { logout } from "./auth";
+
 const API_BASE = process.env.NEXT_PUBLIC_API_BASE ?? "";
 
 export async function apiFetch(
@@ -14,7 +16,7 @@ export async function apiFetch(
     ...options,
     headers: {
       "Content-Type": "application/json",
-      "ngrok-skip-browser-warning": "true",
+      ...(process.env.NODE_ENV === "development" ? { "ngrok-skip-browser-warning": "true" } : {}),
       ...(token ? { Authorization: `Bearer ${token}` } : {}),
       ...(options.headers || {}),
     },
@@ -22,12 +24,23 @@ export async function apiFetch(
 
   if (!res.ok) {
     if (res.status === 401) {
-      localStorage.clear();
+      logout();
       window.location.href = "/login";
       throw new Error("Session expired");
     }
-    const text = await res.text();
-    throw new Error(text || "API request failed");
+    if (res.status === 402) {
+      let msg = "Subscription has expired";
+      try { const b = await res.json(); msg = b.error ?? msg; } catch {}
+      // Redirect to subscription page — guarded to prevent infinite reload loop
+      if (!window.location.pathname.startsWith("/dashboard/subscription")) {
+        window.location.href = "/dashboard/subscription";
+      }
+      throw new Error(msg);
+    }
+    let errMsg: string;
+    try { const b = await res.json(); errMsg = b.error ?? b.message ?? ""; } catch { errMsg = ""; }
+    if (!errMsg) { try { errMsg = await res.text(); } catch {} }
+    throw new Error(errMsg || "API request failed");
   }
 
   return res.json();

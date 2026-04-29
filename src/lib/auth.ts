@@ -1,3 +1,6 @@
+import { resetSocket } from "./socket";
+import { useChatStore } from "../store/chatStore";
+
 export function saveToken(token: string) {
   localStorage.setItem("TOKEN", token);
 }
@@ -7,6 +10,8 @@ export function getToken() {
 }
 
 export function logout() {
+  resetSocket();
+  useChatStore.getState().resetStore();
   localStorage.removeItem("TOKEN");
   localStorage.removeItem("USER_ROLE");
   localStorage.removeItem("HOTEL_ID");

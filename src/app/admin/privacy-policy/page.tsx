@@ -55,7 +55,7 @@ export default function PrivacyPolicyAdminPage() {
   // Load current policy
   useEffect(() => {
     if (!mounted) return;
-    fetch(`${API_BASE}/admin/privacy-policy`, { headers: { "ngrok-skip-browser-warning": "true" } })
+    fetch(`${API_BASE}/admin/privacy-policy`, { headers: { ...(process.env.NODE_ENV === "development" ? { "ngrok-skip-browser-warning": "true" } : {}) } })
       .then((r) => r.json())
       .then((data) => {
         setEffectiveDate(data.effectiveDate ?? "");

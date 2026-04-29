@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 
-const API_BASE = process.env.NEXT_PUBLIC_API_BASE ?? "http://localhost:5000";
+const API_BASE = process.env.NEXT_PUBLIC_API_BASE ?? "";
 
 type Doc = { effectiveDate: string; content: string; updatedAt: string };
 
@@ -12,7 +12,7 @@ export default function TermsPage() {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    fetch(`${API_BASE}/admin/terms-of-service`, { headers: { "ngrok-skip-browser-warning": "true" } })
+    fetch(`${API_BASE}/admin/terms-of-service`, { headers: { ...(process.env.NODE_ENV === "development" ? { "ngrok-skip-browser-warning": "true" } : {}) } })
       .then((r) => r.json())
       .then((data) => { setDoc(data); setLoading(false); })
       .catch(() => setLoading(false));

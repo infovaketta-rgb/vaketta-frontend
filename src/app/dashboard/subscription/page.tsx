@@ -246,6 +246,40 @@ export default function SubscriptionPage() {
     );
   }
 
+  // 402 — backend blocked all API calls; show a static expired screen
+  if (error.toLowerCase().includes("expired")) {
+    return (
+      <div className="p-8 max-w-xl">
+        <div className="rounded-2xl border border-red-200 bg-white shadow-sm overflow-hidden">
+          <div className="bg-red-50 border-b border-red-100 px-6 py-8 text-center space-y-2">
+            <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-full bg-red-100">
+              <svg className="h-6 w-6 text-red-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
+                  d="M12 9v2m0 4h.01M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z" />
+              </svg>
+            </div>
+            <h2 className="text-lg font-bold text-red-800">Subscription Expired</h2>
+            <p className="text-sm text-red-600">
+              Your hotel's subscription has expired. All automated features are currently paused.
+            </p>
+          </div>
+          <div className="px-6 py-7 text-center space-y-4">
+            <p className="text-sm text-[#0C1B33]/65">
+              To restore access and resume operations, contact your account manager to renew.
+            </p>
+            <a
+              href="mailto:support@vaketta.com"
+              className="inline-flex items-center gap-2 rounded-xl bg-[#1B52A8] px-7 py-3 text-sm font-semibold text-white shadow-sm hover:bg-[#163F82] transition"
+            >
+              Contact Support
+            </a>
+            <p className="text-xs text-[#0C1B33]/35">support@vaketta.com</p>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   const subCurrency  = sub?.snapshot?.currency ?? sub?.plan?.currency;
   const convLimit    = sub?.snapshot?.conversationLimit       ?? sub?.plan?.conversationLimit       ?? 0;
   const aiLimit      = sub?.snapshot?.aiReplyLimit            ?? sub?.plan?.aiReplyLimit            ?? 0;

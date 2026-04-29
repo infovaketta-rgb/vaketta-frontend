@@ -437,6 +437,14 @@ export default function ChatWindow() {
   const [pendingUndos, setPendingUndos] = useState<Map<string, number>>(new Map());
   const undoTimersRef = useRef<Map<string, ReturnType<typeof setInterval>>>(new Map());
 
+  // Clear all undo countdown timers when the component unmounts
+  useEffect(() => {
+    return () => {
+      undoTimersRef.current.forEach((timer) => clearInterval(timer));
+      undoTimersRef.current.clear();
+    };
+  }, []);
+
   const [text, setText] = useState("");
   const [togglingBot, setTogglingBot] = useState(false);
   const [sendError, setSendError] = useState("");

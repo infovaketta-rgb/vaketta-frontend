@@ -38,7 +38,7 @@ export default function TermsAdminPage() {
 
   useEffect(() => {
     if (!mounted) return;
-    fetch(`${API_BASE}/admin/terms-of-service`, { headers: { "ngrok-skip-browser-warning": "true" } })
+    fetch(`${API_BASE}/admin/terms-of-service`, { headers: { ...(process.env.NODE_ENV === "development" ? { "ngrok-skip-browser-warning": "true" } : {}) } })
       .then((r) => r.json())
       .then((data) => {
         setEffectiveDate(data.effectiveDate ?? "");

@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { apiFetch } from "@/lib/api";
 import { getSocket } from "@/lib/socket";
 import { useChatStore } from "@/store/chatStore";
@@ -75,10 +75,16 @@ function getLastMessagePreview(
 export default function ChatList() {
   const mounted = useMounted();
   const [conversations, setConversations] = useState<Conversation[]>([]);
+  const conversationsRef = useRef<Conversation[]>([]);
   const [search, setSearch] = useState("");
   const [loading, setLoading] = useState(true);
   const selectedGuestId = useChatStore((s) => s.selectedGuestId);
   const setSelectedGuest = useChatStore((s) => s.setSelectedGuest);
+
+  // Keep ref in sync so socket handlers always see the latest list without stale closure
+  useEffect(() => {
+    conversationsRef.current = conversations;
+  }, [conversations]);
 
   // Load conversations on mount
   useEffect(() => {
@@ -95,33 +101,30 @@ export default function ChatList() {
     const socket = getSocket();
 
     const onNewMessage = ({ message }: { message: any }) => {
-      setConversations((prev) => {
-        const exists = prev.find((c) => c.guestId === message.guestId);
+      // Check against ref (not setState prev) to avoid async side effects in updater
+      if (!conversationsRef.current.some((c) => c.guestId === message.guestId)) {
+        apiFetch("/conversations").then(setConversations).catch(console.error);
+        return;
+      }
 
-        if (exists) {
-          const updated = prev.map((c) =>
-            c.guestId === message.guestId
-              ? {
-                  ...c,
-                  lastMessage: message.body,
-                  lastMessageType: message.messageType ?? null,
-                  lastDirection: message.direction,
-                  lastTimestamp: message.timestamp,
-                  unreadCount:
-                    message.direction === "IN" && message.guestId !== selectedGuestId
-                      ? c.unreadCount + 1
-                      : c.unreadCount,
-                }
-              : c
-          );
-          const target = updated.find((c) => c.guestId === message.guestId)!;
-          return [target, ...updated.filter((c) => c.guestId !== message.guestId)];
-        } else {
-          apiFetch("/conversations")
-            .then(setConversations)
-            .catch(console.error);
-          return prev;
-        }
+      setConversations((prev) => {
+        const updated = prev.map((c) =>
+          c.guestId === message.guestId
+            ? {
+                ...c,
+                lastMessage: message.body,
+                lastMessageType: message.messageType ?? null,
+                lastDirection: message.direction,
+                lastTimestamp: message.timestamp,
+                unreadCount:
+                  message.direction === "IN" && message.guestId !== selectedGuestId
+                    ? c.unreadCount + 1
+                    : c.unreadCount,
+              }
+            : c
+        );
+        const target = updated.find((c) => c.guestId === message.guestId)!;
+        return [target, ...updated.filter((c) => c.guestId !== message.guestId)];
       });
     };
 

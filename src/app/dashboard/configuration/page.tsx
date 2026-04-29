@@ -27,6 +27,12 @@ type WhatsAppConfig = {
   connected:         boolean;
 };
 
+type InstagramConfig = {
+  accessToken:   string;
+  igAccountId:   string;
+  connected:     boolean;
+};
+
 // ── helpers ────────────────────────────────────────────────────────────────────
 
 const inputClass =
@@ -78,8 +84,10 @@ function Field({
 // ── component ──────────────────────────────────────────────────────────────────
 
 const WEBHOOK_URL =
-  (process.env.NEXT_PUBLIC_API_BASE ?? "http://localhost:5000") +
-  "/webhook/whatsapp";
+  (process.env.NEXT_PUBLIC_API_BASE ?? "") + "/webhook/whatsapp";
+
+const INSTAGRAM_WEBHOOK_URL =
+  (process.env.NEXT_PUBLIC_API_BASE ?? "") + "/webhook/instagram";
 
 export default function ConfigurationPage() {
   const mounted = useMounted();
@@ -110,6 +118,14 @@ export default function ConfigurationPage() {
   const [testResult,   setTestResult]   = useState<"success" | "error" | null>(null);
   const [fbConnecting, setFbConnecting] = useState(false);
   const [fbError,      setFbError]      = useState("");
+
+  // Instagram integration state
+  const [ig, setIg]               = useState<InstagramConfig>({ accessToken: "", igAccountId: "", connected: false });
+  const [igSaving,  setIgSaving]  = useState(false);
+  const [igSaved,   setIgSaved]   = useState(false);
+  const [igError,   setIgError]   = useState("");
+  const [showIgToken, setShowIgToken] = useState(false);
+  const [igAdvancedOpen, setIgAdvancedOpen] = useState(false);
 
   // Message delay state
   const [delayEnabled, setDelayEnabled]   = useState(false);
@@ -160,6 +176,14 @@ export default function ConfigurationPage() {
         metaWabaId:        data.metaWabaId        ?? "",
         metaVerifyToken:   data.metaVerifyToken   ?? "",
         connected:         data.connected         ?? false,
+      }))
+      .catch(() => {});
+
+    apiFetch("/hotel-settings/instagram")
+      .then((data: any) => setIg({
+        accessToken: data.accessToken ?? "",
+        igAccountId: data.igAccountId ?? "",
+        connected:   data.connected   ?? false,
       }))
       .catch(() => {});
   }, [mounted]);
@@ -376,10 +400,38 @@ export default function ConfigurationPage() {
     );
   }
 
+  async function handleIgSave(e: React.SyntheticEvent) {
+    e.preventDefault();
+    setIgSaving(true);
+    setIgError("");
+    try {
+      const updated = await apiFetch("/hotel-settings/instagram", {
+        method: "PATCH",
+        body: JSON.stringify({
+          accessToken: ig.accessToken.trim() || null,
+          igAccountId: ig.igAccountId.trim() || null,
+        }),
+      });
+      setIg({
+        accessToken: updated.accessToken ?? "",
+        igAccountId: updated.igAccountId ?? "",
+        connected:   updated.connected   ?? false,
+      });
+      setIgSaved(true);
+      setTimeout(() => setIgSaved(false), 3000);
+    } catch (err: any) {
+      setIgError(err.message || "Failed to save Instagram settings.");
+    } finally {
+      setIgSaving(false);
+    }
+  }
+
   async function copyText(text: string, setCopiedFn: (v: boolean) => void) {
-    await navigator.clipboard.writeText(text);
-    setCopiedFn(true);
-    setTimeout(() => setCopiedFn(false), 2000);
+    try {
+      await navigator.clipboard.writeText(text);
+      setCopiedFn(true);
+      setTimeout(() => setCopiedFn(false), 2000);
+    } catch { /* clipboard unavailable or permission denied — silently ignore */ }
   }
 
   if (!mounted || loading) {
@@ -884,6 +936,142 @@ export default function ConfigurationPage() {
                           )}
                         </button>
                       </div>
+                    </div>
+
+                  </div>
+                )}
+              </div>
+
+            </div>
+          </div>
+        </form>
+
+        {/* ── Instagram Integration (separate form) ── */}
+        <form onSubmit={handleIgSave}>
+          <div className="rounded-2xl border border-gray-100 bg-white shadow-sm overflow-hidden">
+
+            {/* Card header */}
+            <div className="border-b border-gray-100 px-6 py-4 flex items-center gap-3"
+              style={{ background: "linear-gradient(to right, #fce4ec, #fff3e0, white)" }}>
+              <div className="w-8 h-8 rounded-lg flex items-center justify-center shrink-0"
+                style={{ background: "radial-gradient(circle at 30% 107%, #fdf497 0%, #fdf497 5%, #fd5949 45%, #d6249f 60%, #285AEB 90%)" }}>
+                <svg className="w-5 h-5 text-white" fill="currentColor" viewBox="0 0 24 24">
+                  <path d="M12 2.163c3.204 0 3.584.012 4.85.07 3.252.148 4.771 1.691 4.919 4.919.058 1.265.069 1.645.069 4.849 0 3.205-.012 3.584-.069 4.849-.149 3.225-1.664 4.771-4.919 4.919-1.266.058-1.644.07-4.85.07-3.204 0-3.584-.012-4.849-.07-3.26-.149-4.771-1.699-4.919-4.92-.058-1.265-.07-1.644-.07-4.849 0-3.204.013-3.583.07-4.849.149-3.227 1.664-4.771 4.919-4.919 1.266-.057 1.645-.069 4.849-.069zM12 0C8.741 0 8.333.014 7.053.072 2.695.272.273 2.69.073 7.052.014 8.333 0 8.741 0 12c0 3.259.014 3.668.072 4.948.2 4.358 2.618 6.78 6.98 6.98C8.333 23.986 8.741 24 12 24c3.259 0 3.668-.014 4.948-.072 4.354-.2 6.782-2.618 6.979-6.98.059-1.28.073-1.689.073-4.948 0-3.259-.014-3.667-.072-4.947-.196-4.354-2.617-6.78-6.979-6.98C15.668.014 15.259 0 12 0zm0 5.838a6.162 6.162 0 1 0 0 12.324 6.162 6.162 0 0 0 0-12.324zM12 16a4 4 0 1 1 0-8 4 4 0 0 1 0 8zm6.406-11.845a1.44 1.44 0 1 0 0 2.881 1.44 1.44 0 0 0 0-2.881z"/>
+                </svg>
+              </div>
+              <div className="flex-1">
+                <h2 className="text-sm font-semibold text-[#2B0D3E]">Instagram Integration</h2>
+                <p className="mt-0.5 text-xs text-gray-500">Connect your Instagram Business account to send and receive DMs.</p>
+              </div>
+              <span className={`flex items-center gap-1.5 text-xs font-medium px-3 py-1 rounded-full border ${
+                ig.connected
+                  ? "text-green-700 bg-green-50 border-green-200"
+                  : "text-gray-500 bg-gray-50 border-gray-200"
+              }`}>
+                <span className={`w-1.5 h-1.5 rounded-full ${ig.connected ? "bg-green-500" : "bg-gray-400"}`} />
+                {ig.connected ? "Connected" : "Not configured"}
+              </span>
+            </div>
+
+            <div className="px-6 py-5 space-y-4">
+
+              {/* Collapsible credentials panel */}
+              <div className="rounded-xl border border-gray-200 overflow-hidden">
+                <button
+                  type="button"
+                  onClick={() => setIgAdvancedOpen((v) => !v)}
+                  className="w-full flex items-center gap-2 px-4 py-3 text-left text-sm font-medium text-gray-700 hover:bg-gray-50 transition-colors"
+                >
+                  <svg className="w-4 h-4 shrink-0 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"/>
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/>
+                  </svg>
+                  Credentials Setup
+                  <svg className={`w-4 h-4 ml-auto shrink-0 text-gray-400 transition-transform ${igAdvancedOpen ? "rotate-180" : ""}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7"/>
+                  </svg>
+                </button>
+
+                {igAdvancedOpen && (
+                  <div className="px-4 pb-5 pt-1 space-y-4 border-t border-gray-100">
+
+                    {/* Webhook URL */}
+                    <Field label="Webhook URL" hint="Paste this in Meta's Instagram webhook configuration.">
+                      <div className="flex gap-2">
+                        <input type="text" value={INSTAGRAM_WEBHOOK_URL} readOnly className={`${readonlyClass} font-mono text-xs`} />
+                        <button
+                          type="button"
+                          onClick={() => copyText(INSTAGRAM_WEBHOOK_URL, setCopiedWebhook)}
+                          className="shrink-0 rounded-lg border border-gray-200 px-3 py-2 text-xs font-medium text-gray-600 hover:bg-gray-50 transition"
+                        >
+                          {copiedWebhook ? "Copied!" : "Copy"}
+                        </button>
+                      </div>
+                    </Field>
+
+                    <div className="grid gap-4 sm:grid-cols-2">
+                      <Field label="Instagram Account ID" hint="Your Instagram Business Account ID from Meta Business Suite.">
+                        <input
+                          type="text"
+                          value={ig.igAccountId}
+                          onChange={(e) => setIg((v) => ({ ...v, igAccountId: e.target.value }))}
+                          placeholder="e.g. 17841400000000000"
+                          className={inputClass}
+                        />
+                      </Field>
+
+                      <Field label="Page Access Token" hint="Permanent token with instagram_manage_messages permission.">
+                        <div className="flex gap-2">
+                          <input
+                            type={showIgToken ? "text" : "password"}
+                            value={ig.accessToken}
+                            onChange={(e) => setIg((v) => ({ ...v, accessToken: e.target.value }))}
+                            placeholder="EAAg…"
+                            className={`${inputClass} font-mono text-xs`}
+                            autoComplete="off"
+                          />
+                          <button
+                            type="button"
+                            onClick={() => setShowIgToken((v) => !v)}
+                            title={showIgToken ? "Hide token" : "Show token"}
+                            className="shrink-0 rounded-lg border border-gray-200 px-3 py-2 text-xs font-medium text-gray-600 hover:bg-gray-50 transition"
+                          >
+                            {showIgToken ? (
+                              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13.875 18.825A10.05 10.05 0 0112 19c-4.478 0-8.268-2.943-9.543-7a9.97 9.97 0 011.563-3.029m5.858.908a3 3 0 114.243 4.243M9.878 9.878l4.242 4.242M9.88 9.88L6.59 6.59m7.532 7.532l3.29 3.29M3 3l18 18"/>
+                              </svg>
+                            ) : (
+                              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0zM2.458 12C3.732 7.943 7.522 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"/>
+                              </svg>
+                            )}
+                          </button>
+                        </div>
+                      </Field>
+                    </div>
+
+                    {igError && (
+                      <div className="rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+                        {igError}
+                      </div>
+                    )}
+
+                    <div className="flex items-center justify-between pt-1 gap-3">
+                      <p className="text-xs text-gray-400">Credentials are stored securely and used to send outgoing Instagram messages.</p>
+                      <button
+                        type="submit"
+                        disabled={igSaving}
+                        className="flex items-center gap-2 rounded-lg px-5 py-2.5 text-sm font-semibold text-white transition disabled:opacity-50 shrink-0"
+                        style={{ background: "linear-gradient(135deg, #d6249f, #fd5949)" }}
+                      >
+                        {igSaving ? (
+                          <><span className="h-4 w-4 animate-spin rounded-full border-2 border-white border-t-transparent" />Saving…</>
+                        ) : igSaved ? (
+                          <><svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M5 13l4 4L19 7"/></svg>Saved</>
+                        ) : (
+                          "Save Instagram Settings"
+                        )}
+                      </button>
                     </div>
 
                   </div>

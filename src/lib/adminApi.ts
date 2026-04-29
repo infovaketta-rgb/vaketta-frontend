@@ -18,7 +18,7 @@ export async function adminApiFetch(path: string, options?: RequestInit): Promis
   const base = process.env.NEXT_PUBLIC_API_BASE ?? "";
   const headers: Record<string, string> = {
     "Content-Type": "application/json",
-    "ngrok-skip-browser-warning": "true",
+    ...(process.env.NODE_ENV === "development" ? { "ngrok-skip-browser-warning": "true" } : {}),
     ...((options?.headers as Record<string, string>) ?? {}),
   };
 
