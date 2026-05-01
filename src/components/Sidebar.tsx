@@ -90,6 +90,7 @@ export default function Sidebar({ open = false, onClose }: SidebarProps) {
                 </svg>
               } />
               {showBookings && <NavItem href="/dashboard/bookings" label="Bookings" onClick={onClose} />}
+              {showBookings && <NavItem href="/dashboard/guests"   label="Guests"   onClick={onClose} />}
             </ul>
           </div>
 
