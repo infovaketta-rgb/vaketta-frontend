@@ -227,7 +227,7 @@ export default function GuestsPage() {
             <div className="px-4 py-10 text-center text-[#0C1B33]/40 text-sm">No guests found.</div>
           )}
           {!loading && guests.map((g) => (
-            <div key={g.id} className="px-4 py-3 flex items-start gap-3">
+            <div key={g.id} className="px-4 py-3 flex items-start gap-3 cursor-pointer hover:bg-[#F4F2ED]/60 transition" onClick={() => router.push(`/dashboard/guests/${g.id}`)}>
               <Avatar guest={g} />
               <div className="flex-1 min-w-0">
                 <div className="flex items-center justify-between gap-2">
@@ -280,7 +280,7 @@ export default function GuestsPage() {
               </tr>
             )}
             {!loading && guests.map((g) => (
-              <tr key={g.id} className="hover:bg-[#F4F2ED]/60 transition">
+              <tr key={g.id} className="hover:bg-[#F4F2ED]/60 transition cursor-pointer" onClick={(e) => { if (!(e.target as HTMLElement).closest("[data-no-nav]")) router.push(`/dashboard/guests/${g.id}`); }}>
                 {/* Avatar + name + phone */}
                 <td className="px-4 py-3">
                   <div className="flex items-center gap-3">
@@ -322,9 +322,9 @@ export default function GuestsPage() {
                 </td>
 
                 {/* Actions */}
-                <td className="px-4 py-3">
+                <td className="px-4 py-3" data-no-nav>
                   <button
-                    onClick={() => openChat(g)}
+                    onClick={(e) => { e.stopPropagation(); openChat(g); }}
                     className="flex items-center gap-1.5 rounded-lg border border-[#E5E0D4] px-3 py-1.5 text-xs font-medium text-[#1B52A8] hover:bg-[#F2EAF7] transition"
                   >
                     <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -335,6 +335,7 @@ export default function GuestsPage() {
                   </button>
                 </td>
               </tr>
+
             ))}
           </tbody>
         </table>
