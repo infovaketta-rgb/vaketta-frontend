@@ -31,6 +31,10 @@ type RecentMessage = {
   channel:     MessageChannel;
   messageType: string;
   timestamp:   string;
+  mediaUrl:    string | null;
+  mimeType:    string | null;
+  fileName:    string | null;
+  status:      string;
 };
 
 type MediaMessage = {
@@ -42,19 +46,29 @@ type MediaMessage = {
   direction: "IN" | "OUT";
 };
 
+type ActivityEntry = {
+  type:      string;
+  timestamp: string;
+  label:     string;
+};
+
 type GuestDetail = {
   id:                 string;
   name:               string | null;
   phone:              string;
   notes:              string | null;
+  isVip:              boolean;
+  tags:               string[];
   createdAt:          string;
   lastHandledByStaff: boolean;
   totalMessages:      number;
+  totalSpend:         number;
   lastActivity:       string;
   channel:            MessageChannel;
   bookings:           Booking[];
   recentMessages:     RecentMessage[];
   mediaMessages:      MediaMessage[];
+  activityLog:        ActivityEntry[];
 };
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
@@ -134,16 +148,18 @@ function BookingStatusBadge({ status }: { status: BookingStatus }) {
   );
 }
 
-function StatCard({ label, value }: { label: string; value: string | number }) {
+function StatMini({ label, value }: { label: string; value: string | number }) {
   return (
-    <div className="rounded-xl border border-[#E5E0D4] bg-white p-4">
-      <p className="text-xs font-medium text-[#0C1B33]/50 mb-1">{label}</p>
-      <p className="text-xl font-bold text-[#0C1B33]">{value}</p>
+    <div className="flex flex-col items-center gap-0.5 py-3 px-2">
+      <span className="text-lg font-bold text-[#0C1B33]">{value}</span>
+      <span className="text-[10px] text-[#0C1B33]/50 text-center leading-tight">{label}</span>
     </div>
   );
 }
 
 // ── Page ──────────────────────────────────────────────────────────────────────
+
+type Tab = "overview" | "bookings" | "messages" | "media" | "activity";
 
 export default function GuestDetailPage() {
   const mounted  = useMounted();
@@ -155,7 +171,7 @@ export default function GuestDetailPage() {
   const [guest,   setGuest]   = useState<GuestDetail | null>(null);
   const [loading, setLoading] = useState(true);
   const [error,   setError]   = useState("");
-  const [tab,     setTab]     = useState<"overview" | "bookings" | "media">("overview");
+  const [tab,     setTab]     = useState<Tab>("overview");
 
   // Inline name edit
   const [editingName, setEditingName] = useState(false);
@@ -166,6 +182,13 @@ export default function GuestDetailPage() {
   const [notes,       setNotes]       = useState("");
   const [savingNotes, setSavingNotes] = useState(false);
   const notesDirtyRef = useRef(false);
+
+  // Tags
+  const [tagInput,    setTagInput]    = useState("");
+  const [addingTag,   setAddingTag]   = useState(false);
+
+  // Copy feedback
+  const [copied, setCopied] = useState(false);
 
   // Lightbox
   const [lightboxSrc, setLightboxSrc] = useState<string | null>(null);
@@ -216,6 +239,63 @@ export default function GuestDetailPage() {
     }
   }
 
+  async function toggleVip() {
+    if (!guest) return;
+    const newVal = !guest.isVip;
+    setGuest((g) => g ? { ...g, isVip: newVal } : g);
+    try {
+      await apiFetch(`/guests/${id}`, {
+        method: "PATCH",
+        body:   JSON.stringify({ isVip: newVal }),
+      });
+    } catch (e: any) {
+      setGuest((g) => g ? { ...g, isVip: !newVal } : g);
+      addToast(e.message || "Failed to update VIP status", "error");
+    }
+  }
+
+  async function addTag() {
+    const tag = tagInput.trim();
+    if (!tag || !guest) return;
+    if (guest.tags.includes(tag)) { setTagInput(""); return; }
+    const newTags = [...guest.tags, tag];
+    setGuest((g) => g ? { ...g, tags: newTags } : g);
+    setTagInput("");
+    setAddingTag(false);
+    try {
+      await apiFetch(`/guests/${id}`, {
+        method: "PATCH",
+        body:   JSON.stringify({ tags: newTags }),
+      });
+    } catch (e: any) {
+      setGuest((g) => g ? { ...g, tags: guest.tags } : g);
+      addToast(e.message || "Failed to save tag", "error");
+    }
+  }
+
+  async function removeTag(tag: string) {
+    if (!guest) return;
+    const newTags = guest.tags.filter((t) => t !== tag);
+    setGuest((g) => g ? { ...g, tags: newTags } : g);
+    try {
+      await apiFetch(`/guests/${id}`, {
+        method: "PATCH",
+        body:   JSON.stringify({ tags: newTags }),
+      });
+    } catch (e: any) {
+      setGuest((g) => g ? { ...g, tags: guest.tags } : g);
+      addToast(e.message || "Failed to remove tag", "error");
+    }
+  }
+
+  function copyPhone() {
+    if (!guest) return;
+    navigator.clipboard.writeText(guest.phone).then(() => {
+      setCopied(true);
+      setTimeout(() => setCopied(false), 1800);
+    });
+  }
+
   function openChat() {
     if (!guest) return;
     setSelectedGuest(guest.id, !guest.lastHandledByStaff, guest.phone, guest.name, guest.channel);
@@ -241,13 +321,20 @@ export default function GuestDetailPage() {
     );
   }
 
-  const avatarColor   = getAvatarColor(guest.phone);
+  const avatarColor    = getAvatarColor(guest.phone);
   const avatarInitials = guest.channel === "INSTAGRAM"
     ? (guest.name ? guest.name.slice(0, 2).toUpperCase() : "IG")
     : guest.phone.replace(/\D/g, "").slice(-2);
-  const displayName   = guest.name || (guest.channel === "INSTAGRAM" ? "Instagram User" : guest.phone);
-  const lastBooking   = guest.bookings[0];
-  const avg           = avgStayNights(guest.bookings);
+  const displayName    = guest.name || (guest.channel === "INSTAGRAM" ? "Instagram User" : guest.phone);
+  const avg            = avgStayNights(guest.bookings);
+
+  const TABS: { key: Tab; label: string; count?: number }[] = [
+    { key: "overview",  label: "Overview" },
+    { key: "bookings",  label: "Bookings",  count: guest.bookings.length },
+    { key: "messages",  label: "Messages",  count: guest.recentMessages.length },
+    { key: "media",     label: "Media",     count: guest.mediaMessages.length },
+    { key: "activity",  label: "Activity",  count: guest.activityLog.length },
+  ];
 
   return (
     <div className="h-full overflow-y-auto bg-[#F4F2ED] p-4 md:p-6">
@@ -263,6 +350,9 @@ export default function GuestDetailPage() {
           </button>
           <div className="flex items-center gap-2 flex-wrap">
             <h1 className="text-xl font-bold text-[#0C1B33]">{displayName}</h1>
+            {guest.isVip && (
+              <span className="text-amber-400 text-base" title="VIP Guest">★</span>
+            )}
             <ChannelBadge channel={guest.channel} />
           </div>
         </div>
@@ -285,7 +375,7 @@ export default function GuestDetailPage() {
         <div className="flex flex-col gap-4 lg:w-72 lg:shrink-0">
           <div className="rounded-xl border border-[#E5E0D4] bg-white p-5">
 
-            {/* Avatar */}
+            {/* Avatar + VIP + name */}
             <div className="flex flex-col items-center gap-3 pb-5 border-b border-[#E5E0D4]">
               <div className="relative">
                 <div
@@ -294,6 +384,7 @@ export default function GuestDetailPage() {
                 >
                   {avatarInitials}
                 </div>
+                {/* Channel ring indicator */}
                 {guest.channel === "INSTAGRAM" && (
                   <span
                     className="absolute -bottom-0.5 -right-0.5 w-5 h-5 rounded-full flex items-center justify-center border-2 border-white"
@@ -304,6 +395,15 @@ export default function GuestDetailPage() {
                     </svg>
                   </span>
                 )}
+                {/* VIP star overlay */}
+                <button
+                  onClick={toggleVip}
+                  title={guest.isVip ? "Remove VIP" : "Mark as VIP"}
+                  className={`absolute -top-1 -right-1 w-5 h-5 rounded-full flex items-center justify-center border-2 border-white text-[11px] transition
+                    ${guest.isVip ? "bg-amber-400 text-white" : "bg-white text-[#0C1B33]/30 hover:bg-amber-50 hover:text-amber-400"}`}
+                >
+                  ★
+                </button>
               </div>
 
               {/* Editable name */}
@@ -332,11 +432,36 @@ export default function GuestDetailPage() {
               <ChannelBadge channel={guest.channel} />
             </div>
 
+            {/* Stats mini-grid */}
+            <div className="grid grid-cols-3 divide-x divide-[#E5E0D4] border-b border-[#E5E0D4] -mx-5 px-5">
+              <StatMini label="Messages"  value={guest.totalMessages} />
+              <StatMini label="Bookings"  value={guest.bookings.length} />
+              <StatMini label="Spent"     value={guest.totalSpend > 0 ? formatCurrency(guest.totalSpend) : "—"} />
+            </div>
+
             {/* Meta */}
             <div className="pt-4 flex flex-col gap-3 text-sm">
               <div className="flex items-start justify-between gap-2">
                 <span className="text-[#0C1B33]/50 shrink-0">Phone / ID</span>
-                <span className="font-mono text-[#0C1B33]/80 text-xs text-right break-all">{guest.phone}</span>
+                <div className="flex items-center gap-1 min-w-0">
+                  <span className="font-mono text-[#0C1B33]/80 text-xs text-right break-all">{guest.phone}</span>
+                  <button
+                    onClick={copyPhone}
+                    title="Copy"
+                    className="shrink-0 text-[#0C1B33]/30 hover:text-[#7A3F91] transition"
+                  >
+                    {copied ? (
+                      <svg className="w-3.5 h-3.5 text-emerald-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                      </svg>
+                    ) : (
+                      <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
+                          d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" />
+                      </svg>
+                    )}
+                  </button>
+                </div>
               </div>
               <div className="flex items-center justify-between gap-2">
                 <span className="text-[#0C1B33]/50">Member since</span>
@@ -347,11 +472,74 @@ export default function GuestDetailPage() {
                 <span className="text-[#0C1B33]/80 text-xs">{relativeTime(guest.lastActivity)}</span>
               </div>
               <div className="flex items-center justify-between gap-2">
+                <span className="text-[#0C1B33]/50">Avg stay</span>
+                <span className="text-[#0C1B33]/80 text-xs">{avg > 0 ? `${avg} night${avg !== 1 ? "s" : ""}` : "—"}</span>
+              </div>
+              <div className="flex items-center justify-between gap-2">
                 <span className="text-[#0C1B33]/50">Bot</span>
                 <span className={`text-xs font-medium px-2 py-0.5 rounded-full ${guest.lastHandledByStaff ? "bg-slate-100 text-slate-500" : "bg-emerald-100 text-emerald-700"}`}>
                   {guest.lastHandledByStaff ? "OFF" : "ON"}
                 </span>
               </div>
+            </div>
+
+            {/* Tags */}
+            <div className="mt-4 pt-4 border-t border-[#E5E0D4]">
+              <div className="flex items-center justify-between mb-2">
+                <p className="text-xs font-semibold text-[#0C1B33]/50 uppercase tracking-wider">Tags</p>
+                <button
+                  onClick={() => setAddingTag(true)}
+                  className="text-[10px] text-[#7A3F91] hover:text-[#2B0D3E] font-semibold transition"
+                >
+                  + Add
+                </button>
+              </div>
+              <div className="flex flex-wrap gap-1.5">
+                {guest.tags.map((tag) => (
+                  <span
+                    key={tag}
+                    className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-medium bg-[#7A3F91]/10 text-[#7A3F91]"
+                  >
+                    {tag}
+                    <button
+                      onClick={() => removeTag(tag)}
+                      className="text-[#7A3F91]/60 hover:text-red-500 transition leading-none"
+                    >
+                      ×
+                    </button>
+                  </span>
+                ))}
+                {guest.tags.length === 0 && !addingTag && (
+                  <span className="text-[11px] text-[#0C1B33]/30 italic">No tags yet</span>
+                )}
+              </div>
+              {addingTag && (
+                <div className="mt-2 flex gap-1.5">
+                  <input
+                    autoFocus
+                    value={tagInput}
+                    onChange={(e) => setTagInput(e.target.value)}
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter") addTag();
+                      if (e.key === "Escape") { setAddingTag(false); setTagInput(""); }
+                    }}
+                    placeholder="Type tag…"
+                    className="flex-1 rounded-lg border border-[#E5E0D4] px-2 py-1 text-xs focus:outline-none focus:ring-2 focus:ring-[#7A3F91]/25 focus:border-[#7A3F91]"
+                  />
+                  <button
+                    onClick={addTag}
+                    className="rounded-lg bg-[#7A3F91] px-2.5 py-1 text-xs font-semibold text-white hover:bg-[#2B0D3E] transition"
+                  >
+                    Add
+                  </button>
+                  <button
+                    onClick={() => { setAddingTag(false); setTagInput(""); }}
+                    className="rounded-lg border border-[#E5E0D4] px-2.5 py-1 text-xs text-[#0C1B33]/50 hover:bg-[#F4F2ED] transition"
+                  >
+                    ✕
+                  </button>
+                </div>
+              )}
             </div>
 
             {/* Notes */}
@@ -392,26 +580,21 @@ export default function GuestDetailPage() {
         <div className="flex-1 min-w-0">
 
           {/* Tab bar */}
-          <div className="flex gap-1 rounded-xl border border-[#E5E0D4] bg-white p-1 mb-4">
-            {(["overview", "bookings", "media"] as const).map((t) => (
+          <div className="flex gap-1 rounded-xl border border-[#E5E0D4] bg-white p-1 mb-4 overflow-x-auto">
+            {TABS.map((t) => (
               <button
-                key={t}
-                onClick={() => setTab(t)}
-                className={`flex-1 rounded-lg py-2 text-sm font-medium transition capitalize ${
-                  tab === t
+                key={t.key}
+                onClick={() => setTab(t.key)}
+                className={`flex-1 min-w-max rounded-lg py-2 px-3 text-sm font-medium transition whitespace-nowrap ${
+                  tab === t.key
                     ? "bg-[#7A3F91] text-white shadow-sm"
                     : "text-[#0C1B33]/60 hover:text-[#0C1B33] hover:bg-[#F4F2ED]"
                 }`}
               >
-                {t}
-                {t === "bookings" && guest.bookings.length > 0 && (
-                  <span className={`ml-1.5 text-[10px] px-1.5 py-0.5 rounded-full ${tab === t ? "bg-white/20" : "bg-[#E5E0D4]"}`}>
-                    {guest.bookings.length}
-                  </span>
-                )}
-                {t === "media" && guest.mediaMessages.length > 0 && (
-                  <span className={`ml-1.5 text-[10px] px-1.5 py-0.5 rounded-full ${tab === t ? "bg-white/20" : "bg-[#E5E0D4]"}`}>
-                    {guest.mediaMessages.length}
+                {t.label}
+                {t.count !== undefined && t.count > 0 && (
+                  <span className={`ml-1.5 text-[10px] px-1.5 py-0.5 rounded-full ${tab === t.key ? "bg-white/20" : "bg-[#E5E0D4]"}`}>
+                    {t.count}
                   </span>
                 )}
               </button>
@@ -421,35 +604,39 @@ export default function GuestDetailPage() {
           {/* ── Tab: Overview ── */}
           {tab === "overview" && (
             <div className="flex flex-col gap-4">
-              {/* Stats */}
+              {/* Stats grid */}
               <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-                <StatCard label="Total Messages" value={guest.totalMessages} />
-                <StatCard label="Total Bookings" value={guest.bookings.length} />
-                <StatCard
-                  label="Last Booking"
-                  value={lastBooking ? relativeTime(lastBooking.createdAt) : "—"}
-                />
-                <StatCard
-                  label="Avg Stay"
-                  value={avg > 0 ? `${avg} night${avg !== 1 ? "s" : ""}` : "—"}
-                />
+                {[
+                  { label: "Total Messages", value: guest.totalMessages },
+                  { label: "Total Bookings", value: guest.bookings.length },
+                  { label: "Total Spend",    value: guest.totalSpend > 0 ? formatCurrency(guest.totalSpend) : "—" },
+                  { label: "Avg Stay",       value: avg > 0 ? `${avg} night${avg !== 1 ? "s" : ""}` : "—" },
+                ].map(({ label, value }) => (
+                  <div key={label} className="rounded-xl border border-[#E5E0D4] bg-white p-4">
+                    <p className="text-xs font-medium text-[#0C1B33]/50 mb-1">{label}</p>
+                    <p className="text-xl font-bold text-[#0C1B33]">{value}</p>
+                  </div>
+                ))}
               </div>
 
-              {/* Recent messages */}
+              {/* Recent messages preview (top 5) */}
               <div className="rounded-xl border border-[#E5E0D4] bg-white">
-                <div className="px-4 pt-4 pb-2 border-b border-[#E5E0D4]">
+                <div className="px-4 pt-4 pb-2 border-b border-[#E5E0D4] flex items-center justify-between">
                   <p className="text-sm font-semibold text-[#0C1B33]">Recent Messages</p>
+                  {guest.recentMessages.length > 5 && (
+                    <button onClick={() => setTab("messages")} className="text-xs text-[#7A3F91] hover:underline">
+                      View all {guest.recentMessages.length}
+                    </button>
+                  )}
                 </div>
                 {guest.recentMessages.length === 0 ? (
                   <div className="px-4 py-10 text-center text-[#0C1B33]/40 text-sm">No messages yet.</div>
                 ) : (
                   <div className="divide-y divide-[#E5E0D4]">
-                    {guest.recentMessages.map((m) => (
+                    {guest.recentMessages.slice(0, 5).map((m) => (
                       <div key={m.id} className={`flex items-start gap-3 px-4 py-3 ${m.direction === "OUT" ? "bg-[#F4F2ED]/40" : ""}`}>
                         <span className={`mt-0.5 shrink-0 text-[10px] font-semibold px-1.5 py-0.5 rounded-full ${
-                          m.direction === "IN"
-                            ? "bg-blue-100 text-blue-700"
-                            : "bg-purple-100 text-purple-700"
+                          m.direction === "IN" ? "bg-blue-100 text-blue-700" : "bg-purple-100 text-purple-700"
                         }`}>
                           {m.direction}
                         </span>
@@ -462,16 +649,7 @@ export default function GuestDetailPage() {
                             <p className="text-sm text-[#0C1B33] truncate">{m.body ?? "—"}</p>
                           )}
                         </div>
-                        <div className="shrink-0 flex items-center gap-1.5">
-                          {m.channel === "INSTAGRAM" && (
-                            <span
-                              className="w-3 h-3 rounded-full inline-block"
-                              style={{ background: "radial-gradient(circle at 30% 107%, #fdf497 0%, #fd5949 45%, #285AEB 90%)" }}
-                              title="Instagram"
-                            />
-                          )}
-                          <span className="text-[11px] text-[#0C1B33]/40 whitespace-nowrap">{relativeTime(m.timestamp)}</span>
-                        </div>
+                        <span className="shrink-0 text-[11px] text-[#0C1B33]/40 whitespace-nowrap">{relativeTime(m.timestamp)}</span>
                       </div>
                     ))}
                   </div>
@@ -488,42 +666,114 @@ export default function GuestDetailPage() {
                   <p className="text-[#0C1B33]/40 text-sm">No bookings yet.</p>
                 </div>
               ) : (
-                <table className="w-full text-sm">
-                  <thead className="border-b border-[#E5E0D4] bg-[#F4F2ED]">
-                    <tr className="text-left text-[#0C1B33]/55 text-xs uppercase tracking-wider font-semibold">
-                      <th className="px-4 py-3 rounded-tl-xl">Reference</th>
-                      <th className="px-4 py-3">Room</th>
-                      <th className="px-4 py-3">Check-in</th>
-                      <th className="px-4 py-3">Check-out</th>
-                      <th className="px-4 py-3">Status</th>
-                      <th className="px-4 py-3 text-right rounded-tr-xl">Total</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-[#E5E0D4]">
-                    {guest.bookings.map((b) => (
-                      <tr
-                        key={b.id}
-                        onClick={() => router.push(`/dashboard/bookings/${b.id}`)}
-                        className="hover:bg-[#F4F2ED]/60 transition cursor-pointer"
+                <div className="overflow-x-auto">
+                  <table className="w-full text-sm">
+                    <thead className="border-b border-[#E5E0D4] bg-[#F4F2ED]">
+                      <tr className="text-left text-[#0C1B33]/55 text-xs uppercase tracking-wider font-semibold">
+                        <th className="px-4 py-3">Reference</th>
+                        <th className="px-4 py-3">Room</th>
+                        <th className="px-4 py-3">Check-in</th>
+                        <th className="px-4 py-3">Check-out</th>
+                        <th className="px-4 py-3">Status</th>
+                        <th className="px-4 py-3 text-right">Total</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-[#E5E0D4]">
+                      {guest.bookings.map((b) => (
+                        <tr
+                          key={b.id}
+                          onClick={() => router.push(`/dashboard/bookings/${b.id}`)}
+                          className="hover:bg-[#F4F2ED]/60 transition cursor-pointer"
+                        >
+                          <td className="px-4 py-3">
+                            {b.referenceNumber ? (
+                              <span className="font-mono text-xs font-semibold text-[#1B52A8] bg-[#1B52A8]/8 px-2 py-1 rounded-md">
+                                {b.referenceNumber}
+                              </span>
+                            ) : (
+                              <span className="text-[#0C1B33]/30 text-xs">—</span>
+                            )}
+                          </td>
+                          <td className="px-4 py-3 text-[#0C1B33]/70">{b.roomType?.name ?? "—"}</td>
+                          <td className="px-4 py-3 text-[#0C1B33]/65">{formatDate(b.checkIn)}</td>
+                          <td className="px-4 py-3 text-[#0C1B33]/65">{formatDate(b.checkOut)}</td>
+                          <td className="px-4 py-3"><BookingStatusBadge status={b.status} /></td>
+                          <td className="px-4 py-3 text-right font-semibold text-[#B8912E]">{formatCurrency(b.totalPrice)}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* ── Tab: Messages ── */}
+          {tab === "messages" && (
+            <div className="rounded-xl border border-[#E5E0D4] bg-white overflow-hidden">
+              {guest.recentMessages.length === 0 ? (
+                <div className="px-4 py-12 text-center">
+                  <p className="text-[#0C1B33]/40 text-sm">No messages yet.</p>
+                </div>
+              ) : (
+                <div className="flex flex-col gap-0 p-4 max-h-[600px] overflow-y-auto">
+                  {[...guest.recentMessages].reverse().map((m) => {
+                    const isOut    = m.direction === "OUT";
+                    const src      = m.mediaUrl ? (m.mediaUrl.startsWith("http") ? m.mediaUrl : `${API_BASE}${m.mediaUrl}`) : null;
+                    const isImage  = m.mimeType?.startsWith("image/");
+                    return (
+                      <div
+                        key={m.id}
+                        className={`flex mb-2 ${isOut ? "justify-end" : "justify-start"}`}
                       >
-                        <td className="px-4 py-3">
-                          {b.referenceNumber ? (
-                            <span className="font-mono text-xs font-semibold text-[#1B52A8] bg-[#1B52A8]/8 px-2 py-1 rounded-md">
-                              {b.referenceNumber}
+                        <div
+                          className={`max-w-[75%] rounded-2xl px-4 py-2.5 text-sm shadow-sm ${
+                            isOut
+                              ? "bg-[#7A3F91] text-white rounded-br-sm"
+                              : "bg-[#F4F2ED] text-[#0C1B33] rounded-bl-sm"
+                          }`}
+                        >
+                          {src && isImage ? (
+                            // eslint-disable-next-line @next/next/no-img-element
+                            <img
+                              src={src}
+                              alt={m.fileName ?? "media"}
+                              className="rounded-lg max-w-[200px] cursor-pointer"
+                              onClick={() => setLightboxSrc(src)}
+                            />
+                          ) : src ? (
+                            <a href={src} target="_blank" rel="noopener noreferrer"
+                              className={`flex items-center gap-1.5 text-xs underline ${isOut ? "text-white/80" : "text-[#1B52A8]"}`}>
+                              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
+                                  d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                              </svg>
+                              {m.fileName ?? "Download file"}
+                            </a>
+                          ) : m.messageType !== "text" ? (
+                            <span className={`italic text-xs ${isOut ? "text-white/70" : "text-[#0C1B33]/50"}`}>
+                              {({ image: "📷 Photo", video: "🎥 Video", audio: "🎵 Voice message", document: "📄 Document" } as any)[m.messageType] ?? "📎 Attachment"}
                             </span>
                           ) : (
-                            <span className="text-[#0C1B33]/30 text-xs">—</span>
+                            <span className="whitespace-pre-wrap break-words leading-relaxed">{m.body ?? ""}</span>
                           )}
-                        </td>
-                        <td className="px-4 py-3 text-[#0C1B33]/70">{b.roomType?.name ?? "—"}</td>
-                        <td className="px-4 py-3 text-[#0C1B33]/65">{formatDate(b.checkIn)}</td>
-                        <td className="px-4 py-3 text-[#0C1B33]/65">{formatDate(b.checkOut)}</td>
-                        <td className="px-4 py-3"><BookingStatusBadge status={b.status} /></td>
-                        <td className="px-4 py-3 text-right font-semibold text-[#B8912E]">{formatCurrency(b.totalPrice)}</td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
+                          <div className={`mt-1 flex items-center gap-1 justify-end ${isOut ? "text-white/50" : "text-[#0C1B33]/35"}`}>
+                            <span className="text-[10px]">{relativeTime(m.timestamp)}</span>
+                            {isOut && (
+                              <svg className="w-3 h-3" fill="currentColor" viewBox="0 0 24 24">
+                                {m.status === "READ" ? (
+                                  <path d="M18 7l-1.41-1.41-6.34 6.34 1.41 1.41L18 7zm4.24-1.41L11.66 16.17 7.48 12l-1.41 1.41L11.66 19l12-12-1.42-1.41zM.41 13.41L6 19l1.41-1.41L1.83 12 .41 13.41z" />
+                                ) : (
+                                  <path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z" />
+                                )}
+                              </svg>
+                            )}
+                          </div>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
               )}
             </div>
           )}
@@ -538,9 +788,9 @@ export default function GuestDetailPage() {
               ) : (
                 <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3">
                   {guest.mediaMessages.map((m) => {
-                    const src = m.mediaUrl.startsWith("http") ? m.mediaUrl : `${API_BASE}${m.mediaUrl}`;
-                    const isImage = m.mimeType?.startsWith("image/");
-                    const isVideo = m.mimeType?.startsWith("video/");
+                    const src      = m.mediaUrl.startsWith("http") ? m.mediaUrl : `${API_BASE}${m.mediaUrl}`;
+                    const isImage  = m.mimeType?.startsWith("image/");
+                    const isVideo  = m.mimeType?.startsWith("video/");
                     return (
                       <div
                         key={m.id}
@@ -570,6 +820,52 @@ export default function GuestDetailPage() {
                       </div>
                     );
                   })}
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* ── Tab: Activity ── */}
+          {tab === "activity" && (
+            <div className="rounded-xl border border-[#E5E0D4] bg-white overflow-hidden">
+              {guest.activityLog.length === 0 ? (
+                <div className="px-4 py-12 text-center">
+                  <p className="text-[#0C1B33]/40 text-sm">No activity yet.</p>
+                </div>
+              ) : (
+                <div className="p-4">
+                  <div className="relative">
+                    {/* Timeline line */}
+                    <div className="absolute left-3.5 top-0 bottom-0 w-px bg-[#E5E0D4]" />
+                    <div className="flex flex-col gap-0">
+                      {guest.activityLog.map((entry, i) => (
+                        <div key={i} className="relative flex items-start gap-4 pb-5">
+                          {/* Dot */}
+                          <div className={`relative z-10 mt-0.5 w-7 h-7 rounded-full flex items-center justify-center shrink-0 border-2 border-white ${
+                            entry.type === "booking"
+                              ? "bg-amber-100 text-amber-600"
+                              : "bg-blue-100 text-blue-600"
+                          }`}>
+                            {entry.type === "booking" ? (
+                              <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
+                                  d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                              </svg>
+                            ) : (
+                              <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
+                                  d="M8 10h.01M12 10h.01M16 10h.01M21 16c0 1.1-.9 2-2 2H7l-4 4V6c0-1.1.9-2 2-2h14c1.1 0 2 .9 2 2v10z" />
+                              </svg>
+                            )}
+                          </div>
+                          <div className="flex-1 pt-0.5">
+                            <p className="text-sm text-[#0C1B33]">{entry.label}</p>
+                            <p className="text-xs text-[#0C1B33]/40 mt-0.5">{relativeTime(entry.timestamp)}</p>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
                 </div>
               )}
             </div>
