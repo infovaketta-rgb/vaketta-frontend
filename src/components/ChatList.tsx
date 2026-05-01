@@ -151,8 +151,11 @@ export default function ChatList() {
 
   if (!mounted) return null;
 
+  const q = search.trim().toLowerCase();
   const filtered = conversations.filter((c) =>
-    c.phone.includes(search.trim())
+    !q ||
+    c.phone.toLowerCase().includes(q) ||
+    (c.name ?? "").toLowerCase().includes(q)
   );
 
   return (
@@ -204,7 +207,7 @@ export default function ChatList() {
           return (
             <div
               key={c.guestId}
-              onClick={() => { if (c.guestId !== selectedGuestId) setSelectedGuest(c.guestId, !c.lastHandledByStaff, c.phone, c.name); }}
+              onClick={() => { if (c.guestId !== selectedGuestId) setSelectedGuest(c.guestId, !c.lastHandledByStaff, c.phone, c.name, c.channel); }}
               className={`flex items-center gap-3 px-4 py-3 cursor-pointer transition-colors border-b border-[#E5E0D4]/60 ${
                 isActive
                   ? "bg-blue-50 border-l-2 border-l-[#1B52A8]"
@@ -217,7 +220,9 @@ export default function ChatList() {
                   className="w-11 h-11 rounded-full flex items-center justify-center text-sm font-bold text-white"
                   style={{ backgroundColor: avatarColor }}
                 >
-                  {c.phone.replace(/\D/g, "").slice(-2)}
+                  {c.channel === "INSTAGRAM"
+                    ? (c.name ? c.name.slice(0, 2).toUpperCase() : "IG")
+                    : c.phone.replace(/\D/g, "").slice(-2)}
                 </div>
                 {c.channel === "INSTAGRAM" && (
                   <span
@@ -235,7 +240,9 @@ export default function ChatList() {
               <div className="flex-1 min-w-0">
                 <div className="flex items-center justify-between gap-2">
                   <span className="text-sm font-semibold text-[#0C1B33] truncate">
-                    {formatPhone(c.phone)}
+                    {c.channel === "INSTAGRAM"
+                      ? (c.name || "Instagram User")
+                      : formatPhone(c.phone)}
                   </span>
                   <span className={`text-[11px] shrink-0 ${c.unreadCount > 0 ? "text-[#1B52A8] font-medium" : "text-slate-400"}`}>
                     {formatTime(c.lastTimestamp)}

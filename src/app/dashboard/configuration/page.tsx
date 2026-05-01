@@ -444,6 +444,8 @@ export default function ConfigurationPage() {
 
   function handleIgConnect() {
     const url = ig.embedUrl || process.env.NEXT_PUBLIC_INSTAGRAM_EMBED_URL || "";
+    console.log("Opening OAuth URL:", url); // add this
+    
     if (!url) {
       setIgOAuthError("Instagram OAuth URL is not configured. Contact your administrator.");
       return;

@@ -16,14 +16,17 @@ export type Message = {
   jobId:       string | null;
 };
 
+type MessageChannel = "WHATSAPP" | "INSTAGRAM";
+
 type ChatState = {
   selectedGuestId: string | null;
   selectedGuestPhone: string | null;
   selectedGuestName: string | null;
+  selectedGuestChannel: MessageChannel | null;
   messages: Message[];
   botEnabled: boolean;
 
-  setSelectedGuest: (guestId: string | null, botEnabled?: boolean, phone?: string | null, name?: string | null) => void;
+  setSelectedGuest: (guestId: string | null, botEnabled?: boolean, phone?: string | null, name?: string | null, channel?: MessageChannel | null) => void;
   setSelectedGuestName: (name: string) => void;
   replaceMessages: (msgs: Message[]) => void;
   addMessage: (msg: Message) => void;
@@ -38,13 +41,14 @@ export const useChatStore = create<ChatState>((set) => ({
   selectedGuestId: null,
   selectedGuestPhone: null,
   selectedGuestName: null,
+  selectedGuestChannel: null,
   messages: [],
   botEnabled: true,
 
-  setSelectedGuest: (guestId, botEnabled = true, phone = null, name = null) =>
+  setSelectedGuest: (guestId, botEnabled = true, phone = null, name = null, channel = null) =>
     set(guestId === null
-      ? { selectedGuestId: null, selectedGuestPhone: null, selectedGuestName: null, messages: [], botEnabled: true }
-      : { selectedGuestId: guestId, selectedGuestPhone: phone, selectedGuestName: name, messages: [], botEnabled }
+      ? { selectedGuestId: null, selectedGuestPhone: null, selectedGuestName: null, selectedGuestChannel: null, messages: [], botEnabled: true }
+      : { selectedGuestId: guestId, selectedGuestPhone: phone, selectedGuestName: name, selectedGuestChannel: channel, messages: [], botEnabled }
     ),
 
   setSelectedGuestName: (name) => set({ selectedGuestName: name }),
@@ -103,10 +107,11 @@ export const useChatStore = create<ChatState>((set) => ({
   setBotEnabled: (enabled) => set({ botEnabled: enabled }),
 
   resetStore: () => set({
-    selectedGuestId:   null,
-    selectedGuestPhone: null,
-    selectedGuestName:  null,
-    messages:           [],
-    botEnabled:         true,
+    selectedGuestId:      null,
+    selectedGuestPhone:   null,
+    selectedGuestName:    null,
+    selectedGuestChannel: null,
+    messages:             [],
+    botEnabled:           true,
   }),
 }));

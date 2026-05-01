@@ -423,8 +423,9 @@ export default function ChatWindow() {
 
   const botEnabled = useChatStore((s) => s.botEnabled);
   const setBotEnabledStore = useChatStore((s) => s.setBotEnabled);
-  const selectedGuestPhone = useChatStore((s) => s.selectedGuestPhone);
-  const selectedGuestName  = useChatStore((s) => s.selectedGuestName);
+  const selectedGuestPhone   = useChatStore((s) => s.selectedGuestPhone);
+  const selectedGuestName    = useChatStore((s) => s.selectedGuestName);
+  const selectedGuestChannel = useChatStore((s) => s.selectedGuestChannel);
   const setSelectedGuestName = useChatStore((s) => s.setSelectedGuestName);
 
   const [editingName, setEditingName] = useState(false);
@@ -917,7 +918,9 @@ return () => {
           className="w-9 h-9 rounded-full flex items-center justify-center text-white text-sm font-bold shrink-0"
           style={{ backgroundColor: avatarColor }}
         >
-          {selectedGuestPhone ? selectedGuestPhone.replace(/\D/g, "").slice(-2) : "G"}
+          {selectedGuestChannel === "INSTAGRAM"
+            ? (selectedGuestName ? selectedGuestName.slice(0, 2).toUpperCase() : "IG")
+            : (selectedGuestPhone ? selectedGuestPhone.replace(/\D/g, "").slice(-2) : "G")}
         </div>
 
         {/* Name / status */}
@@ -940,10 +943,22 @@ return () => {
               title="Click to edit name"
               onClick={() => { setNameInput(selectedGuestName ?? ""); setEditingName(true); }}
             >
-              {selectedGuestName || (selectedGuestPhone ? formatPhone(selectedGuestPhone) : "Guest")}
+              {selectedGuestName ||
+                (selectedGuestChannel === "INSTAGRAM"
+                  ? "Instagram User"
+                  : (selectedGuestPhone ? formatPhone(selectedGuestPhone) : "Guest"))}
             </p>
           )}
-          <p className="text-xs text-gray-500">WhatsApp</p>
+          {selectedGuestChannel === "INSTAGRAM" ? (
+            <p
+              className="text-xs font-medium"
+              style={{ background: "radial-gradient(circle at 30% 107%, #fdf497 0%, #fdf497 5%, #fd5949 45%, #d6249f 60%, #285AEB 90%)", WebkitBackgroundClip: "text", WebkitTextFillColor: "transparent" }}
+            >
+              Instagram
+            </p>
+          ) : (
+            <p className="text-xs text-green-600">WhatsApp</p>
+          )}
         </div>
 
         {/* Voice call (UI only) */}
