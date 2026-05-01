@@ -240,9 +240,8 @@ export default function ChatList() {
               <div className="flex-1 min-w-0">
                 <div className="flex items-center justify-between gap-2">
                   <span className="text-sm font-semibold text-[#0C1B33] truncate">
-                    {c.channel === "INSTAGRAM"
-                      ? (c.name || "Instagram User")
-                      : formatPhone(c.phone)}
+                    {c.name ||
+                      (c.channel === "INSTAGRAM" ? "Instagram User" : formatPhone(c.phone))}
                   </span>
                   <span className={`text-[11px] shrink-0 ${c.unreadCount > 0 ? "text-[#1B52A8] font-medium" : "text-slate-400"}`}>
                     {formatTime(c.lastTimestamp)}
