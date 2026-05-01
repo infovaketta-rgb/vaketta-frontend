@@ -197,7 +197,13 @@ export default function GuestDetailPage() {
     if (!mounted) return;
     apiFetch(`/guests/${id}`)
       .then((g: GuestDetail) => {
-        setGuest(g);
+        setGuest({
+          ...g,
+          isVip:       g.isVip       ?? false,
+          tags:        Array.isArray(g.tags) ? g.tags : [],
+          totalSpend:  g.totalSpend  ?? 0,
+          activityLog: Array.isArray(g.activityLog) ? g.activityLog : [],
+        });
         setNotes(g.notes ?? "");
       })
       .catch((e: any) => setError(e.message || "Failed to load guest"))
@@ -716,7 +722,7 @@ export default function GuestDetailPage() {
                   <p className="text-[#0C1B33]/40 text-sm">No messages yet.</p>
                 </div>
               ) : (
-                <div className="flex flex-col gap-0 p-4 max-h-[600px] overflow-y-auto">
+                <div className="flex flex-col gap-0 p-4 max-h-150 overflow-y-auto">
                   {[...guest.recentMessages].reverse().map((m) => {
                     const isOut    = m.direction === "OUT";
                     const src      = m.mediaUrl ? (m.mediaUrl.startsWith("http") ? m.mediaUrl : `${API_BASE}${m.mediaUrl}`) : null;
@@ -738,7 +744,7 @@ export default function GuestDetailPage() {
                             <img
                               src={src}
                               alt={m.fileName ?? "media"}
-                              className="rounded-lg max-w-[200px] cursor-pointer"
+                              className="rounded-lg max-w-50 cursor-pointer"
                               onClick={() => setLightboxSrc(src)}
                             />
                           ) : src ? (
@@ -755,7 +761,7 @@ export default function GuestDetailPage() {
                               {({ image: "📷 Photo", video: "🎥 Video", audio: "🎵 Voice message", document: "📄 Document" } as any)[m.messageType] ?? "📎 Attachment"}
                             </span>
                           ) : (
-                            <span className="whitespace-pre-wrap break-words leading-relaxed">{m.body ?? ""}</span>
+                            <span className="whitespace-pre-wrap wrap-break-word leading-relaxed">{m.body ?? ""}</span>
                           )}
                           <div className={`mt-1 flex items-center gap-1 justify-end ${isOut ? "text-white/50" : "text-[#0C1B33]/35"}`}>
                             <span className="text-[10px]">{relativeTime(m.timestamp)}</span>
