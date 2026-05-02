@@ -12,16 +12,17 @@ type MediaItem = {
   mimeType:    string | null;
   fileName:    string | null;
   messageType: string;
-  timestamp:   string;
-  direction:   "IN" | "OUT";
+  timestamp:   string | null;
+  direction:   "IN" | "OUT" | "room_photo";
   guest:       { phone: string; name: string | null } | null;
 };
 
-type FilterTab = "all" | "image" | "audio" | "video" | "document";
+type FilterTab = "all" | "image" | "audio" | "video" | "document" | "room_photo";
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
-function formatTime(iso: string) {
+function formatTime(iso: string | null): string {
+  if (!iso) return "Room Photo";
   const d = new Date(iso);
   return d.toLocaleDateString(undefined, { day: "numeric", month: "short", year: "numeric" });
 }
@@ -29,6 +30,10 @@ function formatTime(iso: string) {
 function guestLabel(item: MediaItem) {
   if (!item.guest) return "Guest";
   return item.guest.name || item.guest.phone;
+}
+
+function isRoomPhoto(item: MediaItem) {
+  return item.direction === "room_photo";
 }
 
 // ── Audio Player ──────────────────────────────────────────────────────────────
@@ -117,13 +122,32 @@ function DocIcon({ fileName, mimeType }: { fileName: string | null; mimeType: st
   return <div className="w-12 h-12 rounded-xl bg-gray-100 text-gray-500 flex items-center justify-center text-xs font-bold">FILE</div>;
 }
 
+// ── Direction badge ───────────────────────────────────────────────────────────
+
+function DirectionBadge({ item, className = "" }: { item: MediaItem; className?: string }) {
+  if (isRoomPhoto(item)) {
+    return (
+      <span className={`text-[9px] font-bold px-1.5 py-0.5 rounded-full bg-amber-400/90 text-white ${className}`}>
+        Room
+      </span>
+    );
+  }
+  return (
+    <span className={`text-[9px] font-bold px-1.5 py-0.5 rounded-full ${
+      item.direction === "OUT" ? "bg-[#7A3F91]/80 text-white" : "bg-black/50 text-white"
+    } ${className}`}>
+      {item.direction === "OUT" ? "Sent" : "Recv"}
+    </span>
+  );
+}
+
 // ── Media card ────────────────────────────────────────────────────────────────
 
 function MediaCard({ item, onImageClick }: { item: MediaItem; onImageClick: (src: string) => void }) {
   const mime = item.mimeType ?? "";
   const url  = item.mediaUrl;
 
-  // Image card
+  // Image card (includes room photos which have mimeType image/jpeg)
   if (mime.startsWith("image/")) {
     return (
       <button
@@ -136,11 +160,7 @@ function MediaCard({ item, onImageClick }: { item: MediaItem; onImageClick: (src
           <p className="text-white text-[10px] font-medium truncate">{guestLabel(item)}</p>
           <p className="text-white/70 text-[9px]">{formatTime(item.timestamp)}</p>
         </div>
-        <span className={`absolute top-1.5 right-1.5 text-[9px] font-bold px-1.5 py-0.5 rounded-full ${
-          item.direction === "OUT" ? "bg-[#7A3F91]/80 text-white" : "bg-black/50 text-white"
-        }`}>
-          {item.direction === "OUT" ? "Sent" : "Recv"}
-        </span>
+        <DirectionBadge item={item} className="absolute top-1.5 right-1.5" />
       </button>
     );
   }
@@ -161,11 +181,7 @@ function MediaCard({ item, onImageClick }: { item: MediaItem; onImageClick: (src
           <p className="text-white text-[10px] truncate">{guestLabel(item)}</p>
           <p className="text-white/60 text-[9px]">{formatTime(item.timestamp)}</p>
         </div>
-        <span className={`absolute top-1.5 right-1.5 text-[9px] font-bold px-1.5 py-0.5 rounded-full ${
-          item.direction === "OUT" ? "bg-[#7A3F91]/80 text-white" : "bg-black/50 text-white"
-        }`}>
-          {item.direction === "OUT" ? "Sent" : "Recv"}
-        </span>
+        <DirectionBadge item={item} className="absolute top-1.5 right-1.5" />
       </div>
     );
   }
@@ -181,11 +197,7 @@ function MediaCard({ item, onImageClick }: { item: MediaItem; onImageClick: (src
                 d="M9 19V6l12-3v13M9 19c0 1.105-1.343 2-3 2s-3-.895-3-2 1.343-2 3-2 3 .895 3 2zm12-3c0 1.105-1.343 2-3 2s-3-.895-3-2 1.343-2 3-2 3 .895 3 2zM9 10l12-3" />
             </svg>
           </div>
-          <span className={`text-[9px] font-bold px-1.5 py-0.5 rounded-full ${
-            item.direction === "OUT" ? "bg-[#7A3F91]/10 text-[#7A3F91]" : "bg-gray-100 text-gray-500"
-          }`}>
-            {item.direction === "OUT" ? "Sent" : "Recv"}
-          </span>
+          <DirectionBadge item={item} />
         </div>
         <AudioPlayer src={url} />
         <div className="mt-0.5">
@@ -206,11 +218,7 @@ function MediaCard({ item, onImageClick }: { item: MediaItem; onImageClick: (src
     >
       <div className="flex items-start justify-between gap-2">
         <DocIcon fileName={item.fileName} mimeType={mime} />
-        <span className={`text-[9px] font-bold px-1.5 py-0.5 rounded-full shrink-0 ${
-          item.direction === "OUT" ? "bg-[#7A3F91]/10 text-[#7A3F91]" : "bg-gray-100 text-gray-500"
-        }`}>
-          {item.direction === "OUT" ? "Sent" : "Recv"}
-        </span>
+        <DirectionBadge item={item} />
       </div>
       <div>
         <p className="text-xs font-medium text-gray-800 truncate leading-tight">
@@ -260,8 +268,15 @@ function Lightbox({ src, onClose }: { src: string; onClose: () => void }) {
 
 function EmptyState({ filter }: { filter: FilterTab }) {
   const labels: Record<FilterTab, string> = {
-    all: "No media yet", image: "No images yet",
-    audio: "No audio yet", video: "No videos yet", document: "No documents yet",
+    all:        "No media yet",
+    image:      "No images yet",
+    audio:      "No audio yet",
+    video:      "No videos yet",
+    document:   "No documents yet",
+    room_photo: "No room photos yet",
+  };
+  const subtitles: Partial<Record<FilterTab, string>> = {
+    room_photo: "Add photos to room types to see them here.",
   };
   return (
     <div className="flex flex-col items-center justify-center py-24 gap-4 text-center">
@@ -273,7 +288,9 @@ function EmptyState({ filter }: { filter: FilterTab }) {
       </div>
       <div>
         <p className="text-sm font-semibold text-gray-500">{labels[filter]}</p>
-        <p className="text-xs text-gray-400 mt-1">Media shared in chats will appear here.</p>
+        <p className="text-xs text-gray-400 mt-1">
+          {subtitles[filter] ?? "Media shared in chats will appear here."}
+        </p>
       </div>
     </div>
   );
@@ -282,17 +299,32 @@ function EmptyState({ filter }: { filter: FilterTab }) {
 // ── Page ──────────────────────────────────────────────────────────────────────
 
 const TABS: { key: FilterTab; label: string }[] = [
-  { key: "all",      label: "All"       },
-  { key: "image",    label: "Images"    },
-  { key: "audio",    label: "Audio"     },
-  { key: "video",    label: "Video"     },
-  { key: "document", label: "Documents" },
+  { key: "all",        label: "All"         },
+  { key: "image",      label: "Images"      },
+  { key: "audio",      label: "Audio"       },
+  { key: "video",      label: "Video"       },
+  { key: "document",   label: "Documents"   },
+  { key: "room_photo", label: "Room Photos" },
 ];
+
+function matchesFilter(item: MediaItem, filter: FilterTab): boolean {
+  if (filter === "room_photo") return isRoomPhoto(item);
+  if (isRoomPhoto(item))       return filter === "all" || filter === "image";
+  const mime = item.mimeType ?? "";
+  switch (filter) {
+    case "all":      return true;
+    case "image":    return mime.startsWith("image/");
+    case "audio":    return mime.startsWith("audio/");
+    case "video":    return mime.startsWith("video/");
+    case "document": return !["image/","video/","audio/"].some((p) => mime.startsWith(p));
+    default:         return true;
+  }
+}
 
 export default function MediaGalleryPage() {
   const mounted = useMounted();
 
-  const [media,    setMedia]    = useState<MediaItem[]>([]);
+  const [allMedia, setAllMedia] = useState<MediaItem[]>([]);
   const [filter,   setFilter]   = useState<FilterTab>("all");
   const [page,     setPage]     = useState(1);
   const [pages,    setPages]    = useState(1);
@@ -303,24 +335,22 @@ export default function MediaGalleryPage() {
 
   useEffect(() => {
     if (!mounted) return;
-    setMedia([]);
+    setAllMedia([]);
     setPage(1);
     fetchMedia(1, true);
-  }, [mounted, filter]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [mounted]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Reset displayed page when filter changes (client-side filtering)
+  useEffect(() => {
+    setPage(1);
+  }, [filter]);
 
   async function fetchMedia(pageNum: number, replace: boolean) {
     replace ? setLoading(true) : setLoadMore(true);
     try {
       const data = await apiFetch(`/messages/media?page=${pageNum}`);
       const items: MediaItem[] = data.data ?? [];
-
-      // Client-side filter by tab
-      const filtered = filter === "all"
-        ? items
-        : items.filter((m) => (m.mimeType ?? "").startsWith(filter + "/") ||
-            (filter === "document" && !["image/","video/","audio/"].some((p) => (m.mimeType ?? "").startsWith(p))));
-
-      setMedia((prev) => replace ? filtered : [...prev, ...filtered]);
+      setAllMedia((prev) => replace ? items : [...prev, ...items]);
       setPages(data.pages ?? 1);
       setTotal(data.total ?? 0);
     } catch (e) {
@@ -337,9 +367,16 @@ export default function MediaGalleryPage() {
     fetchMedia(next, false);
   }
 
-  // Grid column classes differ for document/audio (wider cards) vs image/video (square thumbnails)
-  const isSquareGrid = filter === "image" || filter === "video" ||
-    (filter === "all" && media.some((m) => (m.mimeType ?? "").startsWith("image/")));
+  const media = allMedia.filter((item) => matchesFilter(item, filter));
+
+  const isSquareGrid = filter === "image" || filter === "video" || filter === "room_photo" ||
+    (filter === "all" && allMedia.some((m) => matchesFilter(m, "image")));
+
+  const gridCls = filter === "audio" || filter === "document"
+    ? "grid-cols-1 sm:grid-cols-2 md:grid-cols-3"
+    : "grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5";
+
+  const displayTotal = filter === "all" ? total : media.length;
 
   return (
     <div className="p-4 md:p-8 max-w-6xl mx-auto">
@@ -348,7 +385,7 @@ export default function MediaGalleryPage() {
       <div className="mb-6 flex flex-col gap-1">
         <h2 className="text-lg font-semibold text-[#0C1B33]">Media Gallery</h2>
         {!loading && (
-          <p className="text-sm text-gray-400">{total} item{total !== 1 ? "s" : ""}</p>
+          <p className="text-sm text-gray-400">{displayTotal} item{displayTotal !== 1 ? "s" : ""}</p>
         )}
       </div>
 
@@ -371,11 +408,7 @@ export default function MediaGalleryPage() {
 
       {/* Grid */}
       {loading ? (
-        <div className={`grid gap-3 ${
-          filter === "audio" || filter === "document"
-            ? "grid-cols-1 sm:grid-cols-2 md:grid-cols-3"
-            : "grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5"
-        }`}>
+        <div className={`grid gap-3 ${gridCls}`}>
           {Array.from({ length: 10 }).map((_, i) => (
             <div key={i} className="rounded-xl bg-gray-100 animate-pulse aspect-square" />
           ))}
@@ -384,19 +417,13 @@ export default function MediaGalleryPage() {
         <EmptyState filter={filter} />
       ) : (
         <>
-          <div className={`grid gap-3 ${
-            filter === "audio" || filter === "document"
-              ? "grid-cols-1 sm:grid-cols-2 md:grid-cols-3"
-              : filter === "all"
-                ? "grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5"
-                : "grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5"
-          }`}>
+          <div className={`grid gap-3 ${gridCls}`}>
             {media.map((item) => (
               <MediaCard key={item.id} item={item} onImageClick={setLightbox} />
             ))}
           </div>
 
-          {/* Load more */}
+          {/* Load more (only relevant when not fully client-side filtered) */}
           {page < pages && (
             <div className="mt-8 flex justify-center">
               <button
