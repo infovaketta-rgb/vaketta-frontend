@@ -6,18 +6,23 @@ import type { EndNodeData } from "../types";
 export default function EndNode({ data, selected }: NodeProps<any>) {
   const d = data as EndNodeData;
   return (
-    <div
-      className={`flex flex-col items-center rounded-full border px-4 py-2 shadow-md transition ${
-        selected ? "border-red-400 shadow-lg" : "border-red-300"
-      } bg-red-500`}
-    >
-      <Handle type="target" position={Position.Top} className="!bg-red-700" />
-      <span className="text-sm font-bold text-white">⏹ End</span>
-      {d?.farewellText && (
-        <span className="mt-0.5 max-w-[140px] truncate text-[10px] text-red-100">
-          {d.farewellText}
-        </span>
-      )}
+    <div className={`w-52 rounded-xl border-2 bg-white shadow-md transition ${
+      selected
+        ? "border-[#7A3F91] shadow-xl ring-2 ring-purple-200"
+        : "border-red-300 hover:border-red-500"
+    }`}>
+      <Handle type="target" position={Position.Top} className="bg-red-700!" />
+      <div className="rounded-t-[10px] bg-red-500 px-3 py-1.5 flex items-center gap-1.5">
+        <span className="text-sm leading-none text-white">⏹</span>
+        <span className="text-[10px] font-bold uppercase tracking-widest text-white">End</span>
+      </div>
+      <div className="px-3 py-2">
+        {d?.farewellText ? (
+          <p className="line-clamp-2 text-xs text-gray-600 italic">{d.farewellText}</p>
+        ) : (
+          <p className="text-[11px] text-gray-300 italic">No farewell message</p>
+        )}
+      </div>
     </div>
   );
 }

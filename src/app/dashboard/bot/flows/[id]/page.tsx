@@ -12,6 +12,8 @@ import {
   useEdgesState,
   type Connection,
   type NodeTypes,
+  type EdgeTypes,
+  type ReactFlowInstance,
 } from "@xyflow/react";
 import "@xyflow/react/dist/style.css";
 
@@ -30,9 +32,11 @@ import ShowRoomsNode         from "../nodes/ShowRoomsNode";
 import TimeConditionNode     from "../nodes/TimeConditionNode";
 import JumpNode              from "../nodes/JumpNode";
 import ShowMenuNode          from "../nodes/ShowMenuNode";
+import DeletableEdge         from "../DeletableEdge";
 import NodePalette, { SYSTEM_VARS } from "../NodePalette";
 import CanvasToolbar         from "../CanvasToolbar";
 import NodeInspectorPanel    from "../NodeInspectorPanel";
+import FlowSimulator         from "../FlowSimulator";
 import ErrorBoundary         from "@/components/ErrorBoundary";
 
 // ── Initial node defaults ─────────────────────────────────────────────────────
@@ -63,18 +67,20 @@ export default function FlowCanvasPage() {
   const params    = useParams();
   const flowId    = params["id"] as string;
 
-  const [flow,        setFlow]        = useState<FlowDefinition | null>(null);
-  const [flowName,    setFlowName]    = useState("");
-  const [loading,     setLoading]     = useState(true);
-  const [saving,      setSaving]      = useState(false);
-  const [error,       setError]       = useState("");
-  const [hotelCtx,    setHotelCtx]    = useState<HotelContext | null>(null);
+  const [flow,         setFlow]         = useState<FlowDefinition | null>(null);
+  const [flowName,     setFlowName]     = useState("");
+  const [loading,      setLoading]      = useState(true);
+  const [saving,       setSaving]       = useState(false);
+  const [error,        setError]        = useState("");
+  const [hotelCtx,     setHotelCtx]     = useState<HotelContext | null>(null);
+  const [showSimulator, setShowSimulator] = useState(false);
 
   const [nodes, setNodes, onNodesChange] = useNodesState<FlowNode>([]);
   const [edges, setEdges, onEdgesChange] = useEdgesState<FlowEdge>([]);
   const [selectedNode, setSelectedNode]  = useState<FlowNode | null>(null);
 
   const reactFlowWrapper = useRef<HTMLDivElement>(null);
+  const rfInstance       = useRef<ReactFlowInstance<FlowNode, FlowEdge> | null>(null);
 
   // ── Fetch flow + hotel context ────────────────────────────────────────────
   useEffect(() => {
@@ -117,6 +123,14 @@ export default function FlowCanvasPage() {
     show_menu:          ShowMenuNode as any,
   }), []);
 
+  // ── Edge types — DeletableEdge wraps default edge with a delete button ────
+  const edgeTypes = useMemo<EdgeTypes>(
+    () => (readOnly
+      ? ({} as EdgeTypes)
+      : { default: (props: any) => <DeletableEdge {...props} readOnly={false} /> }),
+    [readOnly]
+  );
+
   // ── Connect edges ─────────────────────────────────────────────────────────
   const onConnect = useCallback(
     (params: Connection) => setEdges((eds) => addEdge(params, eds)),
@@ -135,13 +149,11 @@ export default function FlowCanvasPage() {
       if (!reactFlowWrapper.current) return;
       const type = e.dataTransfer.getData("application/reactflow");
       if (!type) return;
-
       const bounds = reactFlowWrapper.current.getBoundingClientRect();
       const position = {
         x: e.clientX - bounds.left - 80,
         y: e.clientY - bounds.top  - 30,
       };
-
       const newNode: FlowNode = {
         id:   `node-${Date.now()}-${_nodeIdx++}`,
         type: type as any,
@@ -155,9 +167,7 @@ export default function FlowCanvasPage() {
 
   // ── Update node data (from inspector) ────────────────────────────────────
   const updateNodeData = useCallback((id: string, data: Record<string, unknown>) => {
-    setNodes((nds) =>
-      nds.map((n) => (n.id === id ? { ...n, data: data as any } : n))
-    );
+    setNodes((nds) => nds.map((n) => (n.id === id ? { ...n, data: data as any } : n)));
     setSelectedNode((prev) => prev?.id === id ? { ...prev, data: data as any } : prev);
   }, [setNodes]);
 
@@ -192,6 +202,35 @@ export default function FlowCanvasPage() {
     }
   }
 
+  // ── Fit view ──────────────────────────────────────────────────────────────
+  function handleFitView() {
+    rfInstance.current?.fitView({ padding: 0.15, duration: 300 });
+  }
+
+  // ── Keyboard shortcuts ────────────────────────────────────────────────────
+  useEffect(() => {
+    if (readOnly) return;
+    function onKeyDown(e: KeyboardEvent) {
+      const tag = (e.target as HTMLElement)?.tagName;
+      const isEditing = tag === "INPUT" || tag === "TEXTAREA" || tag === "SELECT";
+
+      if ((e.key === "Delete" || e.key === "Backspace") && !isEditing && selectedNode) {
+        deleteNode(selectedNode.id);
+        return;
+      }
+      if (e.key === "s" && (e.ctrlKey || e.metaKey)) {
+        e.preventDefault();
+        handleSave();
+        return;
+      }
+      if (e.key === "Escape") {
+        setSelectedNode(null);
+      }
+    }
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
+  }, [readOnly, selectedNode, deleteNode]);
+
   // ── Render ────────────────────────────────────────────────────────────────
   if (!mounted || loading) {
     return (
@@ -209,24 +248,18 @@ export default function FlowCanvasPage() {
 
   const hasStart = nodes.some((n) => n.type === "start");
 
-  // Collect all variable names defined by question/show_rooms nodes for autocomplete.
-  // System vars are always prepended so they appear first in every dropdown/chip row.
   const definedVars = Array.from(new Set([
-    // system variables always available
     ...SYSTEM_VARS.map((sv) => sv.name),
-    // question nodes → variableName
     ...nodes
       .filter((n) => n.type === "question")
       .map((n) => (n.data as any).variableName as string)
       .filter(Boolean),
-    // show_rooms nodes → {prefix}TypeId, {prefix}TypeName, {prefix}Price
     ...nodes
       .filter((n) => n.type === "show_rooms")
       .flatMap((n) => {
         const p = (n.data as any).variableName as string;
         return p ? [`${p}TypeId`, `${p}TypeName`, `${p}Price`] : [];
       }),
-    // well-known runtime vars always available after their respective nodes
     ...(nodes.some((n) => n.type === "show_rooms" || (n.type === "question" && (n.data as any).questionType === "room_selection"))
       ? ["bookingRoomTypeId", "bookingRoomTypeName", "bookingPricePerNight"] : []),
     ...(nodes.some((n) => n.type === "action" && (n.data as any).actionType === "create_booking")
@@ -244,8 +277,13 @@ export default function FlowCanvasPage() {
         readOnly={readOnly}
         isTemplate={flow?.isTemplate ?? false}
         backHref="/dashboard/bot"
+        nodeCount={nodes.length}
+        edgeCount={edges.length}
+        showingTest={showSimulator}
         onSave={handleSave}
         onNameChange={setFlowName}
+        onFitView={handleFitView}
+        onTest={() => setShowSimulator((v) => !v)}
       />
 
       {readOnly && (
@@ -265,7 +303,7 @@ export default function FlowCanvasPage() {
             {!hasStart && (
               <button
                 onClick={addStartNode}
-                className="w-40 rounded-lg border border-dashed border-green-300 py-2 text-xs font-medium text-green-600 transition hover:bg-green-50"
+                className="w-44 rounded-lg border border-dashed border-green-300 py-2 text-xs font-medium text-green-600 transition hover:bg-green-50"
               >
                 + Add Start
               </button>
@@ -273,11 +311,12 @@ export default function FlowCanvasPage() {
           </div>
         )}
 
-        <div ref={reactFlowWrapper} className="min-w-0 flex-1 rounded-xl border border-gray-200 bg-gray-50 overflow-hidden">
+        <div ref={reactFlowWrapper} className="relative min-w-0 flex-1 rounded-xl border border-gray-200 bg-gray-50 overflow-hidden">
           <ReactFlow
             nodes={nodes}
             edges={edges}
             nodeTypes={nodeTypes}
+            edgeTypes={edgeTypes}
             onNodesChange={readOnly ? undefined : onNodesChange}
             onEdgesChange={readOnly ? undefined : onEdgesChange}
             onConnect={readOnly ? undefined : onConnect}
@@ -285,6 +324,7 @@ export default function FlowCanvasPage() {
             onDragOver={readOnly ? undefined : onDragOver}
             onNodeClick={(_, node) => setSelectedNode(node as FlowNode)}
             onPaneClick={() => setSelectedNode(null)}
+            onInit={(inst) => { rfInstance.current = inst; }}
             fitView
             nodesDraggable={!readOnly}
             nodesConnectable={!readOnly}
@@ -294,16 +334,36 @@ export default function FlowCanvasPage() {
             <Controls />
             <MiniMap />
           </ReactFlow>
+
+          {/* Empty canvas overlay */}
+          {nodes.length === 0 && !readOnly && (
+            <div className="pointer-events-none absolute inset-0 flex flex-col items-center justify-center gap-3 text-gray-400">
+              <span className="text-4xl opacity-30">⬡</span>
+              <div className="text-center">
+                <p className="text-sm font-medium">Canvas is empty</p>
+                <p className="text-xs mt-1 opacity-70">Drag a node from the palette, or click "+ Add Start"</p>
+              </div>
+            </div>
+          )}
         </div>
 
-        <NodeInspectorPanel
-          node={selectedNode}
-          readOnly={readOnly}
-          hotelCtx={hotelCtx}
-          definedVars={definedVars}
-          onChange={updateNodeData}
-          onDelete={deleteNode}
-        />
+        {showSimulator ? (
+          <FlowSimulator
+            nodes={nodes}
+            edges={edges}
+            hotelCtx={hotelCtx}
+            onClose={() => setShowSimulator(false)}
+          />
+        ) : (
+          <NodeInspectorPanel
+            node={selectedNode}
+            readOnly={readOnly}
+            hotelCtx={hotelCtx}
+            definedVars={definedVars}
+            onChange={updateNodeData}
+            onDelete={deleteNode}
+          />
+        )}
       </div>
     </div>
     </ErrorBoundary>

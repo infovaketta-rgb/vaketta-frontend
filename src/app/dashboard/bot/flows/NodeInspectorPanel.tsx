@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback } from "react";
+import { useCallback, useRef, useState } from "react";
 import type {
   FlowNode,
   BranchCondition,
@@ -91,6 +91,42 @@ export default function NodeInspectorPanel({
 }: Props) {
   const inp = "w-full rounded-lg border border-gray-200 px-2.5 py-1.5 text-xs text-gray-800 focus:outline-none focus:ring-2 focus:ring-[#7A3F91] disabled:bg-gray-50 disabled:text-gray-400";
 
+  // Track the last focused textarea/input + cursor position for cursor-aware var insertion
+  const lastSel = useRef<{ el: HTMLTextAreaElement | HTMLInputElement; start: number; end: number } | null>(null);
+  const [copied, setCopied] = useState(false);
+
+  function trackSel(e: React.FocusEvent<HTMLTextAreaElement | HTMLInputElement>) {
+    const el = e.currentTarget;
+    lastSel.current = { el, start: el.selectionStart ?? el.value.length, end: el.selectionEnd ?? el.value.length };
+  }
+
+  function trackSelOnChange(el: HTMLTextAreaElement | HTMLInputElement) {
+    lastSel.current = { el, start: el.selectionStart ?? el.value.length, end: el.selectionEnd ?? el.value.length };
+  }
+
+  // Insert {{var}} at last known cursor position; fallback = append
+  function insertVar(v: string, fallback: (token: string) => void) {
+    const token  = `{{${v}}}`;
+    const saved  = lastSel.current;
+    if (saved?.el && document.contains(saved.el)) {
+      const { el, start, end } = saved;
+      const newVal = el.value.slice(0, start) + token + el.value.slice(end);
+      // Use native setter to bypass React's internal tracking so onChange fires
+      const proto  = el instanceof HTMLTextAreaElement ? HTMLTextAreaElement.prototype : HTMLInputElement.prototype;
+      const setter = Object.getOwnPropertyDescriptor(proto, "value")?.set;
+      if (setter) {
+        setter.call(el, newVal);
+        el.dispatchEvent(new Event("input", { bubbles: true }));
+        el.focus();
+        const pos = start + token.length;
+        el.setSelectionRange(pos, pos);
+        lastSel.current = { el, start: pos, end: pos };
+        return;
+      }
+    }
+    fallback(token);
+  }
+
   const set = useCallback(
     (patch: Record<string, unknown>) => {
       if (!node) return;
@@ -124,20 +160,38 @@ export default function NodeInspectorPanel({
   const varListId = `vars-${node.id}`;
 
   return (
-    <div className="flex w-64 shrink-0 flex-col gap-3 overflow-y-auto rounded-xl border border-gray-200 bg-white p-4 shadow-sm">
-      {/* Header */}
-      <div className="flex items-center justify-between">
-        <p className="text-xs font-bold uppercase tracking-widest text-gray-400">{node.type?.replace(/_/g, " ")}</p>
+    <div className="flex w-64 shrink-0 flex-col rounded-xl border border-gray-200 bg-white shadow-sm overflow-hidden">
+      {/* Sticky header */}
+      <div className="sticky top-0 z-10 flex items-center justify-between gap-2 border-b border-gray-100 bg-white px-3 py-2.5 shrink-0">
+        <div className="min-w-0">
+          <p className="text-[10px] font-bold uppercase tracking-widest text-gray-500">
+            {node.type?.replace(/_/g, " ")}
+          </p>
+          <button
+            onClick={() => {
+              navigator.clipboard?.writeText(node.id).catch(() => {});
+              setCopied(true);
+              setTimeout(() => setCopied(false), 1800);
+            }}
+            className="font-mono text-[10px] text-gray-300 hover:text-gray-500 transition truncate max-w-40 block text-left"
+            title="Copy node ID"
+          >
+            {copied ? "✓ copied" : node.id.slice(0, 20) + (node.id.length > 20 ? "…" : "")}
+          </button>
+        </div>
         {!readOnly && (
           <button
             onClick={() => onDelete(node.id)}
-            className="rounded p-0.5 text-red-400 transition hover:bg-red-50"
+            className="shrink-0 rounded p-1 text-red-400 transition hover:bg-red-50"
             title="Delete node"
           >
             🗑
           </button>
         )}
       </div>
+
+      {/* Scrollable body */}
+      <div className="flex-1 overflow-y-auto p-3 space-y-3">
 
       {/* Hotel context badge */}
       {hotelCtx && (
@@ -175,11 +229,13 @@ export default function NodeInspectorPanel({
             <Label>Message text</Label>
             <textarea disabled={readOnly} rows={4} className={`${inp} resize-none`}
               value={(node.data as any).text ?? ""}
+              onBlur={trackSel}
+              onSelect={(e) => trackSelOnChange(e.currentTarget)}
               onChange={(e) => set({ text: e.target.value })}
               placeholder="What should the bot say?" />
           </div>
           <VarChipRow vars={definedVars} readOnly={readOnly}
-            onInsert={(v) => set({ text: ((node.data as any).text ?? "") + `{{${v}}}` })} />
+            onInsert={(v) => insertVar(v, (token) => set({ text: ((node.data as any).text ?? "") + token }))} />
         </>
       )}
 
@@ -224,11 +280,14 @@ export default function NodeInspectorPanel({
             <div>
               <Label>Question prompt</Label>
               <textarea disabled={readOnly} rows={3} className={`${inp} resize-none`}
-                value={d.text ?? ""} onChange={(e) => set({ text: e.target.value })}
+                value={d.text ?? ""}
+                onBlur={trackSel}
+                onSelect={(e) => trackSelOnChange(e.currentTarget)}
+                onChange={(e) => set({ text: e.target.value })}
                 placeholder="What to ask the guest?" />
             </div>
             <VarChipRow vars={definedVars} readOnly={readOnly}
-              onInsert={(v) => set({ text: (d.text ?? "") + `{{${v}}}` })} />
+              onInsert={(v) => insertVar(v, (token) => set({ text: (d.text ?? "") + token }))} />
 
             {/* Variable name */}
             <div>
@@ -434,11 +493,14 @@ export default function NodeInspectorPanel({
             <div>
               <Label>Prompt text</Label>
               <textarea disabled={readOnly} rows={3} className={`${inp} resize-none`}
-                value={d.text ?? ""} onChange={(e) => set({ text: e.target.value })}
+                value={d.text ?? ""}
+                onBlur={trackSel}
+                onSelect={(e) => trackSelOnChange(e.currentTarget)}
+                onChange={(e) => set({ text: e.target.value })}
                 placeholder="Which room type would you like?" />
             </div>
             <VarChipRow vars={definedVars} readOnly={readOnly}
-              onInsert={(v) => set({ text: (d.text ?? "") + `{{${v}}}` })} />
+              onInsert={(v) => insertVar(v, (token) => set({ text: (d.text ?? "") + token }))} />
 
             <div>
               <Label>Room filter</Label>
@@ -648,10 +710,13 @@ export default function NodeInspectorPanel({
             <div>
               <Label>Message before action (optional)</Label>
               <textarea disabled={readOnly} rows={2} className={`${inp} resize-none`}
-                value={d.message ?? ""} onChange={(e) => set({ message: e.target.value })}
+                value={d.message ?? ""}
+                onBlur={trackSel}
+                onSelect={(e) => trackSelOnChange(e.currentTarget)}
+                onChange={(e) => set({ message: e.target.value })}
                 placeholder="Optional message sent before the action runs" />
               <VarChipRow vars={definedVars} readOnly={readOnly}
-                onInsert={(v) => set({ message: (d.message ?? "") + `{{${v}}}` })} />
+                onInsert={(v) => insertVar(v, (token) => set({ message: (d.message ?? "") + token }))} />
             </div>
 
             {/* ── create_booking ── */}
@@ -709,11 +774,13 @@ export default function NodeInspectorPanel({
                 <div>
                   <Label>Value (supports {"{{interpolation}}"})</Label>
                   <input disabled={readOnly} className={inp} value={d.valueToSet ?? ""}
+                    onBlur={trackSel}
+                    onSelect={(e) => trackSelOnChange(e.currentTarget)}
                     onChange={(e) => set({ valueToSet: e.target.value })}
                     placeholder={`Static value or {{otherVar}}`} />
                 </div>
                 <VarChipRow vars={definedVars} readOnly={readOnly}
-                  onInsert={(v) => set({ valueToSet: (d.valueToSet ?? "") + `{{${v}}}` })} />
+                  onInsert={(v) => insertVar(v, (token) => set({ valueToSet: (d.valueToSet ?? "") + token }))} />
               </SectionBox>
             )}
 
@@ -730,11 +797,13 @@ export default function NodeInspectorPanel({
                   <Label>Custom message (optional)</Label>
                   <textarea disabled={readOnly} rows={2} className={`${inp} resize-none`}
                     value={d.reviewMessage ?? ""}
+                    onBlur={trackSel}
+                    onSelect={(e) => trackSelOnChange(e.currentTarget)}
                     onChange={(e) => set({ reviewMessage: e.target.value })}
                     placeholder="We'd love to hear about your stay!" />
                 </div>
                 <VarChipRow vars={definedVars} readOnly={readOnly}
-                  onInsert={(v) => set({ reviewMessage: (d.reviewMessage ?? "") + `{{${v}}}` })} />
+                  onInsert={(v) => insertVar(v, (token) => set({ reviewMessage: (d.reviewMessage ?? "") + token }))} />
               </SectionBox>
             )}
 
@@ -773,6 +842,8 @@ export default function NodeInspectorPanel({
                       rows={2}
                       className={`${inp} resize-none`}
                       value={(d as any).outsideHoursMessage ?? ""}
+                      onBlur={trackSel}
+                      onSelect={(e) => trackSelOnChange(e.currentTarget)}
                       onChange={(e) => set({ outsideHoursMessage: e.target.value })}
                       placeholder="This option is only available during our business hours."
                     />
@@ -914,11 +985,13 @@ export default function NodeInspectorPanel({
             <Label>Farewell message (optional)</Label>
             <textarea disabled={readOnly} rows={4} className={`${inp} resize-none`}
               value={(node.data as any).farewellText ?? ""}
+              onBlur={trackSel}
+              onSelect={(e) => trackSelOnChange(e.currentTarget)}
               onChange={(e) => set({ farewellText: e.target.value })}
               placeholder="Thanks for chatting! Have a great day 😊" />
           </div>
           <VarChipRow vars={definedVars} readOnly={readOnly}
-            onInsert={(v) => set({ farewellText: ((node.data as any).farewellText ?? "") + `{{${v}}}` })} />
+            onInsert={(v) => insertVar(v, (token) => set({ farewellText: ((node.data as any).farewellText ?? "") + token }))} />
           {definedVars.length > 0 && (
             <p className="text-[10px] text-gray-400">
               Available: {definedVars.map(v => (
@@ -928,6 +1001,8 @@ export default function NodeInspectorPanel({
           )}
         </>
       )}
+
+      </div>{/* end scrollable body */}
     </div>
   );
 }

@@ -491,6 +491,9 @@ export default function BotPage() {
   const [flowsLoaded,   setFlowsLoaded]   = useState(false);
   const [creatingFlow,  setCreatingFlow]  = useState(false);
   const [sidebarOpen,   setSidebarOpen]   = useState(false);
+  const [flowSearch,    setFlowSearch]    = useState("");
+  const [flowFilter,    setFlowFilter]    = useState<"all" | "active" | "mine" | "template">("all");
+  const [duplicatingId, setDuplicatingId] = useState<string | null>(null);
 
   // menu item editing
   const [editingItemId, setEditingItemId] = useState<string | null>(null);
@@ -650,12 +653,48 @@ export default function BotPage() {
   }
 
   async function handleToggleFlowActive(flow: FlowSummary) {
-    if (flow.isTemplate) return; // read-only
+    if (flow.isTemplate) return;
     const updated: FlowSummary = await apiFetch(`/hotel-settings/flows/${flow.id}`, {
       method: "PATCH",
       body: JSON.stringify({ isActive: !flow.isActive }),
     });
     setFlowsList((prev) => prev.map((f) => (f.id === flow.id ? updated : f)));
+  }
+
+  async function handleDuplicateFlow(flow: FlowSummary) {
+    if (duplicatingId) return;
+    setDuplicatingId(flow.id);
+    try {
+      const full: any = await apiFetch(`/hotel-settings/flows/${flow.id}`);
+      const created: FlowSummary & { id: string } = await apiFetch("/hotel-settings/flows", {
+        method: "POST",
+        body: JSON.stringify({ name: `Copy of ${flow.name}` }),
+      });
+      await apiFetch(`/hotel-settings/flows/${created.id}`, {
+        method: "PATCH",
+        body: JSON.stringify({ name: `Copy of ${flow.name}`, nodes: full.nodes ?? [], edges: full.edges ?? [] }),
+      });
+      const refreshed: FlowSummary[] = await apiFetch("/hotel-settings/flows");
+      setFlowsList(refreshed);
+      addToast(`Duplicated "${flow.name}"`, "success");
+    } catch {
+      addToast("Failed to duplicate flow", "error");
+    } finally {
+      setDuplicatingId(null);
+    }
+  }
+
+  function relativeTime(ts: string | undefined): string {
+    if (!ts) return "—";
+    const diff = Date.now() - new Date(ts).getTime();
+    const min  = Math.floor(diff / 60000);
+    if (min < 1)  return "just now";
+    if (min < 60) return `${min}m ago`;
+    const hr = Math.floor(min / 60);
+    if (hr < 24)  return `${hr}h ago`;
+    const day = Math.floor(hr / 24);
+    if (day < 7)  return `${day}d ago`;
+    return new Date(ts).toLocaleDateString([], { day: "2-digit", month: "short" });
   }
 
   // ── guards ─────────────────────────────────────────────────────────────────
@@ -1423,22 +1462,62 @@ export default function BotPage() {
         {/* ── FLOWS TAB ────────────────────────────────────────────────── */}
         {tab === "flows" && (() => {
           if (!flowsLoaded) { loadFlows(); }
+
+          const q = flowSearch.trim().toLowerCase();
+          const visibleFlows = flowsList.filter((f) => {
+            if (q && !f.name.toLowerCase().includes(q)) return false;
+            if (flowFilter === "active")   return f.isActive && !f.isTemplate;
+            if (flowFilter === "mine")     return !f.isTemplate;
+            if (flowFilter === "template") return f.isTemplate;
+            return true;
+          });
+
           return (
             <div className="flex-1 overflow-y-auto p-4 md:p-6 space-y-4">
-              <div className="flex items-center justify-between">
+              {/* Header row */}
+              <div className="flex items-start justify-between gap-3 flex-wrap">
                 <div>
                   <h2 className="text-sm font-semibold text-gray-900">Bot Flows</h2>
                   <p className="mt-0.5 text-xs text-gray-400">
-                    Build visual conversation flows. Global templates (created by Vaketta admin) are read-only.
+                    Build visual conversation flows. Global templates are read-only.
                   </p>
                 </div>
                 <button
                   onClick={handleCreateFlow}
                   disabled={creatingFlow}
-                  className="rounded-lg bg-[#7A3F91] px-4 py-2 text-sm font-semibold text-white transition hover:bg-[#2B0D3E] disabled:opacity-50"
+                  className="rounded-lg bg-[#7A3F91] px-4 py-2 text-sm font-semibold text-white transition hover:bg-[#2B0D3E] disabled:opacity-50 shrink-0"
                 >
                   {creatingFlow ? "Creating…" : "+ New Flow"}
                 </button>
+              </div>
+
+              {/* Search + filter bar */}
+              <div className="flex items-center gap-2 flex-wrap">
+                <div className="relative flex-1 min-w-40">
+                  <svg className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-4.35-4.35M17 11A6 6 0 1 1 5 11a6 6 0 0 1 12 0z" />
+                  </svg>
+                  <input
+                    type="text"
+                    placeholder="Search flows…"
+                    value={flowSearch}
+                    onChange={(e) => setFlowSearch(e.target.value)}
+                    className="w-full pl-8 pr-3 py-1.5 text-xs rounded-lg bg-gray-50 border border-gray-200 outline-none focus:ring-2 focus:ring-[#7A3F91]/20 focus:border-[#7A3F91]"
+                  />
+                </div>
+                <div className="flex rounded-lg border border-gray-200 overflow-hidden text-xs shrink-0">
+                  {(["all", "active", "mine", "template"] as const).map((f) => (
+                    <button
+                      key={f}
+                      onClick={() => setFlowFilter(f)}
+                      className={`px-3 py-1.5 font-medium transition capitalize ${
+                        flowFilter === f ? "bg-[#7A3F91] text-white" : "bg-white text-gray-500 hover:bg-gray-50"
+                      }`}
+                    >
+                      {f === "all" ? "All" : f === "active" ? "Active" : f === "mine" ? "My Flows" : "Templates"}
+                    </button>
+                  ))}
+                </div>
               </div>
 
               <div className="rounded-2xl border border-gray-100 bg-white shadow-sm overflow-hidden">
@@ -1446,21 +1525,28 @@ export default function BotPage() {
                   <div className="flex items-center justify-center py-12">
                     <div className="h-6 w-6 animate-spin rounded-full border-4 border-gray-200 border-t-[#7A3F91]" />
                   </div>
-                ) : flowsList.length === 0 ? (
-                  <div className="py-12 text-center text-sm text-gray-400">No flows yet. Create one to get started.</div>
+                ) : visibleFlows.length === 0 ? (
+                  <div className="py-12 text-center text-sm text-gray-400">
+                    {flowsList.length === 0 ? "No flows yet. Create one to get started." : "No flows match your search."}
+                  </div>
                 ) : (
                   <>
                   {/* Mobile card list */}
                   <div className="md:hidden flex flex-col divide-y divide-gray-100">
-                    {flowsList.map((flow) => (
+                    {visibleFlows.map((flow) => (
                       <div key={flow.id} className="flex items-center justify-between px-4 py-3 gap-3">
                         <div className="min-w-0">
                           <p className="text-sm font-medium text-gray-800 truncate">{flow.name}</p>
-                          {flow.isTemplate ? (
-                            <span className="text-[10px] text-purple-600 font-semibold">Global Template</span>
-                          ) : (
-                            <span className="text-[10px] text-gray-400">My Flow</span>
-                          )}
+                          <div className="flex items-center gap-1.5 mt-0.5">
+                            {flow.isTemplate ? (
+                              <span className="text-[10px] text-purple-600 font-semibold">Template</span>
+                            ) : (
+                              <span className={`text-[10px] font-medium ${flow.isActive ? "text-green-600" : "text-gray-400"}`}>
+                                {flow.isActive ? "Active" : "Inactive"}
+                              </span>
+                            )}
+                            <span className="text-[10px] text-gray-300">{relativeTime((flow as any).updatedAt)}</span>
+                          </div>
                         </div>
                         <div className="flex items-center gap-2 shrink-0">
                           <button
@@ -1485,6 +1571,7 @@ export default function BotPage() {
                       </div>
                     ))}
                   </div>
+
                   {/* Desktop table */}
                   <table className="hidden md:table w-full text-sm">
                     <thead className="border-b border-gray-100 bg-gray-50 text-xs font-semibold text-gray-500 uppercase tracking-wide">
@@ -1492,11 +1579,12 @@ export default function BotPage() {
                         <th className="px-5 py-3 text-left">Name</th>
                         <th className="px-4 py-3 text-left">Type</th>
                         <th className="px-4 py-3 text-center">Active</th>
+                        <th className="px-4 py-3 text-left">Updated</th>
                         <th className="px-4 py-3 text-right">Actions</th>
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-gray-50">
-                      {flowsList.map((flow) => (
+                      {visibleFlows.map((flow) => (
                         <tr key={flow.id} className="hover:bg-gray-50/50 transition">
                           <td className="px-5 py-3">
                             <p className="font-medium text-gray-800">{flow.name}</p>
@@ -1506,7 +1594,9 @@ export default function BotPage() {
                             {flow.isTemplate ? (
                               <span className="rounded-full bg-purple-100 px-2 py-0.5 text-[11px] font-semibold text-purple-700">Global Template</span>
                             ) : (
-                              <span className="rounded-full bg-gray-100 px-2 py-0.5 text-[11px] text-gray-500">My Flow</span>
+                              <span className={`rounded-full px-2 py-0.5 text-[11px] font-medium ${flow.isActive ? "bg-green-100 text-green-700" : "bg-gray-100 text-gray-500"}`}>
+                                {flow.isActive ? "Active" : "Inactive"}
+                              </span>
                             )}
                           </td>
                           <td className="px-4 py-3 text-center">
@@ -1518,13 +1608,26 @@ export default function BotPage() {
                               <span className={`inline-block h-4 w-4 transform rounded-full bg-white shadow transition-transform ${flow.isActive ? "translate-x-4" : "translate-x-0.5"}`} />
                             </button>
                           </td>
-                          <td className="px-4 py-3 text-right space-x-2">
+                          <td className="px-4 py-3 text-xs text-gray-400">
+                            {relativeTime((flow as any).updatedAt)}
+                          </td>
+                          <td className="px-4 py-3 text-right space-x-1">
                             <button
                               onClick={() => router.push(`/dashboard/bot/flows/${flow.id}`)}
                               className="rounded px-2 py-1 text-xs font-medium text-[#7A3F91] transition hover:bg-purple-50"
                             >
                               {flow.isTemplate ? "View" : "Edit"}
                             </button>
+                            {!flow.isTemplate && (
+                              <button
+                                onClick={() => handleDuplicateFlow(flow)}
+                                disabled={duplicatingId === flow.id}
+                                className="rounded px-2 py-1 text-xs font-medium text-gray-500 transition hover:bg-gray-100 disabled:opacity-40"
+                                title="Duplicate flow"
+                              >
+                                {duplicatingId === flow.id ? "…" : "Duplicate"}
+                              </button>
+                            )}
                             {!flow.isTemplate && (
                               <button
                                 onClick={() => handleDeleteFlow(flow.id)}
