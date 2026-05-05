@@ -28,10 +28,15 @@ type WhatsAppConfig = {
 };
 
 type InstagramConfig = {
-  accessToken:   string;
-  igAccountId:   string;
-  connected:     boolean;
-  embedUrl:      string;
+  accessToken: string;
+  igAccountId: string;
+  connected:   boolean;
+};
+
+type FacebookPage = {
+  id:        string;
+  name:      string;
+  igAccount: { id: string; name: string } | null;
 };
 
 // ── helpers ────────────────────────────────────────────────────────────────────
@@ -121,9 +126,12 @@ export default function ConfigurationPage() {
   const [fbError,      setFbError]      = useState("");
 
   // Instagram integration state
-  const [ig, setIg]               = useState<InstagramConfig>({ accessToken: "", igAccountId: "", connected: false, embedUrl: "" });
+  const [ig, setIg]               = useState<InstagramConfig>({ accessToken: "", igAccountId: "", connected: false });
   const [igConnecting,  setIgConnecting]  = useState(false);
   const [igOAuthError,  setIgOAuthError]  = useState("");
+  const [igPages,         setIgPages]         = useState<FacebookPage[]>([]);
+  const [igPageSelecting, setIgPageSelecting] = useState(false);
+  const [igShortToken,    setIgShortToken]    = useState("");
   const [igSubStatus,   setIgSubStatus]   = useState<boolean | null>(null);
   const [igSubLoading,  setIgSubLoading]  = useState(false);
   const [igSubError,    setIgSubError]    = useState("");
@@ -192,7 +200,6 @@ export default function ConfigurationPage() {
           accessToken: data.accessToken ?? "",
           igAccountId: data.igAccountId ?? "",
           connected,
-          embedUrl:    data.embedUrl    ?? "",
         });
         if (connected) {
           apiFetch("/hotel-settings/instagram/subscribe/status")
@@ -442,74 +449,80 @@ export default function ConfigurationPage() {
     }
   }
 
-  function handleIgConnect() {
-    const url = ig.embedUrl || process.env.NEXT_PUBLIC_INSTAGRAM_EMBED_URL || "";
-    console.log("Opening OAuth URL:", url); // add this
-    
-    if (!url) {
-      setIgOAuthError("Instagram OAuth URL is not configured. Contact your administrator.");
-      return;
-    }
+  function handleIgFBConnect() {
     setIgOAuthError("");
 
-    const w = 600, h = 700;
-    const left = Math.round(window.screenX + (window.outerWidth  - w) / 2);
-    const top  = Math.round(window.screenY + (window.outerHeight - h) / 2);
-    const popup = window.open(
-      url,
-      "ig-oauth",
-      `width=${w},height=${h},left=${left},top=${top},scrollbars=yes,resizable=yes`
-    );
-
-    if (!popup) {
-      setIgOAuthError("Popup was blocked. Please allow popups for this site and try again.");
+    const FB = (window as any).FB;
+    if (!FB) {
+      setIgOAuthError("Facebook SDK not loaded. Please refresh the page and try again.");
       return;
     }
 
     setIgConnecting(true);
 
-    const timer = setInterval(() => {
-      if (popup.closed) {
-        clearInterval(timer);
-        setIgConnecting(false);
-        return;
-      }
-      try {
-        const href = popup.location?.href ?? "";
-        const isRedirected = href.includes("vaketta.com") || href.includes("localhost");
-        if (!isRedirected) return;
+    FB.login(
+      function (response: any) {
+        const token = response?.authResponse?.accessToken;
 
-        const code = new URLSearchParams(popup.location.search).get("code");
-        clearInterval(timer);
-        popup.close();
-
-        if (!code) {
+        if (!token) {
           setIgConnecting(false);
-          setIgOAuthError("Instagram authorisation was cancelled. Please try again.");
+          if (response?.status !== "unknown") {
+            setIgOAuthError("Facebook authorisation was cancelled. Please try again.");
+          }
           return;
         }
 
-        apiFetch("/hotel-settings/instagram/oauth-exchange", {
-          method: "POST",
-          body:   JSON.stringify({ code }),
-        })
+        apiFetch(`/api/instagram/pages?token=${encodeURIComponent(token)}`)
           .then((data: any) => {
-            console.log(`[Instagram OAuth] redirect_uri used in exchange: "${data.redirectUri}"`);
-            setIg((prev) => ({
-              ...prev,
-              igAccountId: data.igAccountId ?? prev.igAccountId,
-              connected:   true,
-            }));
-            setIgAdvancedOpen(true);
+            const pages: FacebookPage[] = data.pages ?? [];
+            if (pages.length === 0) {
+              setIgOAuthError("No Instagram Business accounts found linked to your Facebook pages.");
+              setIgConnecting(false);
+              return;
+            }
+            if (pages.length === 1) {
+              connectPage(pages[0].id, token);
+              return;
+            }
+            setIgPages(pages);
+            setIgShortToken(token);
+            setIgPageSelecting(true);
+            setIgConnecting(false);
           })
           .catch((e: any) => {
-            setIgOAuthError(e.message ?? "Failed to exchange Instagram token.");
-          })
-          .finally(() => setIgConnecting(false));
-      } catch {
-        // Cross-origin — popup still on instagram.com, keep polling
+            setIgOAuthError(e.message ?? "Failed to fetch pages.");
+            setIgConnecting(false);
+          });
+      },
+      {
+        scope:         "instagram_manage_messages,instagram_basic,pages_show_list,pages_read_engagement",
+        return_scopes: true,
       }
-    }, 500);
+    );
+  }
+
+  async function connectPage(pageId: string, shortToken: string) {
+    setIgConnecting(true);
+    setIgOAuthError("");
+    try {
+      const data = await apiFetch("/api/instagram/connect", {
+        method: "POST",
+        body:   JSON.stringify({ pageId, shortLivedToken: shortToken }),
+      });
+      setIg((prev) => ({
+        ...prev,
+        igAccountId: (data as any).instagramBusinessAccountId ?? prev.igAccountId,
+        connected:   true,
+      }));
+      setIgPageSelecting(false);
+      setIgPages([]);
+      setIgShortToken("");
+      setIgAdvancedOpen(true);
+    } catch (e: any) {
+      setIgOAuthError(e.message ?? "Failed to connect Instagram account.");
+    } finally {
+      setIgConnecting(false);
+    }
   }
 
   async function handleIgSubscribe() {
@@ -1087,39 +1100,79 @@ export default function ConfigurationPage() {
 
             <div className="px-6 py-5 space-y-4">
 
-              {/* ── Connect via Instagram ── */}
+              {/* ── Connect via Facebook ── */}
               <div className="flex flex-col gap-2">
-                <div className="flex items-center justify-between rounded-xl border px-4 py-3"
-                  style={{ borderColor: "#d6249f33", background: "linear-gradient(to right, #fdf0fa, #fff8f0)" }}>
+                <div className="flex items-center justify-between rounded-xl border border-[#1877F2]/20 bg-[#1877F2]/5 px-4 py-3">
                   <div>
                     <p className="text-sm font-medium text-gray-800">
                       Connect Instagram <span className="text-xs font-normal text-green-600">(Recommended)</span>
                     </p>
                     <p className="text-xs text-gray-400 mt-0.5">
-                      Use Instagram login to connect your Business account automatically.
+                      Use Facebook login to connect your Instagram Business account automatically.
                     </p>
                   </div>
                   <button
                     type="button"
-                    onClick={handleIgConnect}
+                    onClick={handleIgFBConnect}
                     disabled={igConnecting}
-                    className="flex items-center gap-2 rounded-lg px-4 py-2 text-sm font-semibold text-white hover:opacity-90 disabled:opacity-60 disabled:cursor-not-allowed shrink-0 ml-4 transition"
-                    style={{ background: "radial-gradient(circle at 30% 107%, #fdf497 0%, #fdf497 5%, #fd5949 45%, #d6249f 60%, #285AEB 90%)" }}
+                    className="flex items-center gap-2 rounded-lg bg-[#1877F2] px-4 py-2 text-sm font-semibold text-white hover:bg-[#1464d8] disabled:opacity-60 disabled:cursor-not-allowed shrink-0 ml-4 transition"
                   >
                     {igConnecting ? (
                       <span className="h-4 w-4 animate-spin rounded-full border-2 border-white border-t-transparent" />
                     ) : (
                       <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 24 24">
-                        <path d="M12 2.163c3.204 0 3.584.012 4.85.07 3.252.148 4.771 1.691 4.919 4.919.058 1.265.069 1.645.069 4.849 0 3.205-.012 3.584-.069 4.849-.149 3.225-1.664 4.771-4.919 4.919-1.266.058-1.644.07-4.85.07-3.204 0-3.584-.012-4.849-.07-3.26-.149-4.771-1.699-4.919-4.92-.058-1.265-.07-1.644-.07-4.849 0-3.204.013-3.583.07-4.849.149-3.227 1.664-4.771 4.919-4.919 1.266-.057 1.645-.069 4.849-.069zM12 0C8.741 0 8.333.014 7.053.072 2.695.272.273 2.69.073 7.052.014 8.333 0 8.741 0 12c0 3.259.014 3.668.072 4.948.2 4.358 2.618 6.78 6.98 6.98C8.333 23.986 8.741 24 12 24c3.259 0 3.668-.014 4.948-.072 4.354-.2 6.782-2.618 6.979-6.98.059-1.28.073-1.689.073-4.948 0-3.259-.014-3.667-.072-4.947-.196-4.354-2.617-6.78-6.979-6.98C15.668.014 15.259 0 12 0zm0 5.838a6.162 6.162 0 1 0 0 12.324 6.162 6.162 0 0 0 0-12.324zM12 16a4 4 0 1 1 0-8 4 4 0 0 1 0 8zm6.406-11.845a1.44 1.44 0 1 0 0 2.881 1.44 1.44 0 0 0 0-2.881z"/>
+                        <path d="M24 12.073C24 5.446 18.627 0 12 0S0 5.446 0 12.073C0 18.1 4.388 23.094 10.125 24v-8.437H7.078v-3.49h3.047V9.41c0-3.025 1.791-4.697 4.533-4.697 1.312 0 2.686.236 2.686.236v2.97h-1.513c-1.491 0-1.956.93-1.956 1.887v2.268h3.328l-.532 3.49h-2.796V24C19.612 23.094 24 18.1 24 12.073z"/>
                       </svg>
                     )}
-                    {igConnecting ? "Connecting…" : "Connect via Instagram"}
+                    {igConnecting ? "Connecting…" : "Connect via Facebook"}
                   </button>
                 </div>
                 {igOAuthError && (
                   <p className="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-xs text-red-700">{igOAuthError}</p>
                 )}
               </div>
+
+              {/* ── Page selector modal ── */}
+              {igPageSelecting && (
+                <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
+                  <div className="w-full max-w-md rounded-2xl bg-white shadow-xl overflow-hidden">
+                    <div className="border-b border-gray-100 px-6 py-4">
+                      <h3 className="text-sm font-semibold text-[#2B0D3E]">Select a Facebook Page</h3>
+                      <p className="mt-0.5 text-xs text-gray-400">
+                        Choose the page linked to the Instagram account you want to connect.
+                      </p>
+                    </div>
+                    <div className="divide-y divide-gray-100 max-h-72 overflow-y-auto">
+                      {igPages.map((page) => (
+                        <button
+                          key={page.id}
+                          type="button"
+                          onClick={() => connectPage(page.id, igShortToken)}
+                          disabled={igConnecting}
+                          className="w-full flex items-center justify-between px-6 py-4 text-left hover:bg-gray-50 disabled:opacity-50 transition"
+                        >
+                          <div>
+                            <p className="text-sm font-medium text-gray-800">{page.name}</p>
+                            <p className="text-xs text-gray-400 mt-0.5">
+                              Instagram: {page.igAccount?.name || page.igAccount?.id}
+                            </p>
+                          </div>
+                          <span className="text-xs font-semibold text-[#1877F2] shrink-0 ml-4">Select</span>
+                        </button>
+                      ))}
+                    </div>
+                    <div className="border-t border-gray-100 px-6 py-3 flex justify-end">
+                      <button
+                        type="button"
+                        onClick={() => { setIgPageSelecting(false); setIgPages([]); setIgShortToken(""); }}
+                        className="text-xs font-medium text-gray-500 hover:text-gray-700 transition"
+                      >
+                        Cancel
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              )}
 
               {/* ── Webhook Subscription ── */}
               {ig.connected && (
