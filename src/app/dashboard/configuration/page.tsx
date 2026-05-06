@@ -365,7 +365,9 @@ export default function ConfigurationPage() {
         const redirectUri = response?.authResponse?.redirect_uri ?? "";
         if (!code) {
           setFbConnecting(false);
-          if (response?.status !== "unknown") {
+          if (response?.status === "not_authorized") {
+            setFbError("App not authorized. Make sure the Meta App ID is correct.");
+          } else if (response?.status !== "unknown") {
             setFbError("Facebook authorisation was cancelled. Please try again.");
           }
           return;
