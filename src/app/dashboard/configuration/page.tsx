@@ -342,6 +342,31 @@ export default function ConfigurationPage() {
     return () => window.removeEventListener("message", handleMessage);
   }, [mounted]);
 
+  async function handleEmbeddedSignupCode(code: string, redirectUri: string) {
+    try {
+      const data = await apiFetch("/hotel-settings/whatsapp/embedded-signup", {
+        method: "POST",
+        body:   JSON.stringify({
+          code,
+          redirectUri,
+          wabaId:        wabaIdRef.current,
+          phoneNumberId: phoneNumberIdRef.current,
+        }),
+      });
+      setWa((w) => ({
+        ...w,
+        metaPhoneNumberId: (data as any).phoneNumberId ?? w.metaPhoneNumberId,
+        metaWabaId:        (data as any).wabaId        ?? w.metaWabaId,
+        connected:         true,
+      }));
+      setAdvancedOpen(true);
+    } catch (e: any) {
+      setFbError(e.message ?? "Failed to connect. Enter credentials manually below.");
+    } finally {
+      setFbConnecting(false);
+    }
+  }
+
   function launchWhatsAppSignup() {
     setFbError("");
     const FB = (window as any).FB;
@@ -360,7 +385,7 @@ export default function ConfigurationPage() {
     }
 
     FB.login(
-      async function (response: any) {
+      function (response: any) {
         const code        = response?.authResponse?.code;
         const redirectUri = response?.authResponse?.redirect_uri ?? "";
         if (!code) {
@@ -372,28 +397,7 @@ export default function ConfigurationPage() {
           }
           return;
         }
-        try {
-          const data = await apiFetch("/hotel-settings/whatsapp/embedded-signup", {
-            method: "POST",
-            body:   JSON.stringify({
-              code,
-              redirectUri,
-              wabaId:        wabaIdRef.current,
-              phoneNumberId: phoneNumberIdRef.current,
-            }),
-          });
-          setWa((w) => ({
-            ...w,
-            metaPhoneNumberId: (data as any).phoneNumberId ?? w.metaPhoneNumberId,
-            metaWabaId:        (data as any).wabaId        ?? w.metaWabaId,
-            connected:         true,
-          }));
-          setAdvancedOpen(true);
-        } catch (e: any) {
-          setFbError(e.message ?? "Failed to connect. Enter credentials manually below.");
-        } finally {
-          setFbConnecting(false);
-        }
+        handleEmbeddedSignupCode(code, redirectUri);
       },
       {
         config_id:                      configId,
