@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { apiFetch } from "@/lib/api";
 import { useMounted } from "@/lib/useMounted";
 import { saveHotelName } from "@/lib/auth";
@@ -124,6 +124,10 @@ export default function ConfigurationPage() {
   const [testResult,   setTestResult]   = useState<"success" | "error" | null>(null);
   const [fbConnecting, setFbConnecting] = useState(false);
   const [fbError,      setFbError]      = useState("");
+  // Capture WABA + phone IDs from WA_EMBEDDED_SIGNUP MessageEvent via refs to
+  // avoid stale-closure issues inside the FB.login() callback
+  const wabaIdRef       = useRef("");
+  const phoneNumberIdRef = useRef("");
 
   // Instagram integration state
   const [ig, setIg]               = useState<InstagramConfig>({ accessToken: "", igAccountId: "", connected: false });
@@ -316,108 +320,69 @@ export default function ConfigurationPage() {
     }
   }
 
-  // ── Facebook Embedded Signup ──────────────────────────────────────────────
-  // Load the Facebook JS SDK once when the component mounts
+  // ── WhatsApp Embedded Signup ──────────────────────────────────────────────
+  // Capture WABA ID + Phone Number ID sent by Meta during the signup flow
   useEffect(() => {
     if (!mounted) return;
-
-    // fbAsyncInit must be defined BEFORE the SDK script loads
-    (window as any).fbAsyncInit = function () {
-      (window as any).FB.init({
-        appId:   process.env.NEXT_PUBLIC_META_APP_ID ?? "",
-        cookie:  true,
-        xfbml:   true,
-        version: "v21.0",
-      });
-    };
-
-    if (!document.getElementById("facebook-jssdk")) {
-      const script = document.createElement("script");
-      script.id    = "facebook-jssdk";
-      script.src   = "https://connect.facebook.net/en_US/sdk.js";
-      script.async = true;
-      script.defer = true;
-      document.head.appendChild(script);
+    function handleMessage(event: MessageEvent) {
+      if (event.origin !== "https://www.facebook.com") return;
+      try {
+        const data = JSON.parse(event.data);
+        if (data.type === "WA_EMBEDDED_SIGNUP" && data.event === "FINISH") {
+          wabaIdRef.current        = data.data?.waba_id         ?? "";
+          phoneNumberIdRef.current = data.data?.phone_number_id ?? "";
+        }
+      } catch {}
     }
+    window.addEventListener("message", handleMessage);
+    return () => window.removeEventListener("message", handleMessage);
   }, [mounted]);
 
-  function handleFBConnect() {
+  function launchWhatsAppSignup() {
     setFbError("");
-
-    const FB     = (window as any).FB;
-    const appId  = process.env.NEXT_PUBLIC_META_APP_ID;
-    const cfgId  = process.env.NEXT_PUBLIC_META_CONFIG_ID; // Embedded Signup config ID
-
-    // ── Fallback: open the OAuth popup manually if FB SDK hasn't initialised ──
+    const FB = (window as any).FB;
     if (!FB) {
-      if (!appId) {
-        setFbError("Meta App ID is not configured. Contact your administrator.");
-        return;
-      }
-      const w = 600, h = 700;
-      const left = Math.round(window.screenX + (window.outerWidth  - w) / 2);
-      const top  = Math.round(window.screenY + (window.outerHeight - h) / 2);
-      const params = new URLSearchParams({
-        client_id:                    appId,
-        response_type:                "code",
-        override_default_response_type: "true",
-        ...(cfgId ? { config_id: cfgId } : {}),
-      });
-      window.open(
-        `https://www.facebook.com/dialog/oauth?${params}`,
-        "fb-whatsapp-signup",
-        `width=${w},height=${h},left=${left},top=${top},scrollbars=yes,resizable=yes`
-      );
+      setFbError("Facebook SDK not loaded. Please refresh the page and try again.");
       return;
     }
-
-    // ── Primary path: use the Facebook JS SDK (opens popup automatically) ───
     setFbConnecting(true);
-
     FB.login(
-      function (response: any) {
+      async function (response: any) {
         const code = response?.authResponse?.code;
-
         if (!code) {
-          // User cancelled or denied
           setFbConnecting(false);
           if (response?.status !== "unknown") {
             setFbError("Facebook authorisation was cancelled. Please try again.");
           }
           return;
         }
-
-        // Send code to backend → exchange for permanent access token + WABA/phone IDs
-        apiFetch("/hotel-settings/whatsapp/fb-exchange", {
-          method: "POST",
-          body:   JSON.stringify({ code }),
-        })
-          .then((data: any) => {
-            setWa((w) => ({
-              ...w,
-              metaPhoneNumberId: data.phoneNumberId ?? w.metaPhoneNumberId,
-              metaWabaId:        data.wabaId        ?? w.metaWabaId,
-              metaAccessToken:   data.accessToken   ?? w.metaAccessToken,
-              connected:         true,
-            }));
-            // Expand Advanced Setup so user can review & save the pre-filled credentials
-            setAdvancedOpen(true);
-          })
-          .catch((e: any) => {
-            setFbError(e.message ?? "Failed to exchange token. You can enter credentials manually below.");
-          })
-          .finally(() => setFbConnecting(false));
+        try {
+          const data = await apiFetch("/hotel-settings/whatsapp/embedded-signup", {
+            method: "POST",
+            body:   JSON.stringify({
+              code,
+              wabaId:        wabaIdRef.current,
+              phoneNumberId: phoneNumberIdRef.current,
+            }),
+          });
+          setWa((w) => ({
+            ...w,
+            metaPhoneNumberId: (data as any).phoneNumberId ?? w.metaPhoneNumberId,
+            metaWabaId:        (data as any).wabaId        ?? w.metaWabaId,
+            connected:         true,
+          }));
+          setAdvancedOpen(true);
+        } catch (e: any) {
+          setFbError(e.message ?? "Failed to connect. Enter credentials manually below.");
+        } finally {
+          setFbConnecting(false);
+        }
       },
       {
-        // Required params for Meta Embedded Signup (WhatsApp Business Platform)
-        config_id:                      cfgId ?? "",
+        config_id:                      "1594195311668034",
         response_type:                  "code",
         override_default_response_type: true,
-        extras: {
-          setup:              {},
-          featureType:        "",
-          sessionInfoVersion: "2",
-        },
+        extras:                         { version: "v4" },
       }
     );
   }
@@ -845,7 +810,7 @@ export default function ConfigurationPage() {
                   </div>
                   <button
                     type="button"
-                    onClick={handleFBConnect}
+                    onClick={launchWhatsAppSignup}
                     disabled={fbConnecting}
                     className="flex items-center gap-2 rounded-lg bg-[#1877F2] px-4 py-2 text-sm font-semibold text-white hover:bg-[#1464d8] disabled:opacity-60 disabled:cursor-not-allowed shrink-0 ml-4 transition"
                   >
