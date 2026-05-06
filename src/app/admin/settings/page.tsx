@@ -54,6 +54,11 @@ export default function SettingsPage() {
   const [igSuccess, setIgSuccess] = useState("");
   const [igError, setIgError] = useState("");
 
+  const [waEmbedUrl, setWaEmbedUrl] = useState("");
+  const [waSaving, setWaSaving] = useState(false);
+  const [waSuccess, setWaSuccess] = useState("");
+  const [waError, setWaError] = useState("");
+
   useEffect(() => {
     if (!mounted) return;
     let cancelled = false;
@@ -72,7 +77,12 @@ export default function SettingsPage() {
       .finally(() => { if (!cancelled) setLoading(false); });
 
     adminApiFetch("/admin/platform-settings")
-      .then((res: any) => { if (!cancelled) setIgEmbedUrl(res.instagramEmbedUrl ?? ""); })
+      .then((res: any) => {
+        if (!cancelled) {
+          setIgEmbedUrl(res.instagramEmbedUrl      ?? "");
+          setWaEmbedUrl(res.whatsappEmbedSignupUrl ?? "");
+        }
+      })
       .catch(() => {});
 
     return () => { cancelled = true; };
@@ -120,6 +130,24 @@ export default function SettingsPage() {
       setPasswordError(e.message);
     } finally {
       setPasswordSaving(false);
+    }
+  }
+
+  async function handleWaEmbedSave(e: React.FormEvent) {
+    e.preventDefault();
+    setWaError(""); setWaSuccess(""); setWaSaving(true);
+    try {
+      await adminApiFetch("/admin/platform-settings", {
+        method: "PATCH",
+        body: JSON.stringify({ whatsappEmbedSignupUrl: waEmbedUrl.trim() }),
+      });
+      logAdminAction("admin.platform.whatsappEmbedSignupUrl");
+      setWaSuccess("WhatsApp embed signup URL saved.");
+      setTimeout(() => setWaSuccess(""), 3000);
+    } catch (e: any) {
+      setWaError(e.message);
+    } finally {
+      setWaSaving(false);
     }
   }
 
@@ -239,6 +267,48 @@ export default function SettingsPage() {
           </form>
         </div>
       </div>
+      {/* WhatsApp Embedded Signup URL */}
+      <div className="rounded-2xl border border-[#E5E0D4] bg-white shadow-sm overflow-hidden">
+        <div className="border-b border-[#E5E0D4] bg-[#F4F2ED] px-6 py-4">
+          <h2 className="text-sm font-semibold text-[#0C1B33]">WhatsApp Embedded Signup URL</h2>
+          <p className="mt-0.5 text-xs text-[#0C1B33]/45">
+            The full Meta embedded signup URL used when hotel users click "Connect via Facebook". The <code className="font-mono">config_id</code> query parameter is extracted automatically.
+          </p>
+        </div>
+        <div className="px-6 py-5 space-y-4">
+          {waSuccess && (
+            <div className="rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-700">{waSuccess}</div>
+          )}
+          {waError && (
+            <div className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">{waError}</div>
+          )}
+          <form onSubmit={handleWaEmbedSave} className="space-y-4">
+            <div>
+              <label className="mb-1.5 block text-xs font-semibold uppercase tracking-wide text-[#0C1B33]/60">
+                Signup URL
+              </label>
+              <input
+                value={waEmbedUrl}
+                onChange={(e) => setWaEmbedUrl(e.target.value)}
+                className={inputCls}
+                placeholder="https://business.facebook.com/messaging/whatsapp/onboard/?app_id=…&config_id=…"
+              />
+              <p className="mt-1 text-[11px] text-[#0C1B33]/40">
+                Paste the full URL from the Meta App Dashboard including all query parameters.
+              </p>
+            </div>
+            <button
+              type="submit"
+              disabled={waSaving}
+              className="flex items-center gap-2 rounded-xl bg-[#1877F2] px-5 py-2.5 text-sm font-semibold text-white shadow-sm transition hover:bg-[#1464d8] disabled:opacity-60"
+            >
+              {waSaving && <span className="h-3.5 w-3.5 animate-spin rounded-full border-2 border-white border-t-transparent" />}
+              {waSaving ? "Saving…" : "Save URL"}
+            </button>
+          </form>
+        </div>
+      </div>
+
       {/* Instagram Embed URL */}
       <div className="rounded-2xl border border-[#E5E0D4] bg-white shadow-sm overflow-hidden">
         <div className="border-b border-[#E5E0D4] bg-[#F4F2ED] px-6 py-4">

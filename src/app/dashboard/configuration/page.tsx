@@ -25,6 +25,7 @@ type WhatsAppConfig = {
   metaWabaId:        string;
   metaVerifyToken:   string;
   connected:         boolean;
+  embedUrl:          string;
 };
 
 type InstagramConfig = {
@@ -111,6 +112,7 @@ export default function ConfigurationPage() {
     metaWabaId:        "",
     metaVerifyToken:   "",
     connected:         false,
+    embedUrl:          "",
   });
   const [waSaving, setWaSaving]     = useState(false);
   const [waSaved,  setWaSaved]      = useState(false);
@@ -194,6 +196,7 @@ export default function ConfigurationPage() {
         metaWabaId:        data.metaWabaId        ?? "",
         metaVerifyToken:   data.metaVerifyToken   ?? "",
         connected:         data.connected         ?? false,
+        embedUrl:          data.embedUrl          ?? "",
       }))
       .catch(() => {});
 
@@ -310,6 +313,7 @@ export default function ConfigurationPage() {
         metaWabaId:        updated.metaWabaId        ?? "",
         metaVerifyToken:   updated.metaVerifyToken   ?? "",
         connected:         updated.connected         ?? false,
+        embedUrl:          updated.embedUrl          ?? "",
       });
       setWaSaved(true);
       setTimeout(() => setWaSaved(false), 3000);
@@ -346,9 +350,19 @@ export default function ConfigurationPage() {
       return;
     }
     setFbConnecting(true);
+
+    let configId = "1594195311668034";
+    if (wa.embedUrl) {
+      try {
+        const parsed = new URL(wa.embedUrl);
+        configId = parsed.searchParams.get("config_id") ?? configId;
+      } catch {}
+    }
+
     FB.login(
       async function (response: any) {
-        const code = response?.authResponse?.code;
+        const code        = response?.authResponse?.code;
+        const redirectUri = response?.authResponse?.redirect_uri ?? "";
         if (!code) {
           setFbConnecting(false);
           if (response?.status !== "unknown") {
@@ -361,6 +375,7 @@ export default function ConfigurationPage() {
             method: "POST",
             body:   JSON.stringify({
               code,
+              redirectUri,
               wabaId:        wabaIdRef.current,
               phoneNumberId: phoneNumberIdRef.current,
             }),
@@ -379,10 +394,15 @@ export default function ConfigurationPage() {
         }
       },
       {
-        config_id:                      "1594195311668034",
+        config_id:                      configId,
         response_type:                  "code",
         override_default_response_type: true,
-        extras:                         { version: "v4" },
+        extras: {
+          featureType:        "whatsapp_business_app_onboarding",
+          sessionInfoVersion: "3",
+          version:            "v4",
+          features:           [{ name: "app_only_install" }],
+        },
       }
     );
   }
