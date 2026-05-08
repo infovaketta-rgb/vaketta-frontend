@@ -7,6 +7,7 @@ import { useChatStore } from "@/store/chatStore";
 import { useMounted } from "@/lib/useMounted";
 import BookingForm from "./BookingForm";
 import MediaPickerModal from "./MediaPickerModal";
+import TemplatePicker from "./TemplatePicker";
 
 const API_BASE = process.env.NEXT_PUBLIC_API_BASE ?? "";
 
@@ -451,8 +452,9 @@ export default function ChatWindow() {
   const [sendError, setSendError] = useState("");
   const [uploadingMedia, setUploadingMedia] = useState(false);
   const [isRecording, setIsRecording] = useState(false);
-  const [attachMenuOpen,  setAttachMenuOpen]  = useState(false);
-  const [mediaPickerOpen, setMediaPickerOpen] = useState(false);
+  const [attachMenuOpen,    setAttachMenuOpen]    = useState(false);
+  const [mediaPickerOpen,   setMediaPickerOpen]   = useState(false);
+  const [templatePickerOpen, setTemplatePickerOpen] = useState(false);
   const [lightboxSrc, setLightboxSrc] = useState<string | null>(null);
 
   // Media preview state — file staged here before confirm-send
@@ -829,6 +831,21 @@ return () => {
       setTimeout(() => setSendError(""), 4000);
     } finally {
       setSending(false);
+    }
+  }
+
+  async function sendTemplate(templateId: string, values: Record<string, string>) {
+    if (!guestId) return;
+    setTemplatePickerOpen(false);
+    setSendError("");
+    try {
+      await apiFetch("/messages/send-template", {
+        method: "POST",
+        body:   JSON.stringify({ guestId, templateId, values }),
+      });
+    } catch (e: any) {
+      setSendError(e?.message ?? "Failed to send template.");
+      setTimeout(() => setSendError(""), 4000);
     }
   }
 
@@ -1301,6 +1318,13 @@ return () => {
                 <span className="text-lg">🗂️</span>
                 From Gallery
               </button>
+              <button
+                onClick={() => { setAttachMenuOpen(false); setTemplatePickerOpen(true); }}
+                className="flex items-center gap-3 px-3 py-2.5 rounded-xl hover:bg-gray-50 transition text-left text-sm text-gray-700 font-medium"
+              >
+                <span className="text-lg">📋</span>
+                Use Template
+              </button>
             </div>
           )}
         </div>
@@ -1444,6 +1468,14 @@ return () => {
               setUploadingMedia(false);
             }
           }}
+        />
+      )}
+
+      {/* Template picker */}
+      {templatePickerOpen && (
+        <TemplatePicker
+          onClose={() => setTemplatePickerOpen(false)}
+          onSelect={sendTemplate}
         />
       )}
     </div>
