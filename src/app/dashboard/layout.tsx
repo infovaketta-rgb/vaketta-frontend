@@ -22,6 +22,13 @@ export default function DashboardLayout({
   const [debugLog,  setDebugLog]    = useState<string[]>([]);
   const logEndRef = useRef<HTMLDivElement>(null);
 
+  // History sync banner state
+  const [syncBanner, setSyncBanner] = useState<{
+    status:   "in_progress" | "complete";
+    progress: number;
+  } | null>(null);
+  const syncDismissRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
   const pushLog = (msg: string) =>
     setDebugLog((prev) => [...prev, `${new Date().toISOString().slice(11, 23)} ${msg}`]);
 
@@ -110,11 +117,21 @@ export default function DashboardLayout({
       addToast(`New booking from ${booking.guestName}`, "success");
     };
 
+    const onHistorySync = ({ progress, status }: { progress: number; status: string }) => {
+      setSyncBanner({ progress, status: status as "in_progress" | "complete" });
+      if (status === "complete") {
+        if (syncDismissRef.current) clearTimeout(syncDismissRef.current);
+        syncDismissRef.current = setTimeout(() => setSyncBanner(null), 3000);
+      }
+    };
+
     socket.on("staff:notification", onStaffNotification);
     socket.on("booking:new", onBookingNew);
+    socket.on("history:sync_progress", onHistorySync);
     return () => {
       socket.off("staff:notification", onStaffNotification);
       socket.off("booking:new", onBookingNew);
+      socket.off("history:sync_progress", onHistorySync);
     };
   }, []);
 
@@ -124,6 +141,42 @@ export default function DashboardLayout({
       <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
         <TopBar onMenuClick={() => setSidebarOpen(true)} />
         <main className="min-h-0 flex-1 overflow-y-auto overflow-x-hidden">
+          {/* WhatsApp Coexistence history sync banner */}
+          {syncBanner && (
+            <div
+              className={`flex items-center gap-2.5 px-4 py-2.5 text-sm font-medium transition-all ${
+                syncBanner.status === "complete"
+                  ? "bg-emerald-50 text-emerald-700 border-b border-emerald-100"
+                  : "bg-[#7A3F91]/8 text-[#7A3F91] border-b border-[#7A3F91]/12"
+              }`}
+            >
+              {syncBanner.status === "in_progress" ? (
+                <>
+                  <svg className="w-4 h-4 shrink-0 animate-spin" fill="none" viewBox="0 0 24 24">
+                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8H4z" />
+                  </svg>
+                  <span>
+                    Importing your WhatsApp chat history&hellip;
+                    <span className="ml-1 font-semibold">{syncBanner.progress}%</span>
+                  </span>
+                  <div className="ml-2 flex-1 max-w-48 h-1.5 rounded-full bg-[#7A3F91]/15 overflow-hidden">
+                    <div
+                      className="h-full rounded-full bg-[#7A3F91] transition-all duration-500"
+                      style={{ width: `${syncBanner.progress}%` }}
+                    />
+                  </div>
+                </>
+              ) : (
+                <>
+                  <svg className="w-4 h-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                  </svg>
+                  Chat history import complete!
+                </>
+              )}
+            </div>
+          )}
           {children}
         </main>
       </div>
