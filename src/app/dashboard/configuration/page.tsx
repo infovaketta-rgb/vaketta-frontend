@@ -442,7 +442,6 @@ export default function ConfigurationPage() {
           sessionInfoVersion: "3",
           version:            "v4",
           features:           [{ name: "app_only_install" }],
-          ...(coexistence ? { coexistence: true } : {}),
         },
       }
     );
