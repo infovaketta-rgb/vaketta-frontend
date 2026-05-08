@@ -368,19 +368,23 @@ export default function ConfigurationPage() {
       console.log("[WA Signup] postMessage from", event.origin, data);
 
       if (data?.type === "WA_EMBEDDED_SIGNUP") {
-        console.log("[WA Signup] WA_EMBEDDED_SIGNUP event:", data.event, "payload:", data.data);
+        console.log("[WA Signup] WA_EMBEDDED_SIGNUP payload:", data.data, "event field:", data.event);
 
-        if (data.event === "FINISH") {
-          wabaIdRef.current        = data.data?.waba_id         ?? "";
-          phoneNumberIdRef.current = data.data?.phone_number_id ?? "";
-          console.log("[WA Signup] captured from postMessage — wabaId:", wabaIdRef.current, "phoneId:", phoneNumberIdRef.current);
+        // Extract IDs whenever waba_id is present — do NOT guard on data.event
+        // because Meta omits the "event" field in some SDK versions
+        const waba  = data.data?.waba_id         ?? "";
+        const phone = data.data?.phone_number_id ?? "";
 
-          // FB.login callback already fired first (race) — complete the flow now
-          if (pendingCodeRef.current) {
-            const { code, redirectUri } = pendingCodeRef.current;
-            pendingCodeRef.current = null;
-            handleEmbeddedSignupCode(code, redirectUri);
-          }
+        if (waba)  wabaIdRef.current        = waba;
+        if (phone) phoneNumberIdRef.current = phone;
+
+        console.log("[WA Signup] captured — wabaId:", wabaIdRef.current, "phoneId:", phoneNumberIdRef.current);
+
+        // If FB.login callback already fired first (rare race), complete the flow
+        if (wabaIdRef.current && phoneNumberIdRef.current && pendingCodeRef.current) {
+          const { code, redirectUri } = pendingCodeRef.current;
+          pendingCodeRef.current = null;
+          handleEmbeddedSignupCode(code, redirectUri);
         }
       }
     }
