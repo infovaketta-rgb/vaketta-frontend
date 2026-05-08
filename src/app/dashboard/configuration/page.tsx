@@ -128,8 +128,12 @@ export default function ConfigurationPage() {
   const [fbError,      setFbError]      = useState("");
   // Capture WABA + phone IDs from WA_EMBEDDED_SIGNUP MessageEvent via refs to
   // avoid stale-closure issues inside the FB.login() callback
-  const wabaIdRef       = useRef("");
+  const wabaIdRef        = useRef("");
   const phoneNumberIdRef = useRef("");
+  // Coordination refs: handle race between FB.login callback (gives code) and
+  // MessageEvent (gives wabaId + phoneNumberId) — either can arrive first
+  const pendingCodeRef     = useRef<{ code: string; redirectUri: string } | null>(null);
+  const coexistenceModeRef = useRef(false);
 
   // Instagram integration state
   const [ig, setIg]               = useState<InstagramConfig>({ accessToken: "", igAccountId: "", connected: false });
@@ -324,8 +328,14 @@ export default function ConfigurationPage() {
     }
   }
 
+  // Fix 4 — clear any stale error banner on mount
+  useEffect(() => { setFbError(""); }, []);
+
   // ── WhatsApp Embedded Signup ──────────────────────────────────────────────
-  // Capture WABA ID + Phone Number ID sent by Meta during the signup flow
+  // Capture WABA ID + Phone Number ID sent by Meta during the signup flow.
+  // MessageEvent (gives wabaId + phoneNumberId) typically fires BEFORE the
+  // FB.login callback (gives code), but either can arrive first — coordinate
+  // via pendingCodeRef so both paths complete correctly.
   useEffect(() => {
     if (!mounted) return;
     function handleMessage(event: MessageEvent) {
@@ -335,6 +345,12 @@ export default function ConfigurationPage() {
         if (data.type === "WA_EMBEDDED_SIGNUP" && data.event === "FINISH") {
           wabaIdRef.current        = data.data?.waba_id         ?? "";
           phoneNumberIdRef.current = data.data?.phone_number_id ?? "";
+          // FB.login callback already fired first (race) — complete the flow now
+          if (pendingCodeRef.current) {
+            const { code, redirectUri } = pendingCodeRef.current;
+            pendingCodeRef.current = null;
+            handleEmbeddedSignupCode(code, redirectUri, coexistenceModeRef.current);
+          }
         }
       } catch {}
     }
@@ -342,7 +358,7 @@ export default function ConfigurationPage() {
     return () => window.removeEventListener("message", handleMessage);
   }, [mounted]);
 
-  async function handleEmbeddedSignupCode(code: string, redirectUri: string) {
+  async function handleEmbeddedSignupCode(code: string, redirectUri: string, coexistence = false) {
     try {
       const data = await apiFetch("/hotel-settings/whatsapp/embedded-signup", {
         method: "POST",
@@ -351,6 +367,7 @@ export default function ConfigurationPage() {
           redirectUri,
           wabaId:        wabaIdRef.current,
           phoneNumberId: phoneNumberIdRef.current,
+          ...(coexistence ? { coexistence: true } : {}),
         }),
       });
       setWa((w) => ({
@@ -367,8 +384,14 @@ export default function ConfigurationPage() {
     }
   }
 
-  function launchWhatsAppSignup() {
+  function launchWhatsAppSignup(coexistence = false) {
     setFbError("");
+    coexistenceModeRef.current = coexistence;
+    // Reset state from any prior invocation
+    pendingCodeRef.current = null;
+    wabaIdRef.current = "";
+    phoneNumberIdRef.current = "";
+
     const FB = (window as any).FB;
     if (!FB) {
       setFbError("Facebook SDK not loaded. Please refresh the page and try again.");
@@ -390,6 +413,7 @@ export default function ConfigurationPage() {
         const redirectUri = response?.authResponse?.redirect_uri ?? "";
         if (!code) {
           setFbConnecting(false);
+          pendingCodeRef.current = null;
           if (response?.status === "not_authorized") {
             setFbError("App not authorized. Make sure the Meta App ID is correct.");
           } else if (response?.status !== "unknown") {
@@ -397,7 +421,20 @@ export default function ConfigurationPage() {
           }
           return;
         }
-        handleEmbeddedSignupCode(code, redirectUri);
+        // MessageEvent already fired — proceed immediately
+        if (wabaIdRef.current && phoneNumberIdRef.current) {
+          handleEmbeddedSignupCode(code, redirectUri, coexistenceModeRef.current);
+        } else {
+          // MessageEvent hasn't arrived yet — store code and wait for it
+          pendingCodeRef.current = { code, redirectUri };
+          // Safety fallback: proceed after 5 s even if MessageEvent never fires
+          setTimeout(() => {
+            if (pendingCodeRef.current?.code === code) {
+              pendingCodeRef.current = null;
+              handleEmbeddedSignupCode(code, redirectUri, coexistenceModeRef.current);
+            }
+          }, 5000);
+        }
       },
       {
         config_id:                      configId,
@@ -408,6 +445,7 @@ export default function ConfigurationPage() {
           sessionInfoVersion: "3",
           version:            "v4",
           features:           [{ name: "app_only_install" }],
+          ...(coexistence ? { coexistence: true } : {}),
         },
       }
     );
@@ -836,7 +874,7 @@ export default function ConfigurationPage() {
                   </div>
                   <button
                     type="button"
-                    onClick={launchWhatsAppSignup}
+                    onClick={() => launchWhatsAppSignup()}
                     disabled={fbConnecting}
                     className="flex items-center gap-2 rounded-lg bg-[#1877F2] px-4 py-2 text-sm font-semibold text-white hover:bg-[#1464d8] disabled:opacity-60 disabled:cursor-not-allowed shrink-0 ml-4 transition"
                   >
@@ -853,6 +891,31 @@ export default function ConfigurationPage() {
                 {fbError && (
                   <p className="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-xs text-red-700">{fbError}</p>
                 )}
+
+                {/* ── Coexistence: connect existing WA Business App ── */}
+                <div className="flex items-center justify-between rounded-xl border border-[#7A3F91]/20 bg-[#7A3F91]/5 px-4 py-3">
+                  <div>
+                    <p className="text-sm font-medium text-gray-800">Connect Existing WhatsApp Business App</p>
+                    <p className="text-xs text-gray-400 mt-0.5">
+                      Already using the WhatsApp Business App? Connect with Coexistence to import your full chat history into Vaketta.
+                    </p>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => launchWhatsAppSignup(true)}
+                    disabled={fbConnecting}
+                    className="flex items-center gap-2 rounded-lg bg-[#7A3F91] px-4 py-2 text-sm font-semibold text-white hover:bg-[#2B0D3E] disabled:opacity-60 disabled:cursor-not-allowed shrink-0 ml-4 transition"
+                  >
+                    {fbConnecting ? (
+                      <span className="h-4 w-4 animate-spin rounded-full border-2 border-white border-t-transparent" />
+                    ) : (
+                      <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 24 24">
+                        <path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51a11.96 11.96 0 0 0-.57-.01c-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347zM12.05 2.003A9.944 9.944 0 0 0 2 12c0 1.76.463 3.413 1.27 4.847L2 22l5.337-1.245A9.946 9.946 0 0 0 12.05 22C17.523 22 22 17.523 22 12.05 22 6.577 17.523 2 12.05 2v.003z"/>
+                      </svg>
+                    )}
+                    {fbConnecting ? "Connecting…" : "Connect with Coexistence"}
+                  </button>
+                </div>
               </div>
 
               {/* ── 2. Advanced Setup (collapsible) ── */}
