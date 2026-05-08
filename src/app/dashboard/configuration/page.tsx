@@ -338,10 +338,12 @@ export default function ConfigurationPage() {
   useEffect(() => {
     if (!mounted) return;
     function handleMessage(event: MessageEvent) {
-      if (event.origin !== "https://www.facebook.com") return;
+      // Meta can post from www.facebook.com, web.facebook.com, business.facebook.com
+      if (!event.origin?.includes("facebook.com")) return;
       try {
-        const data = JSON.parse(event.data);
-        if (data.type === "WA_EMBEDDED_SIGNUP" && data.event === "FINISH") {
+        // event.data may be a JSON string or already a parsed object
+        const data: any = typeof event.data === "string" ? JSON.parse(event.data) : event.data;
+        if (data?.type === "WA_EMBEDDED_SIGNUP" && data?.event === "FINISH") {
           wabaIdRef.current        = data.data?.waba_id         ?? "";
           phoneNumberIdRef.current = data.data?.phone_number_id ?? "";
           // FB.login callback already fired first (race) — complete the flow now
