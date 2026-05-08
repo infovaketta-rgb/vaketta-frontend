@@ -308,8 +308,11 @@ export default function TemplatesPage() {
   // Delete confirmation
   const [deleting, setDeleting]       = useState<string | null>(null);
 
-  // Syncing
+  // Syncing individual template
   const [syncing, setSyncing]         = useState<string | null>(null);
+
+  // Sync-from-Meta bulk import
+  const [isSyncing, setIsSyncing]     = useState(false);
 
   // Variable examples state
   const varCountBody = (form.components.body.text.match(/\{\{\d+\}\}/g) ?? []).length;
@@ -456,6 +459,26 @@ export default function TemplatesPage() {
     }
   }
 
+  // ── Sync from Meta ───────────────────────────────────────────────────────────
+
+  async function handleSyncFromMeta() {
+    setIsSyncing(true);
+    try {
+      const result = await apiFetch("/hotel-templates/sync-from-meta", { method: "POST" });
+      const { created, updated, skipped } = result.summary as { created: number; updated: number; skipped: number };
+      const parts: string[] = [];
+      if (created)  parts.push(`${created} new`);
+      if (updated)  parts.push(`${updated} updated`);
+      if (skipped)  parts.push(`${skipped} skipped`);
+      addToast(`Synced: ${parts.join(", ") || "nothing changed"}`, "success");
+      await load();
+    } catch (err: any) {
+      addToast(err.message ?? "Sync from Meta failed", "error");
+    } finally {
+      setIsSyncing(false);
+    }
+  }
+
   if (!mounted) return null;
 
   // ── Render ───────────────────────────────────────────────────────────────────
@@ -468,15 +491,36 @@ export default function TemplatesPage() {
           <h1 className="text-xl font-semibold text-[#0C1B33]">WhatsApp Templates</h1>
           <p className="text-sm text-gray-500 mt-0.5">Create and manage message templates for proactive guest outreach.</p>
         </div>
-        <button
-          onClick={openCreate}
-          className="shrink-0 flex items-center gap-2 px-4 py-2 bg-[#1B52A8] hover:bg-[#1442889] text-white text-sm font-medium rounded-xl transition"
-        >
-          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
-          </svg>
-          New Template
-        </button>
+        <div className="flex items-center gap-2 shrink-0">
+          <button
+            onClick={handleSyncFromMeta}
+            disabled={isSyncing}
+            className="flex items-center gap-2 px-4 py-2 border border-[#7A3F91] text-[#7A3F91] hover:bg-[#7A3F91]/8 disabled:opacity-50 text-sm font-medium rounded-xl transition"
+          >
+            {isSyncing ? (
+              <svg className="w-4 h-4 animate-spin" fill="none" viewBox="0 0 24 24">
+                <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8H4z" />
+              </svg>
+            ) : (
+              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
+                  d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+              </svg>
+            )}
+            {isSyncing ? "Syncing…" : "Sync from Meta"}
+          </button>
+
+          <button
+            onClick={openCreate}
+            className="flex items-center gap-2 px-4 py-2 bg-[#1B52A8] hover:bg-[#163f82] text-white text-sm font-medium rounded-xl transition"
+          >
+            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+            </svg>
+            New Template
+          </button>
+        </div>
       </div>
 
       {/* Filters */}
