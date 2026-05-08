@@ -124,8 +124,9 @@ export default function ConfigurationPage() {
   const [advancedOpen,  setAdvancedOpen]  = useState(false);
   const [testing,      setTesting]      = useState(false);
   const [testResult,   setTestResult]   = useState<"success" | "error" | null>(null);
-  const [fbConnecting, setFbConnecting] = useState(false);
-  const [fbError,      setFbError]      = useState("");
+  const [fbConnecting,  setFbConnecting]  = useState(false);
+  const [fbError,       setFbError]       = useState("");
+  const fbErrorTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   // Capture WABA + phone IDs from WA_EMBEDDED_SIGNUP MessageEvent via refs to
   // avoid stale-closure issues inside the FB.login() callback
   const wabaIdRef        = useRef("");
@@ -327,8 +328,26 @@ export default function ConfigurationPage() {
     }
   }
 
-  // Fix 4 — clear any stale error banner on mount
-  useEffect(() => { setFbError(""); }, []);
+  // Clear stale fbError on every mount/rehydration (covers fresh loads AND
+  // Next.js router-cache soft navigation back to this page)
+  useEffect(() => {
+    if (!mounted) return;
+    setFbError("");
+    return () => {
+      // Cancel any pending auto-dismiss timer when leaving the page
+      if (fbErrorTimerRef.current) clearTimeout(fbErrorTimerRef.current);
+    };
+  }, [mounted]);
+
+  // Auto-dismiss fbError after 6 s so it never stays permanently
+  useEffect(() => {
+    if (!fbError) return;
+    if (fbErrorTimerRef.current) clearTimeout(fbErrorTimerRef.current);
+    fbErrorTimerRef.current = setTimeout(() => setFbError(""), 6_000);
+    return () => {
+      if (fbErrorTimerRef.current) clearTimeout(fbErrorTimerRef.current);
+    };
+  }, [fbError]);
 
   // ── WhatsApp Embedded Signup ──────────────────────────────────────────────
   // Capture WABA ID + Phone Number ID sent by Meta during the signup flow.
