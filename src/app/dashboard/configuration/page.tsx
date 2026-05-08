@@ -350,21 +350,30 @@ export default function ConfigurationPage() {
   }, [fbError]);
 
   // ── WhatsApp Embedded Signup ──────────────────────────────────────────────
-  // Capture WABA ID + Phone Number ID sent by Meta during the signup flow.
-  // MessageEvent (gives wabaId + phoneNumberId) typically fires BEFORE the
-  // FB.login callback (gives code), but either can arrive first — coordinate
-  // via pendingCodeRef so both paths complete correctly.
+  // Capture WABA ID + Phone Number ID from Meta's WA_EMBEDDED_SIGNUP postMessage.
+  // This fires DURING the popup (before FB.login callback closes it).
   useEffect(() => {
     if (!mounted) return;
     function handleMessage(event: MessageEvent) {
-      // Meta can post from www.facebook.com, web.facebook.com, business.facebook.com
+      // Accept any facebook.com subdomain
       if (!event.origin?.includes("facebook.com")) return;
+
+      let data: any;
       try {
-        // event.data may be a JSON string or already a parsed object
-        const data: any = typeof event.data === "string" ? JSON.parse(event.data) : event.data;
-        if (data?.type === "WA_EMBEDDED_SIGNUP" && data?.event === "FINISH") {
+        data = typeof event.data === "string" ? JSON.parse(event.data) : event.data;
+      } catch { return; }
+
+      // Log every FB message so we can see exactly what Meta sends
+      console.log("[WA Signup] postMessage from", event.origin, data);
+
+      if (data?.type === "WA_EMBEDDED_SIGNUP") {
+        console.log("[WA Signup] WA_EMBEDDED_SIGNUP event:", data.event, "payload:", data.data);
+
+        if (data.event === "FINISH") {
           wabaIdRef.current        = data.data?.waba_id         ?? "";
           phoneNumberIdRef.current = data.data?.phone_number_id ?? "";
+          console.log("[WA Signup] captured from postMessage — wabaId:", wabaIdRef.current, "phoneId:", phoneNumberIdRef.current);
+
           // FB.login callback already fired first (race) — complete the flow now
           if (pendingCodeRef.current) {
             const { code, redirectUri } = pendingCodeRef.current;
@@ -372,13 +381,14 @@ export default function ConfigurationPage() {
             handleEmbeddedSignupCode(code, redirectUri);
           }
         }
-      } catch {}
+      }
     }
     window.addEventListener("message", handleMessage);
     return () => window.removeEventListener("message", handleMessage);
   }, [mounted]);
 
   async function handleEmbeddedSignupCode(code: string, redirectUri: string) {
+    console.log("[WA Signup] calling backend — code:", code?.slice(0, 8) + "…", "wabaId:", wabaIdRef.current, "phoneId:", phoneNumberIdRef.current);
     try {
       const data = await apiFetch("/hotel-settings/whatsapp/embedded-signup", {
         method: "POST",
@@ -427,8 +437,25 @@ export default function ConfigurationPage() {
 
     FB.login(
       function (response: any) {
+        // Full response log — shows exactly what Meta returns
+        console.log("[WA Signup] FB.login response:", JSON.stringify(response));
+
         const code        = response?.authResponse?.code;
         const redirectUri = response?.authResponse?.redirect_uri ?? "";
+
+        // Some embedded signup configurations return waba_id / phone_number_id
+        // directly inside authResponse instead of (or in addition to) postMessage
+        const authWabaId  = response?.authResponse?.waba_id
+                         ?? response?.authResponse?.data?.waba_id
+                         ?? "";
+        const authPhoneId = response?.authResponse?.phone_number_id
+                         ?? response?.authResponse?.data?.phone_number_id
+                         ?? "";
+        if (authWabaId)  wabaIdRef.current        = authWabaId;
+        if (authPhoneId) phoneNumberIdRef.current = authPhoneId;
+
+        console.log("[WA Signup] code:", code, "wabaId:", wabaIdRef.current, "phoneId:", phoneNumberIdRef.current);
+
         if (!code) {
           setFbConnecting(false);
           pendingCodeRef.current = null;
@@ -439,15 +466,17 @@ export default function ConfigurationPage() {
           }
           return;
         }
-        // MessageEvent already fired — proceed immediately
+
+        // MessageEvent already fired (or data came in authResponse) — proceed immediately
         if (wabaIdRef.current && phoneNumberIdRef.current) {
           handleEmbeddedSignupCode(code, redirectUri);
         } else {
-          // MessageEvent hasn't arrived yet — store code and wait for it
+          // Store code and wait for the postMessage to arrive
           pendingCodeRef.current = { code, redirectUri };
-          // Safety fallback: proceed after 5 s even if MessageEvent never fires
+          // Safety fallback: proceed after 5 s even if postMessage never fires
           setTimeout(() => {
             if (pendingCodeRef.current?.code === code) {
+              console.log("[WA Signup] 5s fallback — wabaId:", wabaIdRef.current, "phoneId:", phoneNumberIdRef.current);
               pendingCodeRef.current = null;
               handleEmbeddedSignupCode(code, redirectUri);
             }
