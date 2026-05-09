@@ -2,6 +2,7 @@
 
 import { useEffect, useState, useRef } from "react";
 import { apiFetch } from "@/lib/api";
+import { getToken } from "@/lib/auth";
 import { useToastStore } from "@/store/toastStore";
 import { useMounted } from "@/lib/useMounted";
 
@@ -19,7 +20,7 @@ interface ButtonDef {
 }
 
 interface Components {
-  header?: { type: "TEXT" | "IMAGE" | "VIDEO" | "DOCUMENT"; text?: string };
+  header?: { type: "TEXT" | "IMAGE" | "VIDEO" | "DOCUMENT"; text?: string; mediaUrl?: string };
   body:    { text: string; examples?: string[] };
   footer?: { text: string };
   buttons?: ButtonDef[];
@@ -79,10 +80,11 @@ const CATEGORY_COLORS: Record<TemplateCategory, string> = {
 // ── WhatsApp Preview ───────────────────────────────────────────────────────────
 
 function WhatsAppPreview({ components, name }: { components: Partial<Components>; name: string }) {
-  const headerText = components.header?.type === "TEXT" ? components.header.text : null;
-  const body       = components.body?.text ?? "";
-  const footer     = components.footer?.text;
-  const buttons    = components.buttons ?? [];
+  const headerText     = components.header?.type === "TEXT" ? components.header.text : null;
+  const headerMediaUrl = components.header?.mediaUrl ?? null;
+  const body           = components.body?.text ?? "";
+  const footer         = components.footer?.text;
+  const buttons        = components.buttons ?? [];
 
   return (
     <div className="flex flex-col items-center bg-[#e5ddd5] rounded-2xl p-4 min-h-[200px] bg-[url('data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSI2MCIgaGVpZ2h0PSI2MCI+PHJlY3Qgd2lkdGg9IjYwIiBoZWlnaHQ9IjYwIiBmaWxsPSIjZTVkZGQ1Ii8+PC9zdmc+')]">
@@ -94,11 +96,28 @@ function WhatsAppPreview({ components, name }: { components: Partial<Components>
               <p className="text-[13px] font-semibold text-gray-900 leading-snug">{headerText}</p>
             )}
             {components.header.type === "IMAGE" && (
-              <div className="w-full h-28 bg-gray-200 rounded-lg flex items-center justify-center">
-                <svg className="w-8 h-8 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5}
-                    d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
-                </svg>
+              <div className="w-full h-28 bg-gray-200 rounded-lg overflow-hidden flex items-center justify-center">
+                {headerMediaUrl ? (
+                  // eslint-disable-next-line @next/next/no-img-element
+                  <img src={headerMediaUrl} alt="Header" className="w-full h-full object-cover" />
+                ) : (
+                  <svg className="w-8 h-8 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5}
+                      d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                  </svg>
+                )}
+              </div>
+            )}
+            {components.header.type === "VIDEO" && (
+              <div className="w-full h-28 bg-gray-900 rounded-lg overflow-hidden flex items-center justify-center">
+                {headerMediaUrl ? (
+                  <video src={headerMediaUrl} className="w-full h-full object-cover" muted playsInline />
+                ) : (
+                  <svg className="w-8 h-8 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5}
+                      d="M15 10l4.553-2.069A1 1 0 0121 8.882v6.236a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z" />
+                  </svg>
+                )}
               </div>
             )}
           </div>
@@ -304,6 +323,9 @@ export default function TemplatesPage() {
   const [form, setForm]               = useState(EMPTY_FORM);
   const [saving, setSaving]           = useState(false);
   const [formError, setFormError]     = useState("");
+  const [headerUploading, setHeaderUploading] = useState(false);
+  const imageFileRef = useRef<HTMLInputElement>(null);
+  const videoFileRef = useRef<HTMLInputElement>(null);
 
   // Delete confirmation
   const [deleting, setDeleting]       = useState<string | null>(null);
@@ -382,6 +404,32 @@ export default function TemplatesPage() {
 
   function patchComponents(patch: Partial<typeof form.components>) {
     setForm((f) => ({ ...f, components: { ...f.components, ...patch } }));
+  }
+
+  async function handleHeaderMediaUpload(file: File) {
+    setHeaderUploading(true);
+    try {
+      const fd = new FormData();
+      fd.append("file", file);
+      const res = await fetch(
+        `${process.env.NEXT_PUBLIC_API_BASE}/hotel-templates/upload-media`,
+        {
+          method: "POST",
+          headers: { ...(getToken() ? { Authorization: `Bearer ${getToken()}` } : {}) },
+          body: fd,
+        }
+      );
+      if (!res.ok) {
+        const b = await res.json().catch(() => ({}));
+        throw new Error((b as any).error ?? "Upload failed");
+      }
+      const { url } = await res.json() as { url: string };
+      patchComponents({ header: { ...form.components.header!, mediaUrl: url } });
+    } catch (err: any) {
+      addToast(err.message ?? "Media upload failed", "error");
+    } finally {
+      setHeaderUploading(false);
+    }
   }
 
   // ── Save ─────────────────────────────────────────────────────────────────────
@@ -716,6 +764,136 @@ export default function TemplatesPage() {
                           maxLength={60}
                           className="w-full border border-gray-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-purple-300"
                         />
+                      )}
+
+                      {form.components.header?.type === "IMAGE" && (
+                        <>
+                          <input
+                            ref={imageFileRef}
+                            type="file"
+                            accept="image/jpeg,image/png,image/webp"
+                            className="hidden"
+                            onChange={(e) => {
+                              const file = e.target.files?.[0];
+                              if (!file) return;
+                              if (file.size > 5 * 1024 * 1024) {
+                                addToast("Image must be under 5 MB", "error");
+                                return;
+                              }
+                              handleHeaderMediaUpload(file);
+                              e.target.value = "";
+                            }}
+                          />
+                          {form.components.header.mediaUrl ? (
+                            <div className="relative rounded-xl overflow-hidden border border-gray-200">
+                              {/* eslint-disable-next-line @next/next/no-img-element */}
+                              <img
+                                src={form.components.header.mediaUrl}
+                                alt="Header preview"
+                                className="w-full h-32 object-cover"
+                              />
+                              <button
+                                type="button"
+                                onClick={() => patchComponents({ header: { ...form.components.header!, mediaUrl: undefined } })}
+                                className="absolute top-2 right-2 bg-black/50 hover:bg-black/70 text-white rounded-full p-1 transition"
+                              >
+                                <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                                </svg>
+                              </button>
+                            </div>
+                          ) : (
+                            <button
+                              type="button"
+                              disabled={headerUploading}
+                              onClick={() => imageFileRef.current?.click()}
+                              className="w-full border-2 border-dashed border-gray-200 rounded-xl py-6 flex flex-col items-center gap-2 text-sm text-gray-400 hover:border-purple-300 hover:text-purple-500 transition disabled:opacity-60"
+                            >
+                              {headerUploading ? (
+                                <>
+                                  <svg className="w-5 h-5 animate-spin" fill="none" viewBox="0 0 24 24">
+                                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8H4z" />
+                                  </svg>
+                                  Uploading…
+                                </>
+                              ) : (
+                                <>
+                                  <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5}
+                                      d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                                  </svg>
+                                  Upload image (JPG, PNG, WebP — max 5 MB)
+                                </>
+                              )}
+                            </button>
+                          )}
+                        </>
+                      )}
+
+                      {form.components.header?.type === "VIDEO" && (
+                        <>
+                          <input
+                            ref={videoFileRef}
+                            type="file"
+                            accept="video/mp4"
+                            className="hidden"
+                            onChange={(e) => {
+                              const file = e.target.files?.[0];
+                              if (!file) return;
+                              if (file.size > 16 * 1024 * 1024) {
+                                addToast("Video must be under 16 MB", "error");
+                                return;
+                              }
+                              handleHeaderMediaUpload(file);
+                              e.target.value = "";
+                            }}
+                          />
+                          {form.components.header.mediaUrl ? (
+                            <div className="relative rounded-xl overflow-hidden border border-gray-200 bg-black">
+                              <video
+                                src={form.components.header.mediaUrl}
+                                className="w-full h-32 object-cover"
+                                muted
+                                playsInline
+                              />
+                              <button
+                                type="button"
+                                onClick={() => patchComponents({ header: { ...form.components.header!, mediaUrl: undefined } })}
+                                className="absolute top-2 right-2 bg-black/50 hover:bg-black/70 text-white rounded-full p-1 transition"
+                              >
+                                <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                                </svg>
+                              </button>
+                            </div>
+                          ) : (
+                            <button
+                              type="button"
+                              disabled={headerUploading}
+                              onClick={() => videoFileRef.current?.click()}
+                              className="w-full border-2 border-dashed border-gray-200 rounded-xl py-6 flex flex-col items-center gap-2 text-sm text-gray-400 hover:border-purple-300 hover:text-purple-500 transition disabled:opacity-60"
+                            >
+                              {headerUploading ? (
+                                <>
+                                  <svg className="w-5 h-5 animate-spin" fill="none" viewBox="0 0 24 24">
+                                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8H4z" />
+                                  </svg>
+                                  Uploading…
+                                </>
+                              ) : (
+                                <>
+                                  <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5}
+                                      d="M15 10l4.553-2.069A1 1 0 0121 8.882v6.236a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z" />
+                                  </svg>
+                                  Upload video (MP4 — max 16 MB)
+                                </>
+                              )}
+                            </button>
+                          )}
+                        </>
                       )}
                     </div>
                   )}
