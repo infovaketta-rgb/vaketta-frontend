@@ -37,10 +37,15 @@ export async function apiFetch(
       }
       throw new Error(msg);
     }
-    let errMsg: string;
-    try { const b = await res.json(); errMsg = b.error ?? b.message ?? ""; } catch { errMsg = ""; }
-    if (!errMsg) { try { errMsg = await res.text(); } catch {} }
-    throw new Error(errMsg || "API request failed");
+    let errMsg = "";
+    let errDetails: unknown;
+    try {
+      const b = await res.json() as Record<string, unknown>;
+      errMsg = (b.error ?? b.message ?? "") as string;
+      errDetails = b.details;
+    } catch { /* ignore */ }
+    if (!errMsg) { try { errMsg = await res.text(); } catch { /* ignore */ } }
+    throw Object.assign(new Error(errMsg || "API request failed"), { details: errDetails });
   }
 
   return res.json();
