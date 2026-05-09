@@ -10,16 +10,19 @@ import type {
   ShowRoomsNodeData,
   ActionNodeData,
   JumpNodeData,
+  ApprovedTemplate,
+  SendTemplateNodeData,
 } from "./types";
 import { SYSTEM_VARS } from "./NodePalette";
 
 interface Props {
-  node:         FlowNode | null;
-  readOnly:     boolean;
-  hotelCtx?:    HotelContext | null;
-  definedVars?: string[];
-  onChange:     (id: string, data: Record<string, unknown>) => void;
-  onDelete:     (id: string) => void;
+  node:              FlowNode | null;
+  readOnly:          boolean;
+  hotelCtx?:         HotelContext | null;
+  definedVars?:      string[];
+  approvedTemplates?: ApprovedTemplate[];
+  onChange:          (id: string, data: Record<string, unknown>) => void;
+  onDelete:          (id: string) => void;
 }
 
 const OPERATORS: Record<string, string> = {
@@ -87,7 +90,7 @@ function VarSelect({
 // ── Main component ─────────────────────────────────────────────────────────────
 
 export default function NodeInspectorPanel({
-  node, readOnly, hotelCtx, definedVars = [], onChange, onDelete,
+  node, readOnly, hotelCtx, definedVars = [], approvedTemplates = [], onChange, onDelete,
 }: Props) {
   const inp = "w-full rounded-lg border border-gray-200 px-2.5 py-1.5 text-xs text-gray-800 focus:outline-none focus:ring-2 focus:ring-[#7A3F91] disabled:bg-gray-50 disabled:text-gray-400";
 
@@ -957,6 +960,146 @@ export default function NodeInspectorPanel({
           </p>
         </SectionBox>
       )}
+
+      {/* ══════════════════════════════════════════════════════════════════════ */}
+      {/* send_template                                                         */}
+      {/* ══════════════════════════════════════════════════════════════════════ */}
+      {node.type === "send_template" && (() => {
+        const d = node.data as SendTemplateNodeData;
+        const selectedTpl = approvedTemplates.find((t) => t.id === d.templateId) ?? null;
+        const varCount = selectedTpl?.variableCount ?? 0;
+
+        function setTpl(tpl: ApprovedTemplate | null) {
+          set({
+            templateId:      tpl?.id      ?? "",
+            templateName:    tpl?.name    ?? "",
+            variableMapping: {},
+          });
+        }
+
+        function setVarMapping(pos: number, flowVar: string) {
+          const next = { ...(d.variableMapping ?? {}), [String(pos)]: flowVar };
+          set({ variableMapping: next });
+        }
+
+        return (
+          <>
+            <p className="text-[10px] text-gray-500 leading-relaxed">
+              Sends an approved WhatsApp template to the guest. Each template variable is resolved from the
+              current flow context. Routes to <span className="text-green-600 font-semibold">success</span> or{" "}
+              <span className="text-red-500 font-semibold">failure</span> output handle.
+            </p>
+
+            {/* Template selector */}
+            <div>
+              <Label>Template *</Label>
+              {approvedTemplates.length === 0 ? (
+                <p className="text-[10px] italic text-gray-400">No approved templates found for this hotel.</p>
+              ) : (
+                <select
+                  disabled={readOnly}
+                  className={inp}
+                  value={d.templateId ?? ""}
+                  onChange={(e) => {
+                    const tpl = approvedTemplates.find((t) => t.id === e.target.value) ?? null;
+                    setTpl(tpl);
+                  }}
+                >
+                  <option value="">— choose a template —</option>
+                  {approvedTemplates.map((t) => (
+                    <option key={t.id} value={t.id}>
+                      {t.name}{t.variableCount > 0 ? ` (${t.variableCount} vars)` : ""} · {t.language}
+                    </option>
+                  ))}
+                </select>
+              )}
+            </div>
+
+            {/* Body preview */}
+            {selectedTpl && (
+              <SectionBox title="Template preview" color="teal">
+                {selectedTpl.components.header?.type === "TEXT" && selectedTpl.components.header.text && (
+                  <p className="text-[10px] font-semibold text-teal-800 mb-1">
+                    {selectedTpl.components.header.text}
+                  </p>
+                )}
+                <p className="text-[10px] text-teal-700 whitespace-pre-wrap leading-relaxed">
+                  {selectedTpl.components.body.text}
+                </p>
+              </SectionBox>
+            )}
+
+            {/* Variable mapping */}
+            {varCount > 0 && (
+              <SectionBox title="Map template variables to flow context" color="teal">
+                <p className="text-[10px] text-teal-500 mb-1">
+                  For each <code className="bg-teal-100 px-0.5 rounded">{"{{n}}"}</code> in the template, choose which flow variable to use.
+                </p>
+                {Array.from({ length: varCount }, (_, i) => {
+                  const pos = i + 1;
+                  const mapped = (d.variableMapping ?? {})[String(pos)] ?? "";
+                  return (
+                    <div key={pos}>
+                      <label className="block text-[10px] font-semibold text-teal-700 mb-0.5">
+                        {`{{${pos}}}`}
+                      </label>
+                      <select
+                        disabled={readOnly}
+                        className={inp}
+                        value={mapped}
+                        onChange={(e) => setVarMapping(pos, e.target.value)}
+                      >
+                        <option value="">— not mapped (empty) —</option>
+                        {definedVars.map((v) => (
+                          <option key={v} value={v}>{v}</option>
+                        ))}
+                      </select>
+                    </div>
+                  );
+                })}
+              </SectionBox>
+            )}
+
+            {varCount === 0 && selectedTpl && (
+              <p className="text-[10px] text-teal-500 italic">
+                This template has no variables — it will be sent as-is.
+              </p>
+            )}
+
+            {/* Failure message */}
+            <div>
+              <Label>Failure message (optional)</Label>
+              <textarea
+                disabled={readOnly}
+                rows={2}
+                className={`${inp} resize-none`}
+                value={d.failureMessage ?? ""}
+                onChange={(e) => set({ failureMessage: e.target.value })}
+                placeholder="Sorry, we couldn't send the message. Please contact us directly."
+              />
+              <p className="mt-0.5 text-[10px] text-gray-400">
+                Sent as a plain text message when the template send fails. Leave blank to fail silently.
+              </p>
+            </div>
+
+            <SectionBox title="Output handles" color="gray">
+              <div className="space-y-1">
+                <div className="flex items-center gap-1.5 text-[10px]">
+                  <span className="text-green-600 font-bold">success</span>
+                  <span className="text-gray-400">— template sent successfully</span>
+                </div>
+                <div className="flex items-center gap-1.5 text-[10px]">
+                  <span className="text-red-500 font-bold">failure</span>
+                  <span className="text-gray-400">— send failed (API error / template rejected)</span>
+                </div>
+              </div>
+              <p className="text-[10px] text-gray-400 italic">
+                Connect a fallback Message node to the failure handle for graceful degradation.
+              </p>
+            </SectionBox>
+          </>
+        );
+      })()}
 
       {/* ══════════════════════════════════════════════════════════════════════ */}
       {/* System variables reference                                            */}

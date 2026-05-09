@@ -34,7 +34,8 @@ export type NodeType =
   | "show_rooms"
   | "time_condition"
   | "jump"
-  | "show_menu";
+  | "show_menu"
+  | "send_template";
 
 // ── Node data interfaces ──────────────────────────────────────────────────────
 
@@ -150,6 +151,28 @@ export interface ShowMenuNodeData {
   [key: string]: unknown;
 }
 
+/** Sends an approved WhatsApp template; routes to success or failure handle. */
+export interface SendTemplateNodeData {
+  templateId:      string;
+  templateName?:   string;
+  variableMapping: Record<string, string>;
+  failureMessage?: string;
+  [key: string]: unknown;
+}
+
+// ── Approved template shape (used by flow canvas) ─────────────────────────────
+
+export interface ApprovedTemplate {
+  id:           string;
+  name:         string;
+  language:     string;
+  variableCount: number;
+  components:   {
+    body: { text: string };
+    header?: { type: string; text?: string };
+  };
+}
+
 // ── Hotel context (passed into canvas + inspector) ────────────────────────────
 
 export interface HotelRoomType {
@@ -177,7 +200,8 @@ export type FlowNodeData =
   | CheckAvailabilityNodeData
   | ShowRoomsNodeData
   | ActionNodeData
-  | EndNodeData;
+  | EndNodeData
+  | SendTemplateNodeData;
 
 // ── React Flow typed node/edge ─────────────────────────────────────────────────
 

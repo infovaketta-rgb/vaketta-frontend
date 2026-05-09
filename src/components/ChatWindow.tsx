@@ -1476,6 +1476,7 @@ return () => {
         <TemplatePicker
           onClose={() => setTemplatePickerOpen(false)}
           onSelect={sendTemplate}
+          guestId={guestId}
         />
       )}
     </div>

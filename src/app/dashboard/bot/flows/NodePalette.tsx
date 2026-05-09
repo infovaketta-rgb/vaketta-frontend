@@ -40,8 +40,9 @@ const CATEGORIES: { title: string; items: PaletteItem[] }[] = [
   {
     title: "Actions",
     items: [
-      { type: "action", label: "Action", icon: "⚡", desc: "Booking, review, variable…",  color: "bg-orange-50 border-orange-300 text-orange-700 hover:bg-orange-100" },
-      { type: "end",    label: "End",    icon: "⏹", desc: "End of this flow path",        color: "bg-red-50    border-red-300    text-red-700    hover:bg-red-100"    },
+      { type: "action",        label: "Action",        icon: "⚡", desc: "Booking, review, variable…",     color: "bg-orange-50 border-orange-300 text-orange-700 hover:bg-orange-100" },
+      { type: "send_template", label: "Send Template", icon: "📨", desc: "Send WhatsApp template message", color: "bg-teal-50   border-teal-300   text-teal-700   hover:bg-teal-100"   },
+      { type: "end",           label: "End",           icon: "⏹", desc: "End of this flow path",          color: "bg-red-50    border-red-300    text-red-700    hover:bg-red-100"    },
     ],
   },
 ];

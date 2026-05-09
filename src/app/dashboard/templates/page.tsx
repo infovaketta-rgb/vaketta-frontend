@@ -25,6 +25,25 @@ interface Components {
   buttons?: ButtonDef[];
 }
 
+type ContextField =
+  | "guest.name" | "guest.phone"
+  | "booking.checkIn" | "booking.checkOut"
+  | "booking.roomTypeName" | "booking.referenceNumber" | "booking.status"
+  | "hotel.name";
+
+const CONTEXT_FIELD_LABELS: Record<ContextField, string> = {
+  "guest.name":              "Guest name",
+  "guest.phone":             "Guest phone",
+  "booking.checkIn":         "Check-in date (DD/MM/YYYY)",
+  "booking.checkOut":        "Check-out date (DD/MM/YYYY)",
+  "booking.roomTypeName":    "Room type name",
+  "booking.referenceNumber": "Booking reference",
+  "booking.status":          "Booking status",
+  "hotel.name":              "Hotel name",
+};
+
+const CONTEXT_FIELDS = Object.keys(CONTEXT_FIELD_LABELS) as ContextField[];
+
 interface Template {
   id:               string;
   name:             string;
@@ -33,6 +52,7 @@ interface Template {
   status:           TemplateStatus;
   qualityScore?:    string | null;
   metaTemplateId?:  string | null;
+  variableMapping?: Record<string, string> | null;
   rejectionReason?: string | null;
   components:       Components;
   createdAt:        string;
@@ -79,6 +99,9 @@ export default function TemplatesPage() {
 
   // Sync-from-Meta bulk import
   const [isSyncing, setIsSyncing] = useState(false);
+
+  // Variable mapping editor
+  const [mappingTarget, setMappingTarget] = useState<Template | null>(null);
 
   // ── Data ────────────────────────────────────────────────────────────────────
 
@@ -138,6 +161,23 @@ export default function TemplatesPage() {
       addToast(err.message ?? "Sync failed", "error");
     } finally {
       setSyncing(null);
+    }
+  }
+
+  // ── Variable mapping ─────────────────────────────────────────────────────────
+
+  async function handleSaveMapping(id: string, mapping: Record<string, string>) {
+    try {
+      const updated = await apiFetch(`/hotel-templates/${id}/variable-mapping`, {
+        method: "PATCH",
+        body:   JSON.stringify({ variableMapping: mapping }),
+      });
+      setTemplates((prev) => prev.map((t) => (t.id === id ? { ...t, variableMapping: updated.variableMapping } : t)));
+      addToast("Variable mapping saved", "success");
+    } catch (err: any) {
+      addToast(err.message ?? "Failed to save mapping", "error");
+    } finally {
+      setMappingTarget(null);
     }
   }
 
@@ -297,6 +337,7 @@ export default function TemplatesPage() {
                 syncing={syncing === t.id}
                 onDelete={() => setDeleting(t.id)}
                 onSync={() => handleSync(t.id)}
+                onMapVariables={() => setMappingTarget(t)}
               />
             ))}
           </div>
@@ -326,6 +367,15 @@ export default function TemplatesPage() {
           </div>
         </div>
       )}
+
+      {/* Variable mapping modal */}
+      {mappingTarget && (
+        <VariableMappingModal
+          template={mappingTarget}
+          onClose={() => setMappingTarget(null)}
+          onSave={(mapping) => handleSaveMapping(mappingTarget.id, mapping)}
+        />
+      )}
     </div>
   );
 }
@@ -337,12 +387,17 @@ function TemplateCard({
   syncing,
   onDelete,
   onSync,
+  onMapVariables,
 }: {
-  template: Template;
-  syncing:  boolean;
-  onDelete: () => void;
-  onSync:   () => void;
+  template:       Template;
+  syncing:        boolean;
+  onDelete:       () => void;
+  onSync:         () => void;
+  onMapVariables: () => void;
 }) {
+  const bodyVarCount = (t.components.body?.text.match(/\{\{\d+\}\}/g) ?? []).length;
+  const isMapped = bodyVarCount > 0 && t.variableMapping && Object.keys(t.variableMapping).length > 0;
+
   return (
     <div className="bg-white rounded-2xl border border-[#E5E0D4] p-4 flex flex-col gap-3 hover:shadow-sm transition group">
       {/* Top row */}
@@ -351,7 +406,7 @@ function TemplateCard({
           <p className="font-mono text-sm font-semibold text-[#0C1B33] truncate">{t.name}</p>
           <p className="text-xs text-gray-400 mt-0.5">{t.language}</p>
         </div>
-        <div className="flex items-center gap-1.5 shrink-0">
+        <div className="flex items-center gap-1.5 shrink-0 flex-wrap justify-end">
           <span className={`text-[10px] font-semibold px-2 py-0.5 rounded-full ${CATEGORY_COLORS[t.category]}`}>
             {t.category}
           </span>
@@ -366,6 +421,24 @@ function TemplateCard({
         {t.components.body?.text || <span className="italic text-gray-400">No body text</span>}
       </p>
 
+      {/* Variable mapping badge */}
+      {bodyVarCount > 0 && (
+        <button
+          onClick={onMapVariables}
+          className={`flex items-center gap-1.5 self-start text-[11px] px-2.5 py-1 rounded-full border transition ${
+            isMapped
+              ? "border-purple-200 bg-purple-50 text-purple-700 hover:bg-purple-100"
+              : "border-amber-200 bg-amber-50 text-amber-700 hover:bg-amber-100"
+          }`}
+        >
+          <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
+              d="M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A1.994 1.994 0 013 12V7a4 4 0 014-4z" />
+          </svg>
+          {isMapped ? `${bodyVarCount} vars mapped` : `${bodyVarCount} vars — map auto-fill`}
+        </button>
+      )}
+
       {/* Rejection reason */}
       {t.status === "REJECTED" && t.rejectionReason && (
         <div className="bg-red-50 rounded-lg px-3 py-2 text-xs text-red-600">
@@ -373,7 +446,7 @@ function TemplateCard({
         </div>
       )}
 
-      {/* Buttons preview */}
+      {/* Quick-reply button preview */}
       {(t.components.buttons?.length ?? 0) > 0 && (
         <div className="flex flex-wrap gap-1">
           {t.components.buttons!.map((b, i) => (
@@ -407,6 +480,103 @@ function TemplateCard({
           </svg>
           Delete
         </button>
+      </div>
+    </div>
+  );
+}
+
+// ── Variable Mapping Modal ─────────────────────────────────────────────────────
+
+function VariableMappingModal({
+  template,
+  onClose,
+  onSave,
+}: {
+  template: Template;
+  onClose:  () => void;
+  onSave:   (mapping: Record<string, string>) => void;
+}) {
+  const bodyText    = template.components.body?.text ?? "";
+  const varCount    = (bodyText.match(/\{\{\d+\}\}/g) ?? []).length;
+  const existingMap = (template.variableMapping ?? {}) as Record<string, string>;
+
+  const [mapping, setMapping] = useState<Record<string, string>>(() => {
+    const init: Record<string, string> = {};
+    for (let i = 1; i <= varCount; i++) {
+      init[String(i)] = existingMap[String(i)] ?? "";
+    }
+    return init;
+  });
+
+  if (varCount === 0) return null;
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40" onClick={onClose}>
+      <div
+        className="bg-white rounded-2xl shadow-2xl w-full max-w-md mx-4 flex flex-col"
+        onClick={(e) => e.stopPropagation()}
+      >
+        {/* Header */}
+        <div className="flex items-center justify-between px-5 py-4 border-b border-gray-100">
+          <div>
+            <h3 className="font-semibold text-[#0C1B33] text-sm">Auto-fill Mapping</h3>
+            <p className="text-xs text-gray-400 mt-0.5 font-mono">{template.name}</p>
+          </div>
+          <button onClick={onClose} className="p-1.5 rounded-lg hover:bg-gray-100 transition">
+            <svg className="w-4 h-4 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+            </svg>
+          </button>
+        </div>
+
+        {/* Body */}
+        <div className="p-5 space-y-4 overflow-y-auto max-h-[60vh]">
+          <p className="text-xs text-gray-500 leading-relaxed">
+            Map each template variable to a context field so Vaketta can auto-fill values when sending to guests.
+          </p>
+
+          {/* Body preview chip */}
+          <div className="bg-gray-50 rounded-xl px-3 py-2 text-[12px] text-gray-600 leading-relaxed font-mono line-clamp-3">
+            {bodyText}
+          </div>
+
+          {Array.from({ length: varCount }, (_, i) => {
+            const pos = String(i + 1);
+            return (
+              <div key={pos}>
+                <label className="block text-xs font-medium text-gray-700 mb-1">
+                  {`{{${pos}}}`} — auto-fill from
+                </label>
+                <select
+                  value={mapping[pos] ?? ""}
+                  onChange={(e) => setMapping((m) => ({ ...m, [pos]: e.target.value }))}
+                  className="w-full border border-gray-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-purple-300"
+                >
+                  <option value="">— no auto-fill (staff fills manually) —</option>
+                  {CONTEXT_FIELDS.map((f) => (
+                    <option key={f} value={f}>{CONTEXT_FIELD_LABELS[f]}</option>
+                  ))}
+                </select>
+              </div>
+            );
+          })}
+        </div>
+
+        {/* Footer */}
+        <div className="px-5 py-4 border-t border-gray-100 flex gap-3">
+          <button
+            onClick={onClose}
+            className="flex-1 border border-gray-200 rounded-xl py-2.5 text-sm font-medium hover:bg-gray-50 transition"
+          >
+            Cancel
+          </button>
+          <button
+            onClick={() => onSave(mapping)}
+            className="flex-1 bg-[#1B52A8] hover:bg-[#163f82] text-white rounded-xl py-2.5 text-sm font-medium transition"
+          >
+            Save Mapping
+          </button>
+        </div>
       </div>
     </div>
   );

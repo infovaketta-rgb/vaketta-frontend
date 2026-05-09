@@ -19,7 +19,7 @@ import "@xyflow/react/dist/style.css";
 
 import { apiFetch } from "@/lib/api";
 import { useMounted } from "@/lib/useMounted";
-import type { FlowDefinition, FlowNode, FlowEdge, HotelContext } from "../types";
+import type { FlowDefinition, FlowNode, FlowEdge, HotelContext, ApprovedTemplate } from "../types";
 
 import StartNode             from "../nodes/StartNode";
 import MessageNode           from "../nodes/MessageNode";
@@ -32,6 +32,7 @@ import ShowRoomsNode         from "../nodes/ShowRoomsNode";
 import TimeConditionNode     from "../nodes/TimeConditionNode";
 import JumpNode              from "../nodes/JumpNode";
 import ShowMenuNode          from "../nodes/ShowMenuNode";
+import SendTemplateNode      from "../nodes/SendTemplateNode";
 import DeletableEdge         from "../DeletableEdge";
 import NodePalette, { SYSTEM_VARS } from "../NodePalette";
 import CanvasToolbar         from "../CanvasToolbar";
@@ -54,6 +55,7 @@ function defaultData(type: string): Record<string, unknown> {
     case "time_condition":     return { label: "" };
     case "jump":               return { targetNodeId: "", label: "" };
     case "show_menu":          return { label: "" };
+    case "send_template":      return { templateId: "", templateName: "", variableMapping: {}, failureMessage: "" };
     default:                   return {};
   }
 }
@@ -67,13 +69,14 @@ export default function FlowCanvasPage() {
   const params    = useParams();
   const flowId    = params["id"] as string;
 
-  const [flow,         setFlow]         = useState<FlowDefinition | null>(null);
-  const [flowName,     setFlowName]     = useState("");
-  const [loading,      setLoading]      = useState(true);
-  const [saving,       setSaving]       = useState(false);
-  const [error,        setError]        = useState("");
-  const [hotelCtx,     setHotelCtx]     = useState<HotelContext | null>(null);
-  const [showSimulator, setShowSimulator] = useState(false);
+  const [flow,              setFlow]              = useState<FlowDefinition | null>(null);
+  const [flowName,          setFlowName]          = useState("");
+  const [loading,           setLoading]           = useState(true);
+  const [saving,            setSaving]            = useState(false);
+  const [error,             setError]             = useState("");
+  const [hotelCtx,          setHotelCtx]          = useState<HotelContext | null>(null);
+  const [approvedTemplates, setApprovedTemplates] = useState<ApprovedTemplate[]>([]);
+  const [showSimulator,     setShowSimulator]      = useState(false);
 
   const [nodes, setNodes, onNodesChange] = useNodesState<FlowNode>([]);
   const [edges, setEdges, onEdgesChange] = useEdgesState<FlowEdge>([]);
@@ -89,8 +92,9 @@ export default function FlowCanvasPage() {
       apiFetch(`/hotel-settings/flows/${flowId}`),
       apiFetch("/hotel-settings"),
       apiFetch("/room-types"),
+      apiFetch("/hotel-templates?status=APPROVED").catch(() => []),
     ])
-      .then(([data, settings, rooms]: [FlowDefinition, any, any[]]) => {
+      .then(([data, settings, rooms, tpls]: [FlowDefinition, any, any[], any[]]) => {
         setFlow(data);
         setFlowName(data.name);
         setNodes((data.nodes as FlowNode[]) ?? []);
@@ -101,6 +105,16 @@ export default function FlowCanvasPage() {
           roomTypes:      rooms,
           bookingEnabled: settings.config?.bookingEnabled ?? true,
         });
+        const varCount = (text: string) => (text.match(/\{\{\d+\}\}/g) ?? []).length;
+        setApprovedTemplates(
+          (tpls ?? []).map((t: any) => ({
+            id:            t.id,
+            name:          t.name,
+            language:      t.language,
+            variableCount: varCount(t.components?.body?.text ?? ""),
+            components:    t.components,
+          }))
+        );
       })
       .catch((e: any) => setError(e.message))
       .finally(() => setLoading(false));
@@ -121,6 +135,7 @@ export default function FlowCanvasPage() {
     time_condition:     TimeConditionNode as any,
     jump:               JumpNode as any,
     show_menu:          ShowMenuNode as any,
+    send_template:      SendTemplateNode as any,
   }), []);
 
   // ── Edge types — DeletableEdge wraps default edge with a delete button ────
@@ -360,6 +375,7 @@ export default function FlowCanvasPage() {
             readOnly={readOnly}
             hotelCtx={hotelCtx}
             definedVars={definedVars}
+            approvedTemplates={approvedTemplates}
             onChange={updateNodeData}
             onDelete={deleteNode}
           />
