@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { apiFetch } from "@/lib/api";
 import { useMounted } from "@/lib/useMounted";
+import { useToastStore } from "@/store/toastStore";
 
 // ── types ──────────────────────────────────────────────────────────────────
 
@@ -35,11 +36,15 @@ function SectionCard({ title, description, children }: {
 export default function SettingsPage() {
   const mounted = useMounted();
   const router  = useRouter();
+  const { addToast } = useToastStore();
 
   const [settings, setSettings] = useState<Settings | null>(null);
   const [loading, setLoading]   = useState(true);
   const [error, setError]       = useState("");
   const [copied, setCopied]     = useState(false);
+
+  const [showDeleteModal, setShowDeleteModal] = useState(false);
+  const [deleting, setDeleting]               = useState(false);
 
   useEffect(() => {
     if (!mounted) return;
@@ -48,6 +53,19 @@ export default function SettingsPage() {
       .catch(() => setError("Failed to load settings."))
       .finally(() => setLoading(false));
   }, [mounted]);
+
+  async function handleDeleteAllChats() {
+    setDeleting(true);
+    try {
+      await apiFetch("/hotel-settings/chats", { method: "DELETE" });
+      addToast("All chats deleted successfully", "success");
+      setShowDeleteModal(false);
+    } catch (err: any) {
+      addToast(err.message || "Failed to delete chats", "error");
+    } finally {
+      setDeleting(false);
+    }
+  }
 
   function copyApiKey() {
     if (!settings?.apiKey) return;
@@ -130,6 +148,68 @@ export default function SettingsPage() {
           </button>
         </div>
       </SectionCard>
+
+      {/* Danger Zone */}
+      <div className="rounded-2xl border border-red-200 bg-white shadow-sm">
+        <div className="border-b border-red-100 px-6 py-4 flex items-center gap-2">
+          <svg className="h-4 w-4 text-red-500 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z" />
+          </svg>
+          <h2 className="text-sm font-semibold text-red-600">Danger Zone</h2>
+        </div>
+        <div className="px-6 py-5">
+          <div className="flex items-start justify-between gap-4">
+            <div>
+              <p className="text-sm font-medium text-gray-800">Delete All Chats</p>
+              <p className="mt-0.5 text-xs text-gray-400">
+                Permanently delete all conversations and messages for this hotel. This cannot be undone.
+              </p>
+            </div>
+            <button
+              onClick={() => setShowDeleteModal(true)}
+              className="shrink-0 rounded-lg border border-red-300 px-3 py-1.5 text-xs font-medium text-red-600 hover:bg-red-50 transition"
+            >
+              Delete All Chats
+            </button>
+          </div>
+        </div>
+      </div>
+
+      {/* Confirmation modal */}
+      {showDeleteModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
+          <div className="w-full max-w-sm rounded-2xl bg-white shadow-xl">
+            <div className="px-6 pt-6 pb-4">
+              <h3 className="text-base font-semibold text-gray-900">Are you sure?</h3>
+              <p className="mt-2 text-sm text-gray-500">
+                This will permanently delete all conversations and messages. This action cannot be undone.
+              </p>
+            </div>
+            <div className="flex gap-2 border-t border-gray-100 px-6 py-4">
+              <button
+                onClick={() => setShowDeleteModal(false)}
+                disabled={deleting}
+                className="flex-1 rounded-lg border border-gray-200 px-4 py-2 text-sm font-medium text-gray-600 hover:bg-gray-50 transition disabled:opacity-50"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleDeleteAllChats}
+                disabled={deleting}
+                className="flex-1 rounded-lg bg-red-600 px-4 py-2 text-sm font-medium text-white hover:bg-red-700 transition disabled:opacity-60 flex items-center justify-center gap-2"
+              >
+                {deleting && (
+                  <svg className="h-4 w-4 animate-spin" fill="none" viewBox="0 0 24 24">
+                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8H4z" />
+                  </svg>
+                )}
+                Delete All Chats
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
     </div>
   );
