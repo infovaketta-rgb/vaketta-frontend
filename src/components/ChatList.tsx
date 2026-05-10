@@ -364,6 +364,20 @@ export default function ChatList() {
     });
   }
 
+  function toggleSelectAll() {
+    const filteredIds = filtered.map((c) => c.guestId);
+    const allSelected = filteredIds.length > 0 && filteredIds.every((id) => selected.has(id));
+    if (allSelected) {
+      setSelected((prev) => {
+        const next = new Set(prev);
+        filteredIds.forEach((id) => next.delete(id));
+        return next;
+      });
+    } else {
+      setSelected((prev) => new Set([...prev, ...filteredIds]));
+    }
+  }
+
   if (!mounted) return null;
 
   const q = search.trim().toLowerCase();
@@ -373,11 +387,41 @@ export default function ChatList() {
     (c.name ?? "").toLowerCase().includes(q)
   );
 
+  const allSelected  = filtered.length > 0 && filtered.every((c) => selected.has(c.guestId));
+  const someSelected = !allSelected && filtered.some((c) => selected.has(c.guestId));
+
   return (
     <div className="relative flex flex-col h-full w-full md:w-80 md:shrink-0 border-r border-[#E5E0D4] bg-white">
       {/* Header */}
       <div className="px-4 pt-4 pb-3 border-b border-[#E5E0D4]">
-        <h2 className="text-base font-semibold text-[#0C1B33] mb-3">Chats</h2>
+        {selectMode ? (
+          <button
+            onClick={toggleSelectAll}
+            className="flex items-center gap-2.5 mb-3 group w-full text-left"
+          >
+            <div className={`w-5 h-5 rounded border-2 flex items-center justify-center shrink-0 transition-colors ${
+              allSelected
+                ? "bg-[#1B52A8] border-[#1B52A8]"
+                : someSelected
+                ? "border-[#1B52A8] bg-white"
+                : "border-slate-300 bg-white group-hover:border-[#1B52A8]"
+            }`}>
+              {allSelected && (
+                <svg className="w-3 h-3 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" />
+                </svg>
+              )}
+              {someSelected && (
+                <div className="w-2.5 h-0.5 rounded bg-[#1B52A8]" />
+              )}
+            </div>
+            <span className="text-sm font-semibold text-[#0C1B33]">
+              {allSelected ? `All ${filtered.length} selected` : "Select all"}
+            </span>
+          </button>
+        ) : (
+          <h2 className="text-base font-semibold text-[#0C1B33] mb-3">Chats</h2>
+        )}
         <div className="relative">
           <svg
             className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400"
