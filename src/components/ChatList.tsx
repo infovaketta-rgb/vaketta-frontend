@@ -6,6 +6,7 @@ import { getSocket } from "@/lib/socket";
 import { useChatStore } from "@/store/chatStore";
 import { useMounted } from "@/lib/useMounted";
 import { SkeletonChatRow } from "@/components/Skeleton";
+import NewChatModal from "@/components/NewChatModal";
 
 type MessageChannel = "WHATSAPP" | "INSTAGRAM";
 
@@ -81,6 +82,7 @@ export default function ChatList() {
   const conversationsRef = useRef<Conversation[]>([]);
   const [search, setSearch] = useState("");
   const [loading, setLoading] = useState(true);
+  const [newChatOpen, setNewChatOpen] = useState(false);
   const selectedGuestId = useChatStore((s) => s.selectedGuestId);
   const setSelectedGuest = useChatStore((s) => s.setSelectedGuest);
 
@@ -159,7 +161,7 @@ export default function ChatList() {
   );
 
   return (
-    <div className="flex flex-col h-full w-full md:w-80 md:shrink-0 border-r border-[#E5E0D4] bg-white">
+    <div className="relative flex flex-col h-full w-full md:w-80 md:shrink-0 border-r border-[#E5E0D4] bg-white">
       {/* Header */}
       <div className="px-4 pt-4 pb-3 border-b border-[#E5E0D4]">
         <h2 className="text-base font-semibold text-[#0C1B33] mb-3">Chats</h2>
@@ -272,6 +274,41 @@ export default function ChatList() {
           );
         })}
       </div>
+
+      {/* FAB — New Chat */}
+      <button
+        onClick={() => setNewChatOpen(true)}
+        className="absolute bottom-4 right-4 w-11 h-11 rounded-full bg-green-600 hover:bg-green-700 active:scale-95 text-white flex items-center justify-center shadow-md transition-all z-10"
+        aria-label="New chat"
+      >
+        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+        </svg>
+      </button>
+
+      <NewChatModal
+        open={newChatOpen}
+        onClose={() => setNewChatOpen(false)}
+        onStart={(guestId) => {
+          setNewChatOpen(false);
+          setSelectedGuest(guestId);
+          setConversations((prev) => {
+            if (prev.find((c) => c.guestId === guestId)) return prev;
+            return [{
+              guestId,
+              phone: "",
+              name: null,
+              lastHandledByStaff: false,
+              lastMessage: null,
+              lastMessageType: null,
+              lastDirection: null,
+              lastTimestamp: null,
+              channel: "WHATSAPP",
+              unreadCount: 0,
+            }, ...prev];
+          });
+        }}
+      />
     </div>
   );
 }
