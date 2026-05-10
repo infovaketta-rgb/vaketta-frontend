@@ -12,7 +12,7 @@ interface ButtonDef {
 
 interface Components {
   header?: { type: string; text?: string };
-  body:    { text: string; examples?: string[] };
+  body:    { text: string; examples?: string[]; namedExamples?: Record<string, string> };
   footer?: { text: string };
   buttons?: ButtonDef[];
 }
@@ -67,8 +67,53 @@ const DEFAULT_MAPPING: Record<number, string> = {
   5: "booking.referenceNumber",
 };
 
-function varCount(text: string): number {
-  return (text.match(/\{\{\d+\}\}/g) ?? []).length;
+// Named-variable name → context-field heuristic (used when the template uses {{guestname}} style)
+const NAME_TO_FIELD: Record<string, string> = {
+  guestname:       "guest.name",
+  guest_name:      "guest.name",
+  name:            "guest.name",
+  customername:    "guest.name",
+  customer_name:   "guest.name",
+  phone:           "guest.phone",
+  guestphone:      "guest.phone",
+  guest_phone:     "guest.phone",
+  checkin:         "booking.checkIn",
+  check_in:        "booking.checkIn",
+  checkindate:     "booking.checkIn",
+  check_in_date:   "booking.checkIn",
+  checkout:        "booking.checkOut",
+  check_out:       "booking.checkOut",
+  checkoutdate:    "booking.checkOut",
+  check_out_date:  "booking.checkOut",
+  roomtype:        "booking.roomTypeName",
+  room_type:       "booking.roomTypeName",
+  room:            "booking.roomTypeName",
+  reference:       "booking.referenceNumber",
+  referencenumber: "booking.referenceNumber",
+  reference_number:"booking.referenceNumber",
+  bookingref:      "booking.referenceNumber",
+  booking_ref:     "booking.referenceNumber",
+  bookingid:       "booking.referenceNumber",
+  status:          "booking.status",
+  bookingstatus:   "booking.status",
+  hotel:           "hotel.name",
+  hotelname:       "hotel.name",
+  hotel_name:      "hotel.name",
+};
+
+const VAR_RE = /\{\{\s*([a-zA-Z0-9_]+)\s*\}\}/g;
+
+// Returns ordered list of unique variable identifiers ("1","2",… or "guestname",…)
+function extractVarIds(text: string): string[] {
+  const seen = new Set<string>();
+  const ids: string[] = [];
+  let m: RegExpExecArray | null;
+  const re = new RegExp(VAR_RE.source, "g");
+  while ((m = re.exec(text)) !== null) {
+    const id = m[1];
+    if (id && !seen.has(id)) { seen.add(id); ids.push(id); }
+  }
+  return ids;
 }
 
 function buildContext(ctx: GuestContext): Record<string, string> {
@@ -90,7 +135,8 @@ export default function TemplatePicker({ onSelect, onClose, guestId }: Props) {
   const [loading, setLoading]     = useState(true);
   const [search, setSearch]       = useState("");
   const [selected, setSelected]   = useState<Template | null>(null);
-  const [values, setValues]       = useState<string[]>([]);
+  const [varIds, setVarIds]       = useState<string[]>([]);
+  const [values, setValues]       = useState<Record<string, string>>({});
   const [sending, setSending]     = useState(false);
   const [contextLoading, setContextLoading] = useState(false);
 
@@ -105,25 +151,33 @@ export default function TemplatePicker({ onSelect, onClose, guestId }: Props) {
     !search || t.name.includes(search.toLowerCase())
   );
 
-  async function select(t: Template) {
-    const count = varCount(t.components.body.text);
-    const initial = new Array(count).fill("");
-    setSelected(t);
-    setValues(initial);
+  function fieldFor(t: Template, id: string): string {
+    const vm = (t.variableMapping ?? {}) as Record<string, string>;
+    if (vm[id]) return vm[id];
+    if (/^\d+$/.test(id)) {
+      return DEFAULT_MAPPING[parseInt(id, 10)] ?? "";
+    }
+    return NAME_TO_FIELD[id.toLowerCase()] ?? "";
+  }
 
-    if (!guestId || count === 0) return;
+  async function select(t: Template) {
+    const ids = extractVarIds(t.components.body.text);
+    setSelected(t);
+    setVarIds(ids);
+    setValues(Object.fromEntries(ids.map((id) => [id, ""])));
+
+    if (!guestId || ids.length === 0) return;
 
     // Auto-fill from guest + booking context
     setContextLoading(true);
     try {
       const ctx: GuestContext = await apiFetch(`/messages/${guestId}/context`);
       const ctxMap = buildContext(ctx);
-      const vm = t.variableMapping ?? {};
-      const filled = Array.from({ length: count }, (_, i) => {
-        const pos = i + 1;
-        const field = (vm as Record<string, string>)[String(pos)] ?? DEFAULT_MAPPING[pos] ?? "";
-        return ctxMap[field] ?? "";
-      });
+      const filled: Record<string, string> = {};
+      for (const id of ids) {
+        const field = fieldFor(t, id);
+        filled[id] = ctxMap[field] ?? "";
+      }
       setValues(filled);
     } catch {
       // Context fetch failed — leave values blank, user fills manually
@@ -135,18 +189,24 @@ export default function TemplatePicker({ onSelect, onClose, guestId }: Props) {
   async function handleSend() {
     if (!selected) return;
     setSending(true);
-    const valuesMap: Record<string, string> = {};
-    values.forEach((v, i) => { valuesMap[String(i + 1)] = v; });
-    onSelect(selected.id, valuesMap);
+    onSelect(selected.id, { ...values });
     setSending(false);
   }
 
-  // Label for {{n}} — use variableMapping if available, fall back to position defaults
-  function varLabel(t: Template, pos: number): string {
-    const vm = (t.variableMapping ?? {}) as Record<string, string>;
-    const field = vm[String(pos)] ?? DEFAULT_MAPPING[pos] ?? "";
-    return FIELD_LABELS[field] ? `{{${pos}}} — ${FIELD_LABELS[field]}` : `{{${pos}}}`;
+  // Label for a variable — use variableMapping if available, then defaults / name heuristic
+  function varLabel(t: Template, id: string): string {
+    const field = fieldFor(t, id);
+    const display = `{{${id}}}`;
+    return FIELD_LABELS[field] ? `${display} — ${FIELD_LABELS[field]}` : display;
   }
+
+  function placeholderFor(t: Template, id: string, idx: number): string {
+    if (t.components.body.namedExamples?.[id]) return t.components.body.namedExamples[id]!;
+    if (t.components.body.examples?.[idx])     return t.components.body.examples[idx]!;
+    return `Value for {{${id}}}`;
+  }
+
+  const allValuesFilled = varIds.every((id) => (values[id] ?? "").trim().length > 0);
 
   return (
     <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/40">
@@ -228,9 +288,9 @@ export default function TemplatePicker({ onSelect, onClose, guestId }: Props) {
                               {t.category}
                             </span>
                             <span className="text-[10px] text-gray-400">{t.language}</span>
-                            {varCount(t.components.body.text) > 0 && (
+                            {extractVarIds(t.components.body.text).length > 0 && (
                               <span className="text-[10px] text-purple-500 bg-purple-50 px-2 py-0.5 rounded-full">
-                                {varCount(t.components.body.text)} variable{varCount(t.components.body.text) > 1 ? "s" : ""}
+                                {extractVarIds(t.components.body.text).length} variable{extractVarIds(t.components.body.text).length > 1 ? "s" : ""}
                               </span>
                             )}
                           </div>
@@ -254,9 +314,9 @@ export default function TemplatePicker({ onSelect, onClose, guestId }: Props) {
                     <p className="text-[13px] font-semibold text-gray-900 mb-1">{selected.components.header.text}</p>
                   )}
                   <p className="text-[13px] text-gray-800 leading-relaxed whitespace-pre-wrap">
-                    {selected.components.body.text.replace(/\{\{(\d+)\}\}/g, (_, n) => {
-                      const v = values[parseInt(n) - 1];
-                      return v ? v : `[${n}]`;
+                    {selected.components.body.text.replace(/\{\{\s*([a-zA-Z0-9_]+)\s*\}\}/g, (_, id) => {
+                      const v = values[id];
+                      return v ? v : `[${id}]`;
                     })}
                   </p>
                   {selected.components.footer?.text && (
@@ -269,7 +329,7 @@ export default function TemplatePicker({ onSelect, onClose, guestId }: Props) {
               </div>
 
               {/* Variable inputs */}
-              {values.length > 0 && (
+              {varIds.length > 0 && (
                 <div className="space-y-3">
                   <div className="flex items-center justify-between">
                     <p className="text-sm font-medium text-gray-700">Fill in variables</p>
@@ -283,19 +343,15 @@ export default function TemplatePicker({ onSelect, onClose, guestId }: Props) {
                       </span>
                     )}
                   </div>
-                  {values.map((v, i) => (
-                    <div key={i}>
+                  {varIds.map((id, i) => (
+                    <div key={id}>
                       <label className="block text-xs font-medium text-gray-500 mb-1">
-                        {varLabel(selected, i + 1)}
+                        {varLabel(selected, id)}
                       </label>
                       <input
-                        value={v}
-                        onChange={(e) => {
-                          const next = [...values];
-                          next[i] = e.target.value;
-                          setValues(next);
-                        }}
-                        placeholder={selected.components.body.examples?.[i] ?? `Value for {{${i + 1}}}`}
+                        value={values[id] ?? ""}
+                        onChange={(e) => setValues((prev) => ({ ...prev, [id]: e.target.value }))}
+                        placeholder={placeholderFor(selected, id, i)}
                         className="w-full border border-gray-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-purple-300"
                       />
                     </div>
@@ -303,7 +359,7 @@ export default function TemplatePicker({ onSelect, onClose, guestId }: Props) {
                 </div>
               )}
 
-              {values.length === 0 && (
+              {varIds.length === 0 && (
                 <p className="text-sm text-gray-500 text-center py-2">
                   This template has no variables — it will be sent as-is.
                 </p>
@@ -323,7 +379,7 @@ export default function TemplatePicker({ onSelect, onClose, guestId }: Props) {
             </button>
             <button
               onClick={handleSend}
-              disabled={sending || contextLoading || values.some((v) => !v.trim() && values.length > 0)}
+              disabled={sending || contextLoading || (varIds.length > 0 && !allValuesFilled)}
               className="flex-1 bg-[#1B52A8] hover:bg-[#163f82] disabled:opacity-50 text-white rounded-xl py-2.5 text-sm font-medium transition flex items-center justify-center gap-2"
             >
               {sending && (

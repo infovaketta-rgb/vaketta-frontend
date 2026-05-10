@@ -395,7 +395,7 @@ function TemplateCard({
   onSync:         () => void;
   onMapVariables: () => void;
 }) {
-  const bodyVarCount = (t.components.body?.text.match(/\{\{\d+\}\}/g) ?? []).length;
+  const bodyVarCount = (t.components.body?.text.match(/\{\{\s*[a-zA-Z0-9_]+\s*\}\}/g) ?? []).length;
   const isMapped = bodyVarCount > 0 && t.variableMapping && Object.keys(t.variableMapping).length > 0;
 
   return (
@@ -497,18 +497,26 @@ function VariableMappingModal({
   onSave:   (mapping: Record<string, string>) => void;
 }) {
   const bodyText    = template.components.body?.text ?? "";
-  const varCount    = (bodyText.match(/\{\{\d+\}\}/g) ?? []).length;
+  const varIds: string[] = (() => {
+    const re = /\{\{\s*([a-zA-Z0-9_]+)\s*\}\}/g;
+    const seen = new Set<string>();
+    const ids: string[] = [];
+    let m: RegExpExecArray | null;
+    while ((m = re.exec(bodyText)) !== null) {
+      const id = m[1]!;
+      if (!seen.has(id)) { seen.add(id); ids.push(id); }
+    }
+    return ids;
+  })();
   const existingMap = (template.variableMapping ?? {}) as Record<string, string>;
 
   const [mapping, setMapping] = useState<Record<string, string>>(() => {
     const init: Record<string, string> = {};
-    for (let i = 1; i <= varCount; i++) {
-      init[String(i)] = existingMap[String(i)] ?? "";
-    }
+    for (const id of varIds) init[id] = existingMap[id] ?? "";
     return init;
   });
 
-  if (varCount === 0) return null;
+  if (varIds.length === 0) return null;
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40" onClick={onClose}>
@@ -540,26 +548,23 @@ function VariableMappingModal({
             {bodyText}
           </div>
 
-          {Array.from({ length: varCount }, (_, i) => {
-            const pos = String(i + 1);
-            return (
-              <div key={pos}>
-                <label className="block text-xs font-medium text-gray-700 mb-1">
-                  {`{{${pos}}}`} — auto-fill from
-                </label>
-                <select
-                  value={mapping[pos] ?? ""}
-                  onChange={(e) => setMapping((m) => ({ ...m, [pos]: e.target.value }))}
-                  className="w-full border border-gray-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-purple-300"
-                >
-                  <option value="">— no auto-fill (staff fills manually) —</option>
-                  {CONTEXT_FIELDS.map((f) => (
-                    <option key={f} value={f}>{CONTEXT_FIELD_LABELS[f]}</option>
-                  ))}
-                </select>
-              </div>
-            );
-          })}
+          {varIds.map((id) => (
+            <div key={id}>
+              <label className="block text-xs font-medium text-gray-700 mb-1">
+                {`{{${id}}}`} — auto-fill from
+              </label>
+              <select
+                value={mapping[id] ?? ""}
+                onChange={(e) => setMapping((m) => ({ ...m, [id]: e.target.value }))}
+                className="w-full border border-gray-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-purple-300"
+              >
+                <option value="">— no auto-fill (staff fills manually) —</option>
+                {CONTEXT_FIELDS.map((f) => (
+                  <option key={f} value={f}>{CONTEXT_FIELD_LABELS[f]}</option>
+                ))}
+              </select>
+            </div>
+          ))}
         </div>
 
         {/* Footer */}

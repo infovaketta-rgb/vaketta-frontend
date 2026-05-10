@@ -971,7 +971,19 @@ export default function NodeInspectorPanel({
       {node.type === "send_template" && (() => {
         const d = node.data as SendTemplateNodeData;
         const selectedTpl = approvedTemplates.find((t) => t.id === d.templateId) ?? null;
-        const varCount = selectedTpl?.variableCount ?? 0;
+        const tplBodyText = selectedTpl?.components.body.text ?? "";
+        const varIds: string[] = (() => {
+          const re = /\{\{\s*([a-zA-Z0-9_]+)\s*\}\}/g;
+          const seen = new Set<string>();
+          const ids: string[] = [];
+          let m: RegExpExecArray | null;
+          while ((m = re.exec(tplBodyText)) !== null) {
+            const id = m[1]!;
+            if (!seen.has(id)) { seen.add(id); ids.push(id); }
+          }
+          return ids;
+        })();
+        const varCount = varIds.length;
 
         function setTpl(tpl: ApprovedTemplate | null) {
           set({
@@ -981,8 +993,8 @@ export default function NodeInspectorPanel({
           });
         }
 
-        function setVarMapping(pos: number, flowVar: string) {
-          const next = { ...(d.variableMapping ?? {}), [String(pos)]: flowVar };
+        function setVarMapping(id: string, flowVar: string) {
+          const next = { ...(d.variableMapping ?? {}), [id]: flowVar };
           set({ variableMapping: next });
         }
 
@@ -1039,19 +1051,18 @@ export default function NodeInspectorPanel({
                 <p className="text-[10px] text-teal-500 mb-1">
                   For each <code className="bg-teal-100 px-0.5 rounded">{"{{n}}"}</code> in the template, choose which flow variable to use.
                 </p>
-                {Array.from({ length: varCount }, (_, i) => {
-                  const pos = i + 1;
-                  const mapped = (d.variableMapping ?? {})[String(pos)] ?? "";
+                {varIds.map((id) => {
+                  const mapped = (d.variableMapping ?? {})[id] ?? "";
                   return (
-                    <div key={pos}>
+                    <div key={id}>
                       <label className="block text-[10px] font-semibold text-teal-700 mb-0.5">
-                        {`{{${pos}}}`}
+                        {`{{${id}}}`}
                       </label>
                       <select
                         disabled={readOnly}
                         className={inp}
                         value={mapped}
-                        onChange={(e) => setVarMapping(pos, e.target.value)}
+                        onChange={(e) => setVarMapping(id, e.target.value)}
                       >
                         <option value="">— not mapped (empty) —</option>
                         {definedVars.map((v) => (

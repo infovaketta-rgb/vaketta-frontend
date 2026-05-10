@@ -110,7 +110,7 @@ export default function FlowCanvasPage() {
           bookingEnabled: settings.config?.bookingEnabled ?? true,
         });
         setSavedReplies(savedRepliesData ?? []);
-        const varCount = (text: string) => (text.match(/\{\{\d+\}\}/g) ?? []).length;
+        const varCount = (text: string) => (text.match(/\{\{\s*[a-zA-Z0-9_]+\s*\}\}/g) ?? []).length;
         setApprovedTemplates(
           (tpls ?? []).map((t: any) => ({
             id:            t.id,
