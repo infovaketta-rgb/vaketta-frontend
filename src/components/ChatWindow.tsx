@@ -8,6 +8,7 @@ import { useMounted } from "@/lib/useMounted";
 import BookingForm from "./BookingForm";
 import MediaPickerModal from "./MediaPickerModal";
 import TemplatePicker from "./TemplatePicker";
+import SavedRepliesPopover from "./SavedRepliesPopover";
 
 const API_BASE = process.env.NEXT_PUBLIC_API_BASE ?? "";
 
@@ -454,7 +455,8 @@ export default function ChatWindow() {
   const [isRecording, setIsRecording] = useState(false);
   const [attachMenuOpen,    setAttachMenuOpen]    = useState(false);
   const [mediaPickerOpen,   setMediaPickerOpen]   = useState(false);
-  const [templatePickerOpen, setTemplatePickerOpen] = useState(false);
+  const [templatePickerOpen,   setTemplatePickerOpen]   = useState(false);
+  const [savedRepliesOpen,     setSavedRepliesOpen]     = useState(false);
   const [lightboxSrc, setLightboxSrc] = useState<string | null>(null);
 
   // Media preview state — file staged here before confirm-send
@@ -464,8 +466,9 @@ export default function ChatWindow() {
     caption: string;
   } | null>(null);
 
-  const fileInputRef    = useRef<HTMLInputElement>(null);
-  const attachMenuRef   = useRef<HTMLDivElement>(null);
+  const fileInputRef      = useRef<HTMLInputElement>(null);
+  const attachMenuRef     = useRef<HTMLDivElement>(null);
+  const savedRepliesBtnRef = useRef<HTMLButtonElement>(null);
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const audioChunksRef = useRef<Blob[]>([]);
   const bottomRef = useRef<HTMLDivElement>(null);
@@ -1327,6 +1330,27 @@ return () => {
               </button>
             </div>
           )}
+        </div>
+
+        {/* Saved Replies button */}
+        <div className="relative">
+          <button
+            ref={savedRepliesBtnRef}
+            onClick={() => setSavedRepliesOpen((o) => !o)}
+            disabled={isRecording}
+            title="Saved replies"
+            className="w-9 h-9 rounded-full bg-gray-100 hover:bg-gray-200 disabled:opacity-50 flex items-center justify-center shrink-0 transition-colors"
+          >
+            <svg className="w-4 h-4 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 5a2 2 0 012-2h10a2 2 0 012 2v16l-7-3.5L5 21V5z" />
+            </svg>
+          </button>
+          <SavedRepliesPopover
+            open={savedRepliesOpen}
+            onClose={() => setSavedRepliesOpen(false)}
+            anchorRef={savedRepliesBtnRef}
+            onInsert={(t) => { setText((prev) => prev + t); setSavedRepliesOpen(false); }}
+          />
         </div>
 
         {/* Text input */}

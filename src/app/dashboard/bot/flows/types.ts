@@ -35,7 +35,8 @@ export type NodeType =
   | "time_condition"
   | "jump"
   | "show_menu"
-  | "send_template";
+  | "send_template"
+  | "send_saved_reply";
 
 // ── Node data interfaces ──────────────────────────────────────────────────────
 
@@ -157,6 +158,14 @@ export interface SendTemplateNodeData {
   templateName?:   string;
   variableMapping: Record<string, string>;
   failureMessage?: string;
+  [key: string]: unknown;
+}
+
+/** Sends an internal saved reply; resolves {{var}} placeholders from flow vars. */
+export interface SendSavedReplyNodeData {
+  savedReplyId:       string | null;
+  savedReplyName?:    string;
+  variableOverrides:  Record<string, string>;
   [key: string]: unknown;
 }
 

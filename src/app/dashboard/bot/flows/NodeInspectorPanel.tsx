@@ -12,8 +12,11 @@ import type {
   JumpNodeData,
   ApprovedTemplate,
   SendTemplateNodeData,
+  SendSavedReplyNodeData,
 } from "./types";
 import { SYSTEM_VARS } from "./NodePalette";
+
+type SavedReplyOption = { id: string; name: string; category: string | null; variables: string[] };
 
 interface Props {
   node:              FlowNode | null;
@@ -21,6 +24,7 @@ interface Props {
   hotelCtx?:         HotelContext | null;
   definedVars?:      string[];
   approvedTemplates?: ApprovedTemplate[];
+  savedReplies?:     SavedReplyOption[];
   onChange:          (id: string, data: Record<string, unknown>) => void;
   onDelete:          (id: string) => void;
 }
@@ -90,7 +94,7 @@ function VarSelect({
 // ── Main component ─────────────────────────────────────────────────────────────
 
 export default function NodeInspectorPanel({
-  node, readOnly, hotelCtx, definedVars = [], approvedTemplates = [], onChange, onDelete,
+  node, readOnly, hotelCtx, definedVars = [], approvedTemplates = [], savedReplies = [], onChange, onDelete,
 }: Props) {
   const inp = "w-full rounded-lg border border-gray-200 px-2.5 py-1.5 text-xs text-gray-800 focus:outline-none focus:ring-2 focus:ring-[#7A3F91] disabled:bg-gray-50 disabled:text-gray-400";
 
@@ -1095,6 +1099,71 @@ export default function NodeInspectorPanel({
               </div>
               <p className="text-[10px] text-gray-400 italic">
                 Connect a fallback Message node to the failure handle for graceful degradation.
+              </p>
+            </SectionBox>
+          </>
+        );
+      })()}
+
+      {/* ══════════════════════════════════════════════════════════════════════ */}
+      {/* send_saved_reply                                                      */}
+      {/* ══════════════════════════════════════════════════════════════════════ */}
+      {node.type === "send_saved_reply" && (() => {
+        const d = node.data as SendSavedReplyNodeData;
+        const selected = savedReplies.find((r) => r.id === d.savedReplyId) ?? null;
+        const overrides = d.variableOverrides ?? {};
+
+        return (
+          <>
+            <div>
+              <Label>Saved reply *</Label>
+              <select
+                disabled={readOnly}
+                value={d.savedReplyId ?? ""}
+                onChange={(e) => {
+                  const r = savedReplies.find((x) => x.id === e.target.value) ?? null;
+                  set({ savedReplyId: r?.id ?? null, savedReplyName: r?.name ?? "", variableOverrides: {} });
+                }}
+                className="w-full rounded-lg border border-gray-200 px-2.5 py-1.5 text-xs text-gray-800 focus:outline-none focus:ring-2 focus:ring-[#7A3F91] disabled:bg-gray-50 disabled:text-gray-400"
+              >
+                <option value="">— select a reply —</option>
+                {savedReplies.map((r) => (
+                  <option key={r.id} value={r.id}>
+                    {r.category ? `[${r.category}] ` : ""}{r.name}
+                  </option>
+                ))}
+              </select>
+              {savedReplies.length === 0 && (
+                <p className="mt-1 text-[10px] text-amber-600">No saved replies yet. Create some in Saved Replies.</p>
+              )}
+            </div>
+
+            {selected && selected.variables.length > 0 && (
+              <SectionBox title="Variable overrides" color="green">
+                <p className="text-[10px] text-green-600 mb-1">
+                  Leave blank to use the flow variable directly. Fill in a literal value or <code className="bg-white px-0.5 rounded text-purple-600">{"{{anotherVar}}"}</code> to override.
+                </p>
+                {selected.variables.map((v) => (
+                  <div key={v}>
+                    <label className="block text-[10px] text-green-700 mb-0.5 font-medium">
+                      <code>{`{{${v}}}`}</code>
+                    </label>
+                    <input
+                      disabled={readOnly}
+                      className="w-full rounded-lg border border-gray-200 px-2.5 py-1.5 text-xs text-gray-800 focus:outline-none focus:ring-2 focus:ring-[#7A3F91] disabled:bg-gray-50 disabled:text-gray-400"
+                      placeholder={`{{${v}}} or literal value`}
+                      value={overrides[v] ?? ""}
+                      list={varListId}
+                      onChange={(e) => set({ variableOverrides: { ...overrides, [v]: e.target.value } })}
+                    />
+                  </div>
+                ))}
+              </SectionBox>
+            )}
+
+            <SectionBox title="How it works" color="gray">
+              <p className="text-[10px] text-gray-500 leading-relaxed">
+                The reply body is sent as a plain text message. All <code className="bg-white px-0.5 rounded text-purple-600">{"{{variable}}"}</code> placeholders are resolved from flow variables. Use overrides above to supply fixed values or remap to a different variable.
               </p>
             </SectionBox>
           </>
