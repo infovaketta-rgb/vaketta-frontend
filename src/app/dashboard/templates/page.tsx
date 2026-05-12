@@ -19,7 +19,13 @@ interface ButtonDef {
 }
 
 interface Components {
-  header?:  { type: "TEXT" | "IMAGE" | "VIDEO" | "DOCUMENT"; text?: string; mediaUrl?: string };
+  header?:  {
+    format?:  "TEXT" | "IMAGE" | "VIDEO" | "DOCUMENT";
+    type?:    "TEXT" | "IMAGE" | "VIDEO" | "DOCUMENT";
+    text?:    string;
+    mediaUrl?: string;
+    sampleUrl?: string;
+  };
   body:     { text: string; examples?: string[] };
   footer?:  { text: string };
   buttons?: ButtonDef[];
@@ -55,8 +61,20 @@ interface Template {
   variableMapping?: Record<string, string> | null;
   rejectionReason?: string | null;
   components:       Components;
+  headerFormat?:    string | null;
+  headerHandle?:    string | null;
   createdAt:        string;
   updatedAt:        string;
+}
+
+// IMAGE/VIDEO/DOCUMENT templates need a numeric Meta media id in headerHandle
+// for Meta to accept sends. Sync stores the scontent sample URL, which is NOT
+// usable for sending — the "Attach Header" button uploads it to /media to
+// produce a sendable id.
+function needsHeaderMedia(t: Template): boolean {
+  const format = t.headerFormat ?? t.components.header?.format ?? t.components.header?.type ?? null;
+  if (!format || !["IMAGE", "VIDEO", "DOCUMENT"].includes(format)) return false;
+  return !t.headerHandle || !/^\d+$/.test(t.headerHandle);
 }
 
 // ── Constants ──────────────────────────────────────────────────────────────────
@@ -96,6 +114,9 @@ export default function TemplatesPage() {
 
   // Syncing individual template
   const [syncing, setSyncing] = useState<string | null>(null);
+
+  // Attaching header media (reattach-from-sample)
+  const [attaching, setAttaching] = useState<string | null>(null);
 
   // Sync-from-Meta bulk import
   const [isSyncing, setIsSyncing] = useState(false);
@@ -146,6 +167,28 @@ export default function TemplatesPage() {
       addToast(err.message ?? "Failed to delete", "error");
     } finally {
       setDeleting(null);
+    }
+  }
+
+  // ── Attach header media (reattach from Meta sample) ──────────────────────────
+
+  async function handleAttachHeader(id: string) {
+    setAttaching(id);
+    try {
+      const result = await apiFetch(`/hotel-templates/${id}/reattach-header-from-sample`, { method: "POST" });
+      setTemplates((prev) =>
+        prev.map((t) => (t.id === id ? { ...t, headerHandle: String(result.mediaId) } : t))
+      );
+      addToast(`Header media attached (id: ${result.mediaId})`, "success");
+    } catch (err: any) {
+      const msg = err.message ?? "Failed to attach header media";
+      if (/expired|HTTP 4|HTTP 5/i.test(msg)) {
+        addToast(`${msg} Try clicking Sync first, then Attach again.`, "error");
+      } else {
+        addToast(msg, "error");
+      }
+    } finally {
+      setAttaching(null);
     }
   }
 
@@ -335,8 +378,10 @@ export default function TemplatesPage() {
                 key={t.id}
                 template={t}
                 syncing={syncing === t.id}
+                attaching={attaching === t.id}
                 onDelete={() => setDeleting(t.id)}
                 onSync={() => handleSync(t.id)}
+                onAttachHeader={() => handleAttachHeader(t.id)}
                 onMapVariables={() => setMappingTarget(t)}
               />
             ))}
@@ -385,18 +430,23 @@ export default function TemplatesPage() {
 function TemplateCard({
   template: t,
   syncing,
+  attaching,
   onDelete,
   onSync,
+  onAttachHeader,
   onMapVariables,
 }: {
   template:       Template;
   syncing:        boolean;
+  attaching:      boolean;
   onDelete:       () => void;
   onSync:         () => void;
+  onAttachHeader: () => void;
   onMapVariables: () => void;
 }) {
   const bodyVarCount = (t.components.body?.text.match(/\{\{\s*[a-zA-Z0-9_]+\s*\}\}/g) ?? []).length;
   const isMapped = bodyVarCount > 0 && t.variableMapping && Object.keys(t.variableMapping).length > 0;
+  const headerMissing = needsHeaderMedia(t);
 
   return (
     <div className="bg-white rounded-2xl border border-[#E5E0D4] p-4 flex flex-col gap-3 hover:shadow-sm transition group">
@@ -420,6 +470,32 @@ function TemplateCard({
       <p className="text-sm text-gray-600 line-clamp-3 leading-relaxed">
         {t.components.body?.text || <span className="italic text-gray-400">No body text</span>}
       </p>
+
+      {/* Header media missing warning */}
+      {headerMissing && (
+        <div className="bg-amber-50 border border-amber-200 rounded-lg px-3 py-2 flex items-center justify-between gap-2">
+          <div className="flex items-center gap-2 text-xs text-amber-800 min-w-0">
+            <svg className="w-3.5 h-3.5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
+                d="M12 9v2m0 4h.01M21 12c0 4.97-4.03 9-9 9s-9-4.03-9-9 4.03-9 9-9 9 4.03 9 9z" />
+            </svg>
+            <span className="truncate">Header media not attached — sends will fail</span>
+          </div>
+          <button
+            onClick={onAttachHeader}
+            disabled={attaching}
+            className="shrink-0 text-[11px] font-medium px-2.5 py-1 rounded-md bg-amber-600 hover:bg-amber-700 text-white transition disabled:opacity-50 flex items-center gap-1"
+          >
+            {attaching && (
+              <svg className="w-3 h-3 animate-spin" fill="none" viewBox="0 0 24 24">
+                <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8H4z" />
+              </svg>
+            )}
+            {attaching ? "Attaching…" : "Attach Header"}
+          </button>
+        </div>
+      )}
 
       {/* Variable mapping badge */}
       {bodyVarCount > 0 && (
