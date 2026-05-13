@@ -33,8 +33,8 @@ export function RoomCarouselCards({ content }: Props) {
 
   return (
     <div
-      className="flex gap-2 overflow-x-auto pb-1"
-      style={{ scrollbarWidth: "none", msOverflowStyle: "none" }}
+      className="wa-room-strip flex gap-2 overflow-x-auto pb-1"
+      style={{ scrollbarWidth: "none", msOverflowStyle: "none" } as React.CSSProperties}
     >
       {/* Hide WebKit scrollbar via a scoped style tag */}
       <style>{`.wa-room-strip::-webkit-scrollbar { display: none; }`}</style>

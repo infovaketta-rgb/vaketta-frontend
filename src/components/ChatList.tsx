@@ -70,8 +70,12 @@ function getLastMessagePreview(
       video:    "🎥 Video",
       audio:    "🎵 Voice message",
       document: "📄 Document",
+      carousel: "🛏️ Room options",
     };
     const label = labels[lastMessageType] ?? "📎 Attachment";
+    // For media-with-caption we suffix the caption. Carousel's body is a JSON
+    // payload, not human-readable, so the label alone is the right preview.
+    if (lastMessageType === "carousel") return label;
     return lastMessage ? `${label} • ${lastMessage}` : label;
   }
   return lastMessage ?? "No messages yet";
