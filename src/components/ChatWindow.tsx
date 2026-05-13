@@ -9,6 +9,7 @@ import BookingForm from "./BookingForm";
 import MediaPickerModal from "./MediaPickerModal";
 import TemplatePicker, { type SelectedTemplate } from "./TemplatePicker";
 import SavedRepliesPopover from "./SavedRepliesPopover";
+import RoomCarouselCards from "./RoomCarouselCards";
 
 const API_BASE = process.env.NEXT_PUBLIC_API_BASE ?? "";
 
@@ -1306,6 +1307,15 @@ return () => {
                         </button>
                       )}
 
+                      {m.messageType === "carousel" ? (
+                        <div className="max-w-[85%] flex flex-col gap-1">
+                          <RoomCarouselCards content={m.body ?? ""} />
+                          <div className="flex justify-end items-center gap-1 px-1 text-gray-500">
+                            <span className="text-[10px]">{formatMsgTime(m.timestamp)}</span>
+                            {isOut && !m.deleted && <StatusTicks status={m.status} />}
+                          </div>
+                        </div>
+                      ) : (
                       <div
                         className={`wa-bubble max-w-[65%] ${isOut ? "wa-bubble-out" : "wa-bubble-in"} ${
                           m.template ? "wa-template-card" : ""
@@ -1348,6 +1358,7 @@ return () => {
                           {isOut && !m.deleted && <StatusTicks status={m.status} />}
                         </div>
                       </div>
+                      )}
 
                       {isOut && !m.deleted && (
                         <button
