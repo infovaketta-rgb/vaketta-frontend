@@ -565,18 +565,16 @@ export default function NodeInspectorPanel({
             </SectionBox>
 
             <div>
-              <Label>Store selection as (variable prefix)</Label>
+              <Label>Store result as</Label>
               <input disabled={readOnly} className={inp} value={d.variableName ?? ""}
-                onChange={(e) => set({ variableName: e.target.value })} placeholder="e.g. room" />
-              {d.variableName && (
-                <p className="mt-0.5 text-[10px] text-gray-400">
-                  Stores: <code className="text-purple-600">{d.variableName}TypeId</code>,{" "}
-                  <code className="text-purple-600">{d.variableName}TypeName</code>,{" "}
-                  <code className="text-purple-600">{d.variableName}Price</code>,{" "}
-                  <code className="text-purple-600">{d.variableName}MaxAdults</code>,{" "}
-                  <code className="text-purple-600">{d.variableName}MaxChildren</code>
-                </p>
-              )}
+                onChange={(e) => set({ variableName: e.target.value })} placeholder="selectedRoom" />
+              <p className="mt-0.5 text-[10px] text-gray-400">
+                Use{" "}
+                <code className="text-purple-600">{`{{${d.variableName || "selectedRoom"}.name}}`}</code>
+                ,{" "}
+                <code className="text-purple-600">{`{{${d.variableName || "selectedRoom"}.price}}`}</code>
+                {" "}in later nodes.
+              </p>
             </div>
 
             <div>

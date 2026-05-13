@@ -30,7 +30,7 @@ export default function ShowRoomsNode({ data, selected }: NodeProps<any>) {
           </span>
           {d?.variableName && (
             <span className="font-mono rounded bg-blue-100 px-1 py-0.5 text-[10px] text-blue-700">
-              → {d.variableName}
+              {`→ {{${d.variableName}}}`}
             </span>
           )}
         </div>
