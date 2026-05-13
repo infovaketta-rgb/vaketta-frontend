@@ -24,6 +24,7 @@ type RoomType = {
   maxChildren: number | null;
   totalRooms: number;
   description: string | null;
+  carouselButtonLabel: string | null;
   createdAt: string;
   photos: RoomPhoto[];
 };
@@ -46,6 +47,7 @@ export default function RoomTypeDetailPage() {
 
   const [form, setForm] = useState({
     name: "", basePrice: "", capacity: "", maxAdults: "", maxChildren: "", totalRooms: "", description: "",
+    carouselButtonLabel: "",
   });
 
   useEffect(() => {
@@ -54,13 +56,14 @@ export default function RoomTypeDetailPage() {
       .then((rt: RoomType) => {
         setRoomType(rt);
         setForm({
-          name:        rt.name,
-          basePrice:   String(rt.basePrice),
-          capacity:    rt.capacity    != null ? String(rt.capacity)    : "",
-          maxAdults:   rt.maxAdults   != null ? String(rt.maxAdults)   : "",
-          maxChildren: rt.maxChildren != null ? String(rt.maxChildren) : "",
-          totalRooms:  String(rt.totalRooms),
-          description: rt.description ?? "",
+          name:                rt.name,
+          basePrice:           String(rt.basePrice),
+          capacity:            rt.capacity    != null ? String(rt.capacity)    : "",
+          maxAdults:           rt.maxAdults   != null ? String(rt.maxAdults)   : "",
+          maxChildren:         rt.maxChildren != null ? String(rt.maxChildren) : "",
+          totalRooms:          String(rt.totalRooms),
+          description:         rt.description ?? "",
+          carouselButtonLabel: rt.carouselButtonLabel ?? "",
         });
       })
       .catch(() => setError("Failed to load room type"))
@@ -81,6 +84,8 @@ export default function RoomTypeDetailPage() {
           ...(form.maxChildren ? { maxChildren: Number(form.maxChildren) } : {}),
           ...(form.totalRooms  ? { totalRooms:  Number(form.totalRooms)  } : {}),
           ...(form.description ? { description: form.description         } : {}),
+          // Send the trimmed label even if blank, so users can clear back to default
+          carouselButtonLabel: form.carouselButtonLabel.trim(),
         }),
       });
       setRoomType((prev) => prev ? { ...prev, ...updated } : prev);
@@ -253,6 +258,26 @@ export default function RoomTypeDetailPage() {
                   onChange={(e) => setForm((p) => ({ ...p, totalRooms: e.target.value }))}
                   className={inp} placeholder="4" />
               </div>
+            </div>
+
+            <div>
+              <div className="flex items-baseline justify-between mb-1">
+                <label className={lbl}>Carousel Button Label</label>
+                <span className={`text-[10px] tabular-nums ${form.carouselButtonLabel.length > 20 ? "text-red-500" : "text-gray-400"}`}>
+                  {form.carouselButtonLabel.length}/20
+                </span>
+              </div>
+              <input
+                type="text"
+                maxLength={20}
+                value={form.carouselButtonLabel}
+                onChange={(e) => setForm((p) => ({ ...p, carouselButtonLabel: e.target.value }))}
+                className={inp}
+                placeholder="Select Room"
+              />
+              <p className="text-[11px] text-gray-400 mt-1">
+                Shown on the WhatsApp carousel card button (max 20 chars). Defaults to &quot;Select Room&quot; if blank.
+              </p>
             </div>
           </div>
 
