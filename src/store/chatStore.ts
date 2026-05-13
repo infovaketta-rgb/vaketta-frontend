@@ -1,5 +1,28 @@
 import { create } from "zustand";
 
+// Frontend-only metadata attached to outbound template messages so the bubble
+// can render the rich WhatsApp template card (header image / body / footer /
+// action buttons). The backend persists templates as plain text messages, so
+// this metadata is populated optimistically when the staff member sends a
+// template and copied over when the real socket message replaces the tmp.
+export type TemplateBubbleMeta = {
+  header?: {
+    format?:    "TEXT" | "IMAGE" | "VIDEO" | "DOCUMENT";
+    text?:      string;
+    mediaUrl?:  string;
+    sampleUrl?: string;
+  };
+  body?:    { text: string };
+  footer?:  { text: string };
+  buttons?: Array<{
+    type:         "QUICK_REPLY" | "URL" | "PHONE_NUMBER" | "COPY_CODE";
+    text:         string;
+    url?:         string;
+    phoneNumber?: string;
+    couponCode?:  string;
+  }>;
+};
+
 export type Message = {
   id:          string;
   direction:   "IN" | "OUT";
@@ -14,6 +37,7 @@ export type Message = {
   deleted:     boolean;
   deletedBy:   string | null;
   jobId:       string | null;
+  template?:   TemplateBubbleMeta | null;
 };
 
 type MessageChannel = "WHATSAPP" | "INSTAGRAM";
@@ -68,6 +92,22 @@ export const useChatStore = create<ChatState>((set) => ({
       return state;
     }
 
+    // When a real message arrives, locate its optimistic tmp counterpart so we
+    // can copy over frontend-only metadata (e.g. template bubble structure)
+    // before dropping it.
+    const tmpMatch = !message.id.startsWith("tmp_")
+      ? state.messages.find(
+          (m) =>
+            m.id.startsWith("tmp_") &&
+            m.body === message.body &&
+            m.direction === message.direction
+        )
+      : null;
+
+    const enriched: Message = tmpMatch?.template
+      ? { ...message, template: tmpMatch.template }
+      : message;
+
     // if real message arrives, drop any optimistic temp entry with the same body+direction
     const filtered = message.id.startsWith("tmp_")
       ? state.messages
@@ -80,7 +120,7 @@ export const useChatStore = create<ChatState>((set) => ({
     const cleaned = filtered.filter((m) => m.status !== "REPLACED");
 
     return {
-      messages: [...cleaned, message],
+      messages: [...cleaned, enriched],
     };
   }),
   markMessagesRead: (guestId: string) =>

@@ -6,12 +6,21 @@ import { apiFetch } from "@/lib/api";
 // ── Types ──────────────────────────────────────────────────────────────────────
 
 interface ButtonDef {
-  type: "QUICK_REPLY" | "URL" | "PHONE_NUMBER" | "COPY_CODE";
-  text: string;
+  type:         "QUICK_REPLY" | "URL" | "PHONE_NUMBER" | "COPY_CODE";
+  text:         string;
+  url?:         string;
+  phoneNumber?: string;
+  couponCode?:  string;
 }
 
 interface Components {
-  header?: { type: string; text?: string };
+  header?: {
+    type?:      string;
+    format?:    string;
+    text?:      string;
+    mediaUrl?:  string;
+    sampleUrl?: string;
+  };
   body:    { text: string; examples?: string[]; namedExamples?: Record<string, string> };
   footer?: { text: string };
   buttons?: ButtonDef[];
@@ -27,6 +36,13 @@ interface Template {
   variableMapping?: Record<string, string> | null;
 }
 
+export type SelectedTemplate = {
+  id:         string;
+  name:       string;
+  language:   string;
+  components: Components;
+};
+
 interface GuestContext {
   guest:          { name: string; phone: string };
   latestBooking:  {
@@ -39,7 +55,11 @@ interface GuestContext {
 }
 
 interface Props {
-  onSelect: (templateId: string, values: Record<string, string>) => void;
+  onSelect: (
+    templateId: string,
+    values:     Record<string, string>,
+    template:   SelectedTemplate,
+  ) => void;
   onClose:  () => void;
   guestId?: string | null;
 }
@@ -189,7 +209,12 @@ export default function TemplatePicker({ onSelect, onClose, guestId }: Props) {
   async function handleSend() {
     if (!selected) return;
     setSending(true);
-    onSelect(selected.id, { ...values });
+    onSelect(selected.id, { ...values }, {
+      id:         selected.id,
+      name:       selected.name,
+      language:   selected.language,
+      components: selected.components,
+    });
     setSending(false);
   }
 

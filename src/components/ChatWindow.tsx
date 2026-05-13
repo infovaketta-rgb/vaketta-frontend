@@ -3,11 +3,11 @@
 import { useEffect, useRef, useState } from "react";
 import { apiFetch } from "@/lib/api";
 import { getSocket } from "@/lib/socket";
-import { useChatStore } from "@/store/chatStore";
+import { useChatStore, type TemplateBubbleMeta } from "@/store/chatStore";
 import { useMounted } from "@/lib/useMounted";
 import BookingForm from "./BookingForm";
 import MediaPickerModal from "./MediaPickerModal";
-import TemplatePicker from "./TemplatePicker";
+import TemplatePicker, { type SelectedTemplate } from "./TemplatePicker";
 import SavedRepliesPopover from "./SavedRepliesPopover";
 
 const API_BASE = process.env.NEXT_PUBLIC_API_BASE ?? "";
@@ -291,6 +291,164 @@ function MediaBubble({ mediaUrl, mimeType, fileName, body, isOut, onImageClick }
         <span className="text-[11px] text-gray-400">Tap to open</span>
       </div>
     </a>
+  );
+}
+
+// ── WhatsApp-style ticks ──────────────────────────────────────────────────────
+
+function StatusTicks({ status }: { status: string }) {
+  if (status === "SENDING" || status === "PENDING") {
+    return (
+      <svg className="wa-tick wa-tick-sent" viewBox="0 0 16 11" fill="none">
+        <path d="M8 2v3l2 1.5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
+        <circle cx="8" cy="5.5" r="4.25" stroke="currentColor" strokeWidth="1" />
+      </svg>
+    );
+  }
+  if (status === "FAILED") {
+    return (
+      <svg className="wa-tick" viewBox="0 0 16 11" fill="none" style={{ color: "#ef4444" }}>
+        <circle cx="8" cy="5.5" r="4.25" stroke="currentColor" strokeWidth="1.2" />
+        <path d="M6 3.5l4 4M10 3.5l-4 4" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" />
+      </svg>
+    );
+  }
+  if (status === "SENT") {
+    return (
+      <svg className="wa-tick wa-tick-sent" viewBox="0 0 16 11" fill="none">
+        <path d="M11.071.653a.457.457 0 0 1 .304-.102c.146 0 .291.06.405.171l.473.465a.42.42 0 0 1-.005.595L4.39 9.614a.454.454 0 0 1-.301.111h-.211a.451.451 0 0 1-.302-.124L.165 6.193a.418.418 0 0 1-.005-.591l.47-.465a.444.444 0 0 1 .61-.005l3.043 2.943L11.071.653z" fill="currentColor"/>
+      </svg>
+    );
+  }
+  // DELIVERED or READ → double tick (blue if READ)
+  const cls = status === "READ" ? "wa-tick wa-tick-read" : "wa-tick wa-tick-sent";
+  return (
+    <svg className={cls} viewBox="0 0 16 11" fill="none">
+      <path d="M11.071.653a.457.457 0 0 1 .304-.102c.146 0 .291.06.405.171l.473.465a.42.42 0 0 1-.005.595L4.39 9.614a.454.454 0 0 1-.301.111h-.211a.451.451 0 0 1-.302-.124L.165 6.193a.418.418 0 0 1-.005-.591l.47-.465a.444.444 0 0 1 .61-.005l3.043 2.943L11.071.653z" fill="currentColor"/>
+      <path d="M15.105.653a.457.457 0 0 0-.304-.102.582.582 0 0 0-.405.171l-6.49 6.405a.42.42 0 0 0 .005.595l.47.465c.18.176.466.176.642 0L15.115 1.41a.418.418 0 0 0-.01-.756z" fill="currentColor"/>
+    </svg>
+  );
+}
+
+// ── Template card (WhatsApp-style) ────────────────────────────────────────────
+
+function TemplateCard({
+  template,
+  renderedBody,
+  isOut,
+  onImageClick,
+}: {
+  template:     TemplateBubbleMeta;
+  renderedBody: string;
+  isOut:        boolean;
+  onImageClick: (src: string) => void;
+}) {
+  const header = template.header;
+  const footer = template.footer;
+  const buttons = template.buttons ?? [];
+  const headerFormat = header?.format ?? (header as { type?: string } | undefined)?.type;
+  const headerMedia = header?.mediaUrl ?? header?.sampleUrl;
+
+  return (
+    <>
+      {headerFormat === "IMAGE" && headerMedia && (
+        <div className="wa-template-image">
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img
+            src={headerMedia}
+            alt=""
+            onClick={() => onImageClick(headerMedia)}
+            className="cursor-zoom-in"
+            onError={(e) => {
+              // scontent CDN URLs can expire; hide the broken image gracefully
+              (e.currentTarget as HTMLImageElement).style.display = "none";
+            }}
+          />
+        </div>
+      )}
+
+      {headerFormat === "TEXT" && header?.text && (
+        <p className="wa-template-header">{header.text}</p>
+      )}
+
+      <p className="wa-template-body">{renderedBody}</p>
+
+      {footer?.text && <p className="wa-template-footer">{footer.text}</p>}
+
+      {/* Floating time + ticks sit at the bottom-right of the bubble. When
+          there's no footer, give the body more bottom padding so they don't
+          collide with the body text. */}
+      {!footer?.text && <div style={{ height: 18 }} />}
+
+      {buttons.length > 0 && (
+        <div className="wa-template-buttons" style={{ background: isOut ? "rgba(255,255,255,0.4)" : "rgba(0,0,0,0.02)" }}>
+          {buttons.map((btn, i) => {
+            const icon =
+              btn.type === "URL"          ? <UrlIcon /> :
+              btn.type === "PHONE_NUMBER" ? <PhoneIcon /> :
+              btn.type === "COPY_CODE"    ? <CopyIcon /> :
+                                            <ReplyIcon />;
+
+            if (btn.type === "URL" && btn.url) {
+              return (
+                <a key={i} href={btn.url} target="_blank" rel="noopener noreferrer" className="wa-template-button">
+                  {icon}
+                  <span>{btn.text}</span>
+                </a>
+              );
+            }
+            if (btn.type === "PHONE_NUMBER" && btn.phoneNumber) {
+              return (
+                <a key={i} href={`tel:${btn.phoneNumber}`} className="wa-template-button">
+                  {icon}
+                  <span>{btn.text}</span>
+                </a>
+              );
+            }
+            // QUICK_REPLY / COPY_CODE — no client action wired (recipient-side only)
+            return (
+              <button key={i} type="button" className="wa-template-button" onClick={(e) => e.preventDefault()}>
+                {icon}
+                <span>{btn.text}</span>
+              </button>
+            );
+          })}
+        </div>
+      )}
+    </>
+  );
+}
+
+function UrlIcon() {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6" />
+      <polyline points="15 3 21 3 21 9" />
+      <line x1="10" y1="14" x2="21" y2="3" />
+    </svg>
+  );
+}
+function PhoneIcon() {
+  return (
+    <svg viewBox="0 0 24 24" fill="currentColor">
+      <path d="M20.01 15.38c-1.23 0-2.42-.2-3.53-.56a.977.977 0 0 0-1.01.24l-1.57 1.97c-2.83-1.35-5.48-3.9-6.89-6.83l1.95-1.66c.27-.28.35-.67.24-1.02-.37-1.11-.56-2.3-.56-3.53 0-.54-.45-.99-.99-.99H4.19C3.65 3 3 3.24 3 3.99 3 13.28 10.73 21 20.01 21c.71 0 .99-.63.99-1.18v-3.45c0-.54-.45-.99-.99-.99z"/>
+    </svg>
+  );
+}
+function CopyIcon() {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <rect x="9" y="9" width="13" height="13" rx="2" />
+      <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1" />
+    </svg>
+  );
+}
+function ReplyIcon() {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <polyline points="9 17 4 12 9 7" />
+      <path d="M20 18v-2a4 4 0 0 0-4-4H4" />
+    </svg>
   );
 }
 
@@ -837,16 +995,72 @@ return () => {
     }
   }
 
-  async function sendTemplate(templateId: string, values: Record<string, string>) {
+  async function sendTemplate(
+    templateId: string,
+    values:     Record<string, string>,
+    template:   SelectedTemplate,
+  ) {
     if (!guestId) return;
     setTemplatePickerOpen(false);
     setSendError("");
+
+    // Interpolate {{var}} placeholders so the optimistic bubble reads naturally
+    // even before the real server message arrives.
+    const renderedBody = (template.components.body?.text ?? "").replace(
+      /\{\{\s*([a-zA-Z0-9_]+)\s*\}\}/g,
+      (_m, id) => values[id] ?? `{{${id}}}`
+    );
+
+    // Narrow the header.format to the union TemplateBubbleMeta expects. The
+    // picker types it as `string` because it comes back from the API, but only
+    // these four values are emitted by the backend's parseMetaComponents.
+    type HeaderFormat = NonNullable<TemplateBubbleMeta["header"]>["format"];
+    const rawFmt = template.components.header?.format ?? template.components.header?.type;
+    const headerFormat: HeaderFormat = (
+      rawFmt === "TEXT" || rawFmt === "IMAGE" || rawFmt === "VIDEO" || rawFmt === "DOCUMENT"
+        ? rawFmt
+        : undefined
+    );
+
+    const optimisticId = `tmp_${Date.now()}`;
+    useChatStore.getState().addMessage({
+      id:          optimisticId,
+      direction:   "OUT",
+      body:        renderedBody,
+      messageType: "template",
+      mediaUrl:    null,
+      mimeType:    null,
+      fileName:    null,
+      timestamp:   new Date().toISOString(),
+      status:      "SENDING",
+      guestId,
+      deleted:     false,
+      deletedBy:   null,
+      jobId:       null,
+      template:    {
+        header:  template.components.header
+          ? {
+              format:    headerFormat,
+              text:      template.components.header.text,
+              mediaUrl:  template.components.header.mediaUrl,
+              sampleUrl: template.components.header.sampleUrl,
+            }
+          : undefined,
+        body:    { text: renderedBody },
+        footer:  template.components.footer,
+        buttons: template.components.buttons,
+      },
+    });
+
     try {
       await apiFetch("/messages/send-template", {
         method: "POST",
         body:   JSON.stringify({ guestId, templateId, values }),
       });
+      // Real socket message arrives via `message:new`; addMessage will copy
+      // over `template` meta from the matching tmp and drop the tmp.
     } catch (e: any) {
+      useChatStore.getState().updateMessageStatus(optimisticId, "FAILED");
       setSendError(e?.message ?? "Failed to send template.");
       setTimeout(() => setSendError(""), 4000);
     }
@@ -1093,46 +1307,45 @@ return () => {
                       )}
 
                       <div
-                        className={`relative max-w-[65%] px-3 py-2 rounded-2xl shadow-sm text-sm leading-relaxed ${
-                          isOut
-                            ? "bg-[#d9fdd3] text-gray-900 rounded-br-sm"
-                            : "bg-white text-gray-900 rounded-bl-sm"
+                        className={`wa-bubble max-w-[65%] ${isOut ? "wa-bubble-out" : "wa-bubble-in"} ${
+                          m.template ? "wa-template-card" : ""
                         }`}
                       >
                         {m.deleted ? (
-                          <p className="flex items-center gap-1.5 pr-10 italic text-gray-400 text-sm select-none">
-                            <svg className="w-3.5 h-3.5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
-                                d="M18.364 18.364A9 9 0 005.636 5.636m12.728 12.728A9 9 0 015.636 5.636m12.728 12.728L5.636 5.636" />
-                            </svg>
-                            Message deleted by {m.deletedBy ?? "Staff"}
-                          </p>
-                        ) : m.mediaUrl ? (
-                          <MediaBubble
-                            mediaUrl={m.mediaUrl}
-                            mimeType={m.mimeType ?? "application/octet-stream"}
-                            fileName={m.fileName ?? null}
-                            body={m.body}
+                          <div className="wa-bubble-text">
+                            <span className="flex items-center gap-1.5 italic text-gray-400 text-sm select-none">
+                              <svg className="w-3.5 h-3.5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
+                                  d="M18.364 18.364A9 9 0 005.636 5.636m12.728 12.728A9 9 0 015.636 5.636m12.728 12.728L5.636 5.636" />
+                              </svg>
+                              Message deleted by {m.deletedBy ?? "Staff"}
+                            </span>
+                          </div>
+                        ) : m.template ? (
+                          <TemplateCard
+                            template={m.template}
+                            renderedBody={m.body ?? ""}
                             isOut={isOut}
                             onImageClick={setLightboxSrc}
                           />
+                        ) : m.mediaUrl ? (
+                          <div className="p-1">
+                            <MediaBubble
+                              mediaUrl={m.mediaUrl}
+                              mimeType={m.mimeType ?? "application/octet-stream"}
+                              fileName={m.fileName ?? null}
+                              body={m.body}
+                              isOut={isOut}
+                              onImageClick={setLightboxSrc}
+                            />
+                          </div>
                         ) : (
-                          <p className="pr-10 whitespace-pre-wrap">{m.body}</p>
+                          <div className="wa-bubble-text">{m.body}</div>
                         )}
-                        <div className="flex items-center justify-end gap-1 mt-0.5">
-                          <span className="text-[10px] text-gray-400">
-                            {formatMsgTime(m.timestamp)}
-                          </span>
-                          {isOut && (
-                            <span className={`text-[11px] leading-none ${m.status === "READ" ? "text-blue-500" : "text-gray-400"}`}>
-                              {m.status === "SENDING"   && <span className="opacity-60">🕐</span>}
-                              {m.status === "PENDING"   && "🕐"}
-                              {m.status === "FAILED"    && <span className="text-red-400" title="Failed to send">✕</span>}
-                              {m.status === "SENT"      && "✔"}
-                              {m.status === "DELIVERED" && "✔✔"}
-                              {m.status === "READ"      && "✔✔"}
-                            </span>
-                          )}
+
+                        <div className="wa-bubble-meta">
+                          <span>{formatMsgTime(m.timestamp)}</span>
+                          {isOut && !m.deleted && <StatusTicks status={m.status} />}
                         </div>
                       </div>
 

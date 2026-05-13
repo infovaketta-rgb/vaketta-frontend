@@ -23,3 +23,154 @@ body {
   font-family: Arial, Helvetica, sans-serif;
 }
 
+/* ── WhatsApp-style chat bubbles ───────────────────────────────────────────── */
+
+.wa-bubble {
+  position: relative;
+  border-radius: 7.5px;
+  box-shadow: 0 1px 0.5px rgba(11, 20, 26, 0.13);
+  word-wrap: break-word;
+  font-size: 14.2px;
+  line-height: 19px;
+  color: #111b21;
+}
+
+.wa-bubble-out {
+  background-color: #d9fdd3;
+  border-top-right-radius: 0;
+}
+
+.wa-bubble-out::before {
+  content: "";
+  position: absolute;
+  top: 0;
+  right: -8px;
+  width: 8px;
+  height: 13px;
+  background-color: #d9fdd3;
+  clip-path: polygon(0 0, 0 100%, 100% 0);
+}
+
+.wa-bubble-in {
+  background-color: #ffffff;
+  border-top-left-radius: 0;
+}
+
+.wa-bubble-in::before {
+  content: "";
+  position: absolute;
+  top: 0;
+  left: -8px;
+  width: 8px;
+  height: 13px;
+  background-color: #ffffff;
+  clip-path: polygon(100% 0, 100% 100%, 0 0);
+}
+
+/* Text bubble — reserve right padding so the floating meta strip doesn't
+   overlap the last visible character of the message. */
+.wa-bubble-text {
+  padding: 6px 60px 8px 9px;
+  white-space: pre-wrap;
+  word-wrap: break-word;
+}
+
+/* Time + ticks float inside the bubble, overlapping the last text line. */
+.wa-bubble-meta {
+  position: absolute;
+  bottom: 3px;
+  right: 7px;
+  display: flex;
+  align-items: center;
+  gap: 3px;
+  font-size: 11px;
+  line-height: 15px;
+  color: rgba(0, 0, 0, 0.45);
+  user-select: none;
+  pointer-events: none;
+}
+
+.wa-bubble-meta .wa-tick {
+  width: 16px;
+  height: 11px;
+}
+.wa-bubble-meta .wa-tick-read { color: #53bdeb; }
+.wa-bubble-meta .wa-tick-sent { color: rgba(0, 0, 0, 0.45); }
+
+/* Template card variant — wider, hosts media + body + footer + buttons. */
+.wa-template-card {
+  max-width: 330px;
+  padding: 3px;
+}
+
+.wa-template-image {
+  border-radius: 6px;
+  overflow: hidden;
+  background: #f0f2f5;
+  display: block;
+}
+.wa-template-image img {
+  display: block;
+  width: 100%;
+  max-height: 220px;
+  object-fit: cover;
+}
+
+.wa-template-header {
+  font-weight: 600;
+  font-size: 14.6px;
+  padding: 6px 9px 0;
+  color: #111b21;
+}
+
+.wa-template-body {
+  padding: 6px 9px 0;
+  font-size: 14.2px;
+  line-height: 19px;
+  white-space: pre-wrap;
+  word-wrap: break-word;
+  color: #111b21;
+}
+
+.wa-template-footer {
+  padding: 4px 9px 22px;
+  font-size: 13px;
+  color: #667781;
+}
+
+.wa-template-buttons {
+  margin-top: 6px;
+  border-radius: 4px;
+  overflow: hidden;
+  background: rgba(255, 255, 255, 0.55);
+}
+
+.wa-template-button {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  width: 100%;
+  padding: 10px 12px;
+  font-size: 14px;
+  font-weight: 500;
+  color: #027eb5;
+  background: transparent;
+  border: none;
+  border-top: 1px solid rgba(0, 0, 0, 0.08);
+  cursor: pointer;
+  transition: background-color 120ms ease;
+  text-decoration: none;
+}
+.wa-template-button:first-child {
+  border-top: none;
+}
+.wa-template-button:hover {
+  background-color: rgba(0, 0, 0, 0.04);
+}
+.wa-template-button svg {
+  width: 16px;
+  height: 16px;
+  flex-shrink: 0;
+}
+
