@@ -1,7 +1,42 @@
 "use client";
 
-import { useMemo, useRef, useState } from "react";
+import { Component, useMemo, useRef, useState } from "react";
 import type { FlowNode, FlowEdge, HotelContext, BranchCondition } from "./types";
+
+// ── Error boundary ────────────────────────────────────────────────────────────
+
+interface EBState { hasError: boolean; error: Error | null }
+
+class SimulatorErrorBoundary extends Component<{ children: React.ReactNode }, EBState> {
+  constructor(props: { children: React.ReactNode }) {
+    super(props);
+    this.state = { hasError: false, error: null };
+  }
+
+  static getDerivedStateFromError(error: Error): EBState {
+    return { hasError: true, error };
+  }
+
+  render() {
+    if (this.state.hasError) {
+      return (
+        <div className="flex w-72 shrink-0 flex-col rounded-xl border border-red-200 bg-white shadow-sm overflow-hidden p-4 gap-3">
+          <p className="text-xs font-bold text-red-600">Simulator error</p>
+          <p className="text-[11px] text-red-500 wrap-break-word">
+            {this.state.error?.message ?? "Unknown error"}. Fix the node configuration and try again.
+          </p>
+          <button
+            onClick={() => this.setState({ hasError: false, error: null })}
+            className="rounded bg-gray-100 px-3 py-1 text-[11px] font-semibold text-gray-700 hover:bg-gray-200 transition self-start"
+          >
+            ↩ Reset
+          </button>
+        </div>
+      );
+    }
+    return this.props.children;
+  }
+}
 
 const MAX_HOPS = 30;
 
@@ -45,13 +80,14 @@ function addLog(s: SimState, entry: LogEntry): SimState {
 }
 
 interface Props {
-  nodes:    FlowNode[];
-  edges:    FlowEdge[];
-  hotelCtx: HotelContext | null;
-  onClose:  () => void;
+  nodes:          FlowNode[];
+  edges:          FlowEdge[];
+  hotelCtx:       HotelContext | null;
+  showDraftLabel?: boolean;
+  onClose:        () => void;
 }
 
-export default function FlowSimulator({ nodes, edges, hotelCtx, onClose }: Props) {
+function FlowSimulatorPanel({ nodes, edges, hotelCtx, showDraftLabel, onClose }: Props) {
   const nodeMap = useMemo(() => new Map(nodes.map((n) => [n.id, n])), [nodes]);
   const adjMap  = useMemo(() => {
     const m = new Map<string, FlowEdge[]>();
@@ -190,6 +226,15 @@ export default function FlowSimulator({ nodes, edges, hotelCtx, onClose }: Props
         return processNode(s, targetId);
       }
 
+      case "delay": {
+        const dur  = (node.data as any).duration ?? 1;
+        const unit = (node.data as any).unit ?? "hours";
+        s = addLog(s, { kind: "action", text: `⏱ Delay ${dur} ${unit} (simulated — skipped)` });
+        const next = firstTarget(nodeId);
+        if (!next) return addLog({ ...s, done: true }, { kind: "info", text: "⏹ No output connected." });
+        return processNode(s, next);
+      }
+
       default:
         return addLog({ ...s, done: true }, { kind: "error", text: `Unknown node type: ${node.type}` });
     }
@@ -233,6 +278,12 @@ export default function FlowSimulator({ nodes, edges, hotelCtx, onClose }: Props
 
   return (
     <div className="flex w-72 shrink-0 flex-col rounded-xl border border-gray-200 bg-white shadow-sm overflow-hidden">
+      {/* Draft notice */}
+      {showDraftLabel && (
+        <div className="shrink-0 bg-amber-50 border-b border-amber-100 px-3 py-1.5 text-center text-[10px] font-medium text-amber-700">
+          Previewing draft (not yet published)
+        </div>
+      )}
       {/* Header */}
       <div className="flex items-center justify-between gap-2 px-3 py-2 border-b border-gray-100 bg-gray-50 shrink-0">
         <p className="text-xs font-bold text-gray-700">🧪 Flow Simulator</p>
@@ -372,5 +423,13 @@ export default function FlowSimulator({ nodes, edges, hotelCtx, onClose }: Props
         </div>
       )}
     </div>
+  );
+}
+
+export default function FlowSimulator(props: Props) {
+  return (
+    <SimulatorErrorBoundary>
+      <FlowSimulatorPanel {...props} />
+    </SimulatorErrorBoundary>
   );
 }

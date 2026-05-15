@@ -36,7 +36,8 @@ export type NodeType =
   | "jump"
   | "show_menu"
   | "send_template"
-  | "send_saved_reply";
+  | "send_saved_reply"
+  | "delay";
 
 // ── Node data interfaces ──────────────────────────────────────────────────────
 
@@ -201,6 +202,14 @@ export interface HotelContext {
   bookingEnabled: boolean;
 }
 
+/** Pauses flow execution for a configurable duration, then resumes automatically. */
+export interface DelayNodeData {
+  duration:       number;
+  unit:           "minutes" | "hours" | "days";
+  resumeMessage?: string;
+  [key: string]:  unknown;
+}
+
 export type FlowNodeData =
   | StartNodeData
   | MessageNodeData
@@ -210,7 +219,8 @@ export type FlowNodeData =
   | ShowRoomsNodeData
   | ActionNodeData
   | EndNodeData
-  | SendTemplateNodeData;
+  | SendTemplateNodeData
+  | DelayNodeData;
 
 // ── React Flow typed node/edge ─────────────────────────────────────────────────
 

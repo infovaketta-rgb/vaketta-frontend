@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { useMounted } from "@/lib/useMounted";
+import DOMPurify from "isomorphic-dompurify";
 
 const API_BASE = process.env.NEXT_PUBLIC_API_BASE ?? "";
 
@@ -131,7 +132,7 @@ function PrivacyModal({ onClose }: { onClose: () => void }) {
           ) : (
             <div
               className="privacy-modal-body"
-              dangerouslySetInnerHTML={{ __html: policy.content }}
+              dangerouslySetInnerHTML={{ __html: DOMPurify.sanitize(policy.content) }}
             />
           )}
         </div>

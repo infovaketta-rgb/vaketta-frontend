@@ -734,7 +734,7 @@ return () => {
   socket.off("message:undo", onUndo);
   socket.off("message:media_ready", onMediaReady);
 };
-  }, [mounted]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [mounted, guestId]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Close attachment menu on outside click
   useEffect(() => {

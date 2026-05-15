@@ -34,11 +34,13 @@ import JumpNode              from "../nodes/JumpNode";
 import ShowMenuNode          from "../nodes/ShowMenuNode";
 import SendTemplateNode      from "../nodes/SendTemplateNode";
 import SendSavedReplyNode   from "../nodes/SendSavedReplyNode";
+import DelayNode            from "../nodes/DelayNode";
 import DeletableEdge         from "../DeletableEdge";
 import NodePalette, { SYSTEM_VARS } from "../NodePalette";
 import CanvasToolbar         from "../CanvasToolbar";
 import NodeInspectorPanel    from "../NodeInspectorPanel";
 import FlowSimulator         from "../FlowSimulator";
+import FlowVersionHistory    from "../FlowVersionHistory";
 import ErrorBoundary         from "@/components/ErrorBoundary";
 
 // ── Initial node defaults ─────────────────────────────────────────────────────
@@ -58,6 +60,7 @@ function defaultData(type: string): Record<string, unknown> {
     case "show_menu":          return { label: "" };
     case "send_template":      return { templateId: "", templateName: "", variableMapping: {}, failureMessage: "" };
     case "send_saved_reply":   return { savedReplyId: null, savedReplyName: "", variableOverrides: {} };
+    case "delay":              return { duration: 24, unit: "hours", resumeMessage: "" };
     default:                   return {};
   }
 }
@@ -75,11 +78,15 @@ export default function FlowCanvasPage() {
   const [flowName,          setFlowName]          = useState("");
   const [loading,           setLoading]           = useState(true);
   const [saving,            setSaving]            = useState(false);
+  const [publishing,        setPublishing]        = useState(false);
   const [error,             setError]             = useState("");
   const [hotelCtx,          setHotelCtx]          = useState<HotelContext | null>(null);
   const [approvedTemplates, setApprovedTemplates] = useState<ApprovedTemplate[]>([]);
   const [savedReplies,      setSavedReplies]      = useState<{ id: string; name: string; category: string | null; variables: string[] }[]>([]);
-  const [showSimulator,     setShowSimulator]      = useState(false);
+  const [showSimulator,     setShowSimulator]     = useState(false);
+  const [showHistory,       setShowHistory]       = useState(false);
+  const [unsaved,           setUnsaved]           = useState(false);
+  const [hasDraft,          setHasDraft]          = useState(false);
 
   const [nodes, setNodes, onNodesChange] = useNodesState<FlowNode>([]);
   const [edges, setEdges, onEdgesChange] = useEdgesState<FlowEdge>([]);
@@ -87,6 +94,17 @@ export default function FlowCanvasPage() {
 
   const reactFlowWrapper = useRef<HTMLDivElement>(null);
   const rfInstance       = useRef<ReactFlowInstance<FlowNode, FlowEdge> | null>(null);
+
+  // Refs used by the auto-save closure to avoid stale captures
+  const nodesRef    = useRef(nodes);
+  const edgesRef    = useRef(edges);
+  const flowNameRef = useRef(flowName);
+  useEffect(() => { nodesRef.current = nodes; },    [nodes]);
+  useEffect(() => { edgesRef.current = edges; },    [edges]);
+  useEffect(() => { flowNameRef.current = flowName; }, [flowName]);
+
+  const initialLoadDone = useRef(false);
+  const autoSaveTimer   = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   // ── Fetch flow + hotel context ────────────────────────────────────────────
   useEffect(() => {
@@ -98,11 +116,12 @@ export default function FlowCanvasPage() {
       apiFetch("/hotel-templates?status=APPROVED").catch(() => []),
       apiFetch("/saved-replies").catch(() => []),
     ])
-      .then(([data, settings, rooms, tpls, savedRepliesData]: [FlowDefinition, any, any[], any[], any[]]) => {
+      .then(([data, settings, rooms, tpls, savedRepliesData]: [FlowDefinition & { draftVersionId?: string | null }, any, any[], any[], any[]]) => {
         setFlow(data);
         setFlowName(data.name);
         setNodes((data.nodes as FlowNode[]) ?? []);
         setEdges((data.edges as FlowEdge[]) ?? []);
+        setHasDraft(!!data.draftVersionId);
         setHotelCtx({
           hotelId:        settings.id,
           hotelName:      settings.name,
@@ -120,10 +139,33 @@ export default function FlowCanvasPage() {
             components:    t.components,
           }))
         );
+        initialLoadDone.current = true;
       })
       .catch((e: any) => setError(e.message))
       .finally(() => setLoading(false));
   }, [mounted, flowId]);
+
+  // ── Auto-save on canvas change (2 s debounce, silent) ────────────────────
+  useEffect(() => {
+    if (!initialLoadDone.current) return;
+    setUnsaved(true);
+    if (autoSaveTimer.current) clearTimeout(autoSaveTimer.current);
+    autoSaveTimer.current = setTimeout(async () => {
+      try {
+        await apiFetch(`/hotel-settings/flows/${flowId}/draft`, {
+          method: "POST",
+          body: JSON.stringify({
+            name:  flowNameRef.current,
+            nodes: nodesRef.current,
+            edges: edgesRef.current,
+          }),
+        });
+        setUnsaved(false);
+        setHasDraft(true);
+      } catch { /* silent — user can manually save */ }
+    }, 2000);
+    return () => { if (autoSaveTimer.current) clearTimeout(autoSaveTimer.current); };
+  }, [nodes, edges, flowId]);
 
   const readOnly = flow?.isTemplate ?? false;
 
@@ -142,6 +184,7 @@ export default function FlowCanvasPage() {
     show_menu:          ShowMenuNode as any,
     send_template:      SendTemplateNode as any,
     send_saved_reply:   SendSavedReplyNode as any,
+    delay:              DelayNode as any,
   }), []);
 
   // ── Edge types — DeletableEdge wraps default edge with a delete button ────
@@ -207,20 +250,50 @@ export default function FlowCanvasPage() {
     }));
   }
 
-  // ── Save ──────────────────────────────────────────────────────────────────
-  async function handleSave() {
+  // ── Save Draft ────────────────────────────────────────────────────────────
+  async function handleSaveDraft() {
+    if (autoSaveTimer.current) clearTimeout(autoSaveTimer.current);
     setSaving(true);
     setError("");
     try {
-      await apiFetch(`/hotel-settings/flows/${flowId}`, {
-        method: "PATCH",
+      await apiFetch(`/hotel-settings/flows/${flowId}/draft`, {
+        method: "POST",
         body: JSON.stringify({ name: flowName, nodes, edges }),
       });
+      setUnsaved(false);
+      setHasDraft(true);
     } catch (e: any) {
       setError(e.message);
     } finally {
       setSaving(false);
     }
+  }
+
+  // ── Publish ───────────────────────────────────────────────────────────────
+  async function handlePublish() {
+    setPublishing(true);
+    setError("");
+    try {
+      await apiFetch(`/hotel-settings/flows/${flowId}/publish`, { method: "POST" });
+      setHasDraft(false);
+      setUnsaved(false);
+    } catch (e: any) {
+      setError(e.message);
+    } finally {
+      setPublishing(false);
+    }
+  }
+
+  // ── After rollback: reload canvas from server ─────────────────────────────
+  async function handleRollback() {
+    try {
+      const data = await apiFetch(`/hotel-settings/flows/${flowId}`);
+      setNodes((data.nodes as FlowNode[]) ?? []);
+      setEdges((data.edges as FlowEdge[]) ?? []);
+      setHasDraft(true);
+      setUnsaved(false);
+    } catch { /* ignore */ }
+    setShowHistory(false);
   }
 
   // ── Fit view ──────────────────────────────────────────────────────────────
@@ -241,7 +314,7 @@ export default function FlowCanvasPage() {
       }
       if (e.key === "s" && (e.ctrlKey || e.metaKey)) {
         e.preventDefault();
-        handleSave();
+        handleSaveDraft();
         return;
       }
       if (e.key === "Escape") {
@@ -289,6 +362,37 @@ export default function FlowCanvasPage() {
       ? ["availabilityResult", "availabilityCount"] : []),
   ]));
 
+  const rightPanel = showSimulator
+    ? (
+      <FlowSimulator
+        nodes={nodes}
+        edges={edges}
+        hotelCtx={hotelCtx}
+        showDraftLabel={unsaved || hasDraft}
+        onClose={() => setShowSimulator(false)}
+      />
+    )
+    : showHistory
+    ? (
+      <FlowVersionHistory
+        flowId={flowId}
+        onRollback={handleRollback}
+        onClose={() => setShowHistory(false)}
+      />
+    )
+    : (
+      <NodeInspectorPanel
+        node={selectedNode}
+        readOnly={readOnly}
+        hotelCtx={hotelCtx}
+        definedVars={definedVars}
+        approvedTemplates={approvedTemplates}
+        savedReplies={savedReplies}
+        onChange={updateNodeData}
+        onDelete={deleteNode}
+      />
+    );
+
   return (
     <ErrorBoundary>
     <div className="flex h-full flex-col overflow-hidden">
@@ -301,10 +405,16 @@ export default function FlowCanvasPage() {
         nodeCount={nodes.length}
         edgeCount={edges.length}
         showingTest={showSimulator}
-        onSave={handleSave}
+        showingHistory={showHistory}
+        unsaved={unsaved}
+        hasDraft={hasDraft}
+        publishing={publishing}
+        onSave={handleSaveDraft}
+        onPublish={handlePublish}
         onNameChange={setFlowName}
         onFitView={handleFitView}
-        onTest={() => setShowSimulator((v) => !v)}
+        onTest={() => { setShowSimulator((v) => !v); setShowHistory(false); }}
+        onHistory={() => { setShowHistory((v) => !v); setShowSimulator(false); }}
       />
 
       {readOnly && (
@@ -368,25 +478,7 @@ export default function FlowCanvasPage() {
           )}
         </div>
 
-        {showSimulator ? (
-          <FlowSimulator
-            nodes={nodes}
-            edges={edges}
-            hotelCtx={hotelCtx}
-            onClose={() => setShowSimulator(false)}
-          />
-        ) : (
-          <NodeInspectorPanel
-            node={selectedNode}
-            readOnly={readOnly}
-            hotelCtx={hotelCtx}
-            definedVars={definedVars}
-            approvedTemplates={approvedTemplates}
-            savedReplies={savedReplies}
-            onChange={updateNodeData}
-            onDelete={deleteNode}
-          />
-        )}
+        {rightPanel}
       </div>
     </div>
     </ErrorBoundary>

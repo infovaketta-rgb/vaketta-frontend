@@ -2,10 +2,9 @@
 
 import { useEffect, useRef, useState } from "react";
 import { usePathname, useRouter } from "next/navigation";
-import { getHotelName, getUserName, getUserRole } from "@/lib/auth";
-import { useChatStore } from "@/store/chatStore";
+import { getHotelName, getUserName, getUserRole, logout } from "@/lib/auth";
 import { apiFetch } from "@/lib/api";
-import { getSocket, resetSocket } from "@/lib/socket";
+import { getSocket } from "@/lib/socket";
 import { useMounted } from "@/lib/useMounted";
 import { saveLocale } from "@/lib/locale";
 
@@ -133,10 +132,8 @@ export default function TopBar({ onMenuClick }: { onMenuClick?: () => void }) {
         { method: "POST", headers: { Authorization: `Bearer ${token}`, ...(process.env.NODE_ENV === "development" ? { "ngrok-skip-browser-warning": "true" } : {}) } }
       ).catch(() => {});
     }
-    resetSocket();
-    useChatStore.getState().resetStore();
-    localStorage.clear();
-    router.push("/login");
+    // 1. Clear credentials + socket. 2. Navigate. 3. Reset Zustand (deferred).
+    logout(() => router.push("/login"));
   }
 
   const pageTitle = PAGE_TITLES[pathname] ?? "Dashboard";

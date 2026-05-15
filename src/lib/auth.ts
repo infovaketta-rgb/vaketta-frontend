@@ -9,9 +9,16 @@ export function getToken() {
   return localStorage.getItem("TOKEN");
 }
 
-export function logout() {
+/**
+ * Clear auth credentials and optionally navigate before resetting the Zustand
+ * store. Passing `navigate` defers the store reset to the next microtask so
+ * React effects on the outgoing page don't re-subscribe with empty auth state
+ * before routing completes. Without `navigate` (e.g. on a hard 401 redirect)
+ * the store is reset synchronously — the subsequent full-page reload discards
+ * it anyway.
+ */
+export function logout(navigate?: () => void) {
   resetSocket();
-  useChatStore.getState().resetStore();
   localStorage.removeItem("TOKEN");
   localStorage.removeItem("USER_ROLE");
   localStorage.removeItem("HOTEL_ID");
@@ -19,6 +26,14 @@ export function logout() {
   localStorage.removeItem("HOTEL_NAME");
   localStorage.removeItem("USER_NAME");
   localStorage.removeItem("USER_EMAIL");
+  if (navigate) {
+    navigate();
+    // Defer Zustand reset so the router can commit the navigation before
+    // components re-render with empty store state.
+    setTimeout(() => useChatStore.getState().resetStore(), 0);
+  } else {
+    useChatStore.getState().resetStore();
+  }
 }
 
 export function getUserRole() {

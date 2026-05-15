@@ -8,7 +8,9 @@
       "Bash(npx ts-node:*)",
       "Bash(npx tsc:*)",
       "Bash(npm run:*)",
-      "Bash(npx next:*)"
+      "Bash(npx next:*)",
+      "Bash(cd /c/Users/myoos/hotel-automation22122025 && grep -r \"BullMQ\\\\|bullmq\\\\|Queue\\\\|Worker\" --include=\"*.ts\" src/ | grep -E \"\\(import|from\\)\" | sort -u | head -30)",
+      "Read(//c/c/Users/myoos/hotel-automation22122025/**)"
     ]
   }
 }

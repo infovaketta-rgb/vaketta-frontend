@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
+import DOMPurify from "isomorphic-dompurify";
 
 const API_BASE = process.env.NEXT_PUBLIC_API_BASE ?? "";
 
@@ -58,7 +59,7 @@ export default function DataDeletionPage() {
               To request deletion, email <a href="mailto:infovaketta@gmail.com" className="text-[#1B52A8] underline">infovaketta@gmail.com</a> with the subject line <strong>"Data Deletion Request"</strong>. We will respond within 30 days.
             </div>
 
-            <div className="privacy-body px-10 py-8" dangerouslySetInnerHTML={{ __html: doc.content }} />
+            <div className="privacy-body px-10 py-8" dangerouslySetInnerHTML={{ __html: DOMPurify.sanitize(doc.content) }} />
 
             <div className="border-t border-[#E5E0D4] bg-[#F4F2ED] px-10 py-5 text-center text-xs text-[#0C1B33]/40">
               © {new Date().getFullYear()} Vaketta. All rights reserved.

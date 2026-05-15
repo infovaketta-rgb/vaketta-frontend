@@ -13,6 +13,7 @@ import type {
   ApprovedTemplate,
   SendTemplateNodeData,
   SendSavedReplyNodeData,
+  DelayNodeData,
 } from "./types";
 import { SYSTEM_VARS } from "./NodePalette";
 
@@ -1175,6 +1176,79 @@ export default function NodeInspectorPanel({
                 The reply body is sent as a plain text message. All <code className="bg-white px-0.5 rounded text-purple-600">{"{{variable}}"}</code> placeholders are resolved from flow variables. Use overrides above to supply fixed values or remap to a different variable.
               </p>
             </SectionBox>
+          </>
+        );
+      })()}
+
+      {/* ══════════════════════════════════════════════════════════════════════ */}
+      {/* delay                                                                 */}
+      {/* ══════════════════════════════════════════════════════════════════════ */}
+      {node.type === "delay" && (() => {
+        const d = node.data as DelayNodeData;
+        const duration = typeof d.duration === "number" ? d.duration : 1;
+        const unit     = (d.unit as string) || "hours";
+        const durErr   = duration < 1 ? "Duration must be at least 1." : "";
+        const unitErr  = !["minutes","hours","days"].includes(unit) ? "Invalid unit." : "";
+
+        return (
+          <>
+            <SectionBox title="Pause settings" color="blue">
+              <p className="text-[10px] text-blue-600 leading-relaxed">
+                Pauses this flow for the configured time, then automatically resumes from the next node. The guest can still send messages during the pause — they will receive the normal menu.
+              </p>
+            </SectionBox>
+
+            <div className="flex gap-2">
+              <div className="flex-1">
+                <Label>Duration *</Label>
+                <input
+                  disabled={readOnly}
+                  type="number"
+                  min={1}
+                  max={30}
+                  className={`${inp}${durErr ? " border-red-400 ring-1 ring-red-300" : ""}`}
+                  value={duration}
+                  onChange={(e) => {
+                    const v = parseInt(e.target.value, 10);
+                    set({ duration: isNaN(v) ? 1 : Math.max(1, v) });
+                  }}
+                />
+                {durErr && <p className="mt-0.5 text-[10px] text-red-500">{durErr}</p>}
+              </div>
+
+              <div className="w-28">
+                <Label>Unit *</Label>
+                <select
+                  disabled={readOnly}
+                  value={unit}
+                  onChange={(e) => set({ unit: e.target.value })}
+                  className={`w-full rounded-lg border border-gray-200 px-2.5 py-1.5 text-xs text-gray-800 focus:outline-none focus:ring-2 focus:ring-[#7A3F91] disabled:bg-gray-50${unitErr ? " border-red-400" : ""}`}
+                >
+                  <option value="minutes">Minutes</option>
+                  <option value="hours">Hours</option>
+                  <option value="days">Days</option>
+                </select>
+                {unitErr && <p className="mt-0.5 text-[10px] text-red-500">{unitErr}</p>}
+              </div>
+            </div>
+
+            <div>
+              <Label>Message on pause (optional)</Label>
+              <textarea
+                disabled={readOnly}
+                rows={3}
+                className={`${inp} resize-none`}
+                value={d.resumeMessage ?? ""}
+                onBlur={trackSel}
+                onSelect={(e) => trackSelOnChange(e.currentTarget)}
+                onChange={(e) => set({ resumeMessage: e.target.value })}
+                placeholder="Leave blank for a silent pause, or e.g.: ✅ Got it! We'll follow up in {{duration}} hours." />
+              <p className="mt-0.5 text-[10px] text-gray-400">
+                Sent to the guest when the pause starts. Leave blank to pause silently.
+              </p>
+            </div>
+            <VarChipRow vars={definedVars} readOnly={readOnly}
+              onInsert={(v) => insertVar(v, (token) => set({ resumeMessage: (d.resumeMessage ?? "") + token }))} />
           </>
         );
       })()}

@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
+import DOMPurify from "isomorphic-dompurify";
 
 const API_BASE = process.env.NEXT_PUBLIC_API_BASE ?? "";
 
@@ -77,7 +78,7 @@ export default function PrivacyPolicyPage() {
             {/* Policy body */}
             <div
               className="privacy-body px-10 py-8"
-              dangerouslySetInnerHTML={{ __html: policy.content }}
+              dangerouslySetInnerHTML={{ __html: DOMPurify.sanitize(policy.content) }}
             />
 
             {/* Footer */}
