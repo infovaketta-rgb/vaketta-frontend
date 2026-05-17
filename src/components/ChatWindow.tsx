@@ -1280,6 +1280,23 @@ return () => {
               {group.messages.map((m) => {
                 const isOut = m.direction === "OUT";
                 const isFirstUnread = m.id === firstUnreadId;
+                if (!isOut && /^(room_|photos_)[a-zA-Z0-9-]+$/.test(m.body ?? "")) return null;
+
+                // For template messages loaded from DB (no in-memory .template field),
+                // parse the JSON body to extract display components.
+                let tplMeta: TemplateBubbleMeta | null = m.template ?? null;
+                let tplBody = m.body ?? "";
+                if (!tplMeta && m.messageType === "template" && m.body) {
+                  try {
+                    const parsed = JSON.parse(m.body) as {
+                      renderedBody?: string;
+                      components?:   TemplateBubbleMeta;
+                    };
+                    tplBody = parsed.renderedBody ?? m.body;
+                    tplMeta = parsed.components   ?? null;
+                  } catch { /* plain-text body — wa-bubble-text fallback */ }
+                }
+
                 return (
                   <div key={m.id}>
                     {isFirstUnread && (
@@ -1318,7 +1335,7 @@ return () => {
                       ) : (
                       <div
                         className={`wa-bubble max-w-[65%] ${isOut ? "wa-bubble-out" : "wa-bubble-in"} ${
-                          m.template ? "wa-template-card" : ""
+                          tplMeta ? "wa-template-card" : ""
                         }`}
                       >
                         {m.deleted ? (
@@ -1331,10 +1348,10 @@ return () => {
                               Message deleted by {m.deletedBy ?? "Staff"}
                             </span>
                           </div>
-                        ) : m.template ? (
+                        ) : tplMeta ? (
                           <TemplateCard
-                            template={m.template}
-                            renderedBody={m.body ?? ""}
+                            template={tplMeta}
+                            renderedBody={tplBody}
                             isOut={isOut}
                             onImageClick={setLightboxSrc}
                           />

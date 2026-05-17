@@ -96,12 +96,19 @@ export const useChatStore = create<ChatState>((set) => ({
     // can copy over frontend-only metadata (e.g. template bubble structure)
     // before dropping it.
     const tmpMatch = !message.id.startsWith("tmp_")
-      ? state.messages.find(
-          (m) =>
-            m.id.startsWith("tmp_") &&
-            m.body === message.body &&
-            m.direction === message.direction
-        )
+      ? state.messages.find((m) => {
+          if (!m.id.startsWith("tmp_") || m.direction !== message.direction) return false;
+          if (m.body === message.body) return true;
+          // Template messages: real body is JSON {renderedBody, components},
+          // but the optimistic tmp stores plain renderedBody.
+          if (message.messageType === "template" && message.body) {
+            try {
+              const { renderedBody } = JSON.parse(message.body) as { renderedBody?: string };
+              return renderedBody === m.body;
+            } catch { return false; }
+          }
+          return false;
+        })
       : null;
 
     const enriched: Message = tmpMatch?.template
