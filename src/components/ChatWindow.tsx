@@ -1310,8 +1310,8 @@ return () => {
                       {m.messageType === "carousel" ? (
                         <div className="max-w-[85%] flex flex-col gap-1">
                           <RoomCarouselCards content={m.body ?? ""} />
-                          <div className="flex justify-end items-center gap-1 px-1 text-gray-500">
-                            <span className="text-[10px]">{formatMsgTime(m.timestamp)}</span>
+                          <div className="flex justify-end items-center gap-1 px-1">
+                            <span className="text-xs text-gray-400">{formatMsgTime(m.timestamp)}</span>
                             {isOut && !m.deleted && <StatusTicks status={m.status} />}
                           </div>
                         </div>

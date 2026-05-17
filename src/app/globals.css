@@ -90,12 +90,13 @@ body {
   pointer-events: none;
 }
 
-.wa-bubble-meta .wa-tick {
+.wa-tick {
   width: 16px;
   height: 11px;
+  flex-shrink: 0;
 }
-.wa-bubble-meta .wa-tick-read { color: #53bdeb; }
-.wa-bubble-meta .wa-tick-sent { color: rgba(0, 0, 0, 0.45); }
+.wa-tick-read { color: #53bdeb; }
+.wa-tick-sent { color: rgba(0, 0, 0, 0.45); }
 
 /* Template card variant — wider, hosts media + body + footer + buttons. */
 .wa-template-card {
