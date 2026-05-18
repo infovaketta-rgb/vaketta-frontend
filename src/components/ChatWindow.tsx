@@ -209,6 +209,29 @@ function DocIcon({ fileName, mimeType }: { fileName: string | null; mimeType: st
   );
 }
 
+// ── List message bubble ────────────────────────────────────────────────────────
+
+function ListMessageBubble({ body }: { body: string }) {
+  let bodyText = body;
+  let buttonLabel = "View Options";
+  try {
+    const parsed = JSON.parse(body) as { bodyText?: string; buttonLabel?: string };
+    bodyText    = parsed.bodyText    ?? body;
+    buttonLabel = parsed.buttonLabel ?? "View Options";
+  } catch { /* body is plain text — render as-is */ }
+
+  return (
+    <div className="space-y-2 p-1">
+      <p className="text-sm whitespace-pre-wrap leading-relaxed">{bodyText}</p>
+      <div className="flex items-center justify-center rounded-lg border border-gray-200 bg-white/60 px-3 py-1.5 gap-1.5 text-xs text-gray-500 font-medium select-none">
+        <span>{buttonLabel}</span>
+        <span className="text-[10px]">▼</span>
+      </div>
+      <p className="text-[10px] text-gray-400 text-center">List message</p>
+    </div>
+  );
+}
+
 // ── Media bubble ──────────────────────────────────────────────────────────────
 
 function MediaBubble({ mediaUrl, mimeType, fileName, body, isOut, onImageClick }: {
@@ -1280,7 +1303,7 @@ return () => {
               {group.messages.map((m) => {
                 const isOut = m.direction === "OUT";
                 const isFirstUnread = m.id === firstUnreadId;
-                if (!isOut && /^(room_|photos_)[a-zA-Z0-9-]+$/.test(m.body ?? "")) return null;
+                if (!isOut && /^(room_|photos_|opt_)[a-zA-Z0-9_-]+$/.test(m.body ?? "")) return null;
 
                 // For template messages loaded from DB (no in-memory .template field),
                 // parse the JSON body to extract display components.
@@ -1329,6 +1352,14 @@ return () => {
                           <RoomCarouselCards content={m.body ?? ""} />
                           <div className="flex justify-end items-center gap-1 px-1">
                             <span className="text-xs text-gray-400">{formatMsgTime(m.timestamp)}</span>
+                            {isOut && !m.deleted && <StatusTicks status={m.status} />}
+                          </div>
+                        </div>
+                      ) : m.messageType === "list" ? (
+                        <div className={`wa-bubble max-w-[65%] ${isOut ? "wa-bubble-out" : "wa-bubble-in"}`}>
+                          <ListMessageBubble body={m.body ?? ""} />
+                          <div className="wa-bubble-meta">
+                            <span>{formatMsgTime(m.timestamp)}</span>
                             {isOut && !m.deleted && <StatusTicks status={m.status} />}
                           </div>
                         </div>

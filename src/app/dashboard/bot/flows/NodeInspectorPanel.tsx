@@ -14,6 +14,8 @@ import type {
   SendTemplateNodeData,
   SendSavedReplyNodeData,
   DelayNodeData,
+  OptionsNodeData,
+  OptionsItem,
 } from "./types";
 import { SYSTEM_VARS } from "./NodePalette";
 
@@ -1249,6 +1251,146 @@ export default function NodeInspectorPanel({
             </div>
             <VarChipRow vars={definedVars} readOnly={readOnly}
               onInsert={(v) => insertVar(v, (token) => set({ resumeMessage: (d.resumeMessage ?? "") + token }))} />
+          </>
+        );
+      })()}
+
+      {/* ══════════════════════════════════════════════════════════════════════ */}
+      {/* options                                                               */}
+      {/* ══════════════════════════════════════════════════════════════════════ */}
+      {node.type === "options" && (() => {
+        const d    = node.data as OptionsNodeData;
+        const opts = (d.options ?? []) as OptionsItem[];
+
+        function setOpts(next: OptionsItem[]) { set({ options: next }); }
+
+        function addOpt() {
+          setOpts([...opts, { id: `opt-${Date.now()}`, label: "", value: "", description: "" }]);
+        }
+
+        function removeOpt(i: number) {
+          setOpts(opts.filter((_, j) => j !== i));
+        }
+
+        function patchOpt(i: number, patch: Partial<OptionsItem>) {
+          setOpts(opts.map((o, j) => j === i ? { ...o, ...patch } : o));
+        }
+
+        return (
+          <>
+            {/* Prompt */}
+            <div>
+              <Label>Prompt text</Label>
+              <textarea disabled={readOnly} rows={3} className={`${inp} resize-none`}
+                value={d.text ?? ""}
+                onBlur={trackSel}
+                onSelect={(e) => trackSelOnChange(e.currentTarget)}
+                onChange={(e) => set({ text: e.target.value })}
+                placeholder="Please choose one of the following options:" />
+            </div>
+            <VarChipRow vars={definedVars} readOnly={readOnly}
+              onInsert={(v) => insertVar(v, (token) => set({ text: (d.text ?? "") + token }))} />
+
+            {/* Variable name */}
+            <div>
+              <Label>Store selection as</Label>
+              <input disabled={readOnly} className={inp} value={d.variableName ?? ""}
+                list={varListId} onChange={(e) => set({ variableName: e.target.value })}
+                placeholder="selectedOption" />
+              <p className="mt-0.5 text-[10px] text-gray-400">
+                The selected option's value (or label if no value set) is stored in this variable.
+              </p>
+            </div>
+
+            {/* Options list */}
+            <div className="space-y-2">
+              <Label>Options ({opts.length})</Label>
+              {opts.map((opt, i) => (
+                <div key={opt.id ?? i} className="rounded-lg border border-green-200 bg-green-50 p-2 space-y-1.5">
+                  <div className="flex items-center justify-between">
+                    <span className="text-[10px] font-bold text-green-600">Option {i + 1}</span>
+                    {!readOnly && (
+                      <button onClick={() => removeOpt(i)} className="text-red-400 text-xs">✕</button>
+                    )}
+                  </div>
+                  <div>
+                    <label className="block text-[9px] text-green-700 mb-0.5">Label (shown to guest, max 24 chars) *</label>
+                    <input disabled={readOnly} className={inp} value={opt.label ?? ""}
+                      onChange={(e) => patchOpt(i, { label: e.target.value })}
+                      placeholder="e.g. Room Booking" maxLength={24} />
+                  </div>
+                  <div>
+                    <label className="block text-[9px] text-green-700 mb-0.5">Value (stored in variable; defaults to label)</label>
+                    <input disabled={readOnly} className={inp} value={opt.value ?? ""}
+                      onChange={(e) => patchOpt(i, { value: e.target.value })}
+                      placeholder="e.g. room_booking" />
+                  </div>
+                  {d.useListMessage && (
+                    <div>
+                      <label className="block text-[9px] text-green-700 mb-0.5">Description (max 72 chars, optional)</label>
+                      <input disabled={readOnly} className={inp} value={opt.description ?? ""}
+                        onChange={(e) => patchOpt(i, { description: e.target.value })}
+                        placeholder="Short description shown in the list picker" maxLength={72} />
+                    </div>
+                  )}
+                </div>
+              ))}
+              {!readOnly && (
+                <button
+                  onClick={addOpt}
+                  className="w-full rounded-lg border border-dashed border-green-300 py-1.5 text-xs text-green-600 transition hover:bg-green-50"
+                >
+                  + Add option
+                </button>
+              )}
+            </div>
+
+            {/* Validation error */}
+            <div>
+              <Label>Validation error message</Label>
+              <input disabled={readOnly} className={inp} value={d.validationError ?? ""}
+                onChange={(e) => set({ validationError: e.target.value })}
+                placeholder={`Please reply with a number between 1 and ${opts.length || "N"}.`} />
+            </div>
+
+            {/* WhatsApp list message toggle */}
+            <SectionBox title="WhatsApp List Message" color="green">
+              <label className="flex items-center gap-2 cursor-pointer">
+                <input
+                  type="checkbox"
+                  disabled={readOnly}
+                  checked={!!d.useListMessage}
+                  onChange={(e) => set({ useListMessage: e.target.checked })}
+                  className="rounded border-gray-300 text-green-600 focus:ring-green-500"
+                />
+                <span className="text-xs font-medium text-gray-700">Use WhatsApp List Message</span>
+              </label>
+              <p className="text-[10px] text-green-600">
+                Sends a tap-to-open sheet instead of numbered text. Falls back to numbered text if credentials are missing.
+              </p>
+              {d.useListMessage && (
+                <>
+                  <div>
+                    <Label>Button label (max 20 chars)</Label>
+                    <input disabled={readOnly} className={inp} value={d.listButtonLabel ?? ""}
+                      onChange={(e) => set({ listButtonLabel: e.target.value })}
+                      placeholder="View Options" maxLength={20} />
+                  </div>
+                  <div>
+                    <Label>Section title (max 24 chars)</Label>
+                    <input disabled={readOnly} className={inp} value={d.sectionTitle ?? ""}
+                      onChange={(e) => set({ sectionTitle: e.target.value })}
+                      placeholder="Options" maxLength={24} />
+                  </div>
+                </>
+              )}
+            </SectionBox>
+
+            <p className="text-[10px] text-green-600">
+              Stores the selected value in{" "}
+              <code className="bg-green-50 px-0.5 rounded text-purple-600">{`{{${d.variableName || "selectedOption"}}}`}</code>.
+              Use a <strong>Branch</strong> node to route on this value.
+            </p>
           </>
         );
       })()}

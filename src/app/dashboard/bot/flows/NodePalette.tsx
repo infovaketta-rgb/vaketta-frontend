@@ -24,6 +24,7 @@ const CATEGORIES: { title: string; items: PaletteItem[] }[] = [
     items: [
       { type: "message",  label: "Message",   icon: "💬", desc: "Send text to guest",           color: "bg-gray-50   border-gray-300   text-gray-700   hover:bg-gray-100"   },
       { type: "question", label: "Question",  icon: "❓", desc: "Ask & collect an answer",      color: "bg-blue-50   border-blue-300   text-blue-700   hover:bg-blue-100"   },
+      { type: "options",  label: "Options",   icon: "☰", desc: "Multiple choice list or WA list", color: "bg-green-50  border-green-300  text-green-700  hover:bg-green-100"  },
       { type: "branch",   label: "Branch",    icon: "🔀", desc: "Route by variable or value",   color: "bg-yellow-50 border-yellow-300 text-yellow-700 hover:bg-yellow-100" },
       { type: "jump",     label: "Jump",      icon: "↩", desc: "Jump to any node in this flow", color: "bg-violet-50 border-violet-300 text-violet-700 hover:bg-violet-100" },
     ],

@@ -37,7 +37,8 @@ export type NodeType =
   | "show_menu"
   | "send_template"
   | "send_saved_reply"
-  | "delay";
+  | "delay"
+  | "options";
 
 // ── Node data interfaces ──────────────────────────────────────────────────────
 
@@ -210,6 +211,25 @@ export interface DelayNodeData {
   [key: string]:  unknown;
 }
 
+export interface OptionsItem {
+  id?:          string;
+  label:        string;
+  value?:       string;
+  description?: string;
+}
+
+/** Presents a custom options list; optionally sends as a WhatsApp interactive list message. */
+export interface OptionsNodeData {
+  text:             string;
+  options:          OptionsItem[];
+  variableName:     string;
+  validationError?: string;
+  useListMessage?:  boolean;
+  listButtonLabel?: string;
+  sectionTitle?:    string;
+  [key: string]:    unknown;
+}
+
 export type FlowNodeData =
   | StartNodeData
   | MessageNodeData
@@ -220,7 +240,8 @@ export type FlowNodeData =
   | ActionNodeData
   | EndNodeData
   | SendTemplateNodeData
-  | DelayNodeData;
+  | DelayNodeData
+  | OptionsNodeData;
 
 // ── React Flow typed node/edge ─────────────────────────────────────────────────
 

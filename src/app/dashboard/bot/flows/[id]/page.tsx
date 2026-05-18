@@ -35,6 +35,7 @@ import ShowMenuNode          from "../nodes/ShowMenuNode";
 import SendTemplateNode      from "../nodes/SendTemplateNode";
 import SendSavedReplyNode   from "../nodes/SendSavedReplyNode";
 import DelayNode            from "../nodes/DelayNode";
+import OptionsNode           from "../nodes/OptionsNode";
 import DeletableEdge         from "../DeletableEdge";
 import NodePalette, { SYSTEM_VARS } from "../NodePalette";
 import CanvasToolbar         from "../CanvasToolbar";
@@ -61,6 +62,7 @@ function defaultData(type: string): Record<string, unknown> {
     case "send_template":      return { templateId: "", templateName: "", variableMapping: {}, failureMessage: "" };
     case "send_saved_reply":   return { savedReplyId: null, savedReplyName: "", variableOverrides: {} };
     case "delay":              return { duration: 24, unit: "hours", resumeMessage: "" };
+    case "options":            return { text: "", options: [], variableName: "selectedOption", validationError: "", useListMessage: false, listButtonLabel: "View Options", sectionTitle: "Options" };
     default:                   return {};
   }
 }
@@ -185,6 +187,7 @@ export default function FlowCanvasPage() {
     send_template:      SendTemplateNode as any,
     send_saved_reply:   SendSavedReplyNode as any,
     delay:              DelayNode as any,
+    options:            OptionsNode as any,
   }), []);
 
   // ── Edge types — DeletableEdge wraps default edge with a delete button ────
