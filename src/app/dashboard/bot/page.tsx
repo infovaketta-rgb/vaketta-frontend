@@ -1411,6 +1411,68 @@ export default function BotPage() {
               </div>
             </div>
 
+            {/* Main menu list message */}
+            <div className="rounded-2xl border border-gray-100 bg-white shadow-sm">
+              <div className="flex items-center justify-between border-b border-gray-50 px-6 py-4">
+                <div>
+                  <h2 className="text-sm font-semibold text-gray-900">Main Menu — WhatsApp List Message</h2>
+                  <p className="mt-0.5 text-xs text-gray-400">Display the main menu as an interactive tap-to-open list instead of plain numbered text.</p>
+                </div>
+                <SaveBtn saving={savingMsgs} saved={savedMsgs} onSave={saveBotMessages} />
+              </div>
+              <div className="px-6 py-5 space-y-4">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="text-sm font-medium text-gray-700">Enable List Message</p>
+                    <p className="text-xs text-gray-400">Guests tap a button to open a scrollable list of menu options.</p>
+                  </div>
+                  <Toggle
+                    enabled={botMsgs.menuUseListMessage === "true"}
+                    onChange={(v) => setBotMsgs((m) => ({ ...m, menuUseListMessage: v ? "true" : "false" }))}
+                  />
+                </div>
+                {botMsgs.menuUseListMessage === "true" && (
+                  <div className="rounded-xl border border-green-100 bg-green-50 p-4 space-y-3">
+                    <div>
+                      <label className="block text-xs font-medium text-gray-700 mb-1">
+                        Button Label <span className="text-gray-400 font-normal">(max 20 chars)</span>
+                      </label>
+                      <input
+                        type="text"
+                        maxLength={20}
+                        value={botMsgs.menuListButtonLabel ?? ""}
+                        onChange={(e) => setBotMsgs((m) => ({ ...m, menuListButtonLabel: e.target.value.slice(0, 20) }))}
+                        placeholder="View Menu"
+                        className={inp}
+                      />
+                      <p className="mt-1 text-[10px] text-gray-400">Text on the button guests tap to open the list. Default: "View Menu".</p>
+                    </div>
+                    <div>
+                      <label className="block text-xs font-medium text-gray-700 mb-1">
+                        Section Title <span className="text-gray-400 font-normal">(max 24 chars)</span>
+                      </label>
+                      <input
+                        type="text"
+                        maxLength={24}
+                        value={botMsgs.menuListSectionTitle ?? ""}
+                        onChange={(e) => setBotMsgs((m) => ({ ...m, menuListSectionTitle: e.target.value.slice(0, 24) }))}
+                        placeholder="How can we help you?"
+                        className={inp}
+                      />
+                      <p className="mt-1 text-[10px] text-gray-400">Heading shown at the top of the list picker. Defaults to your menu title.</p>
+                    </div>
+                    <div className="rounded-lg border border-green-200 bg-white px-3 py-2">
+                      <p className="text-[10px] text-green-700">
+                        <span className="font-semibold">Note:</span> Requires a configured WhatsApp Business number with Meta credentials.
+                        Falls back to plain text automatically if credentials are missing or the send fails.
+                        Only applies to the default menu — not active when a Main Menu Flow is selected above.
+                      </p>
+                    </div>
+                  </div>
+                )}
+              </div>
+            </div>
+
             {/* Bot message templates */}
             <div className="rounded-2xl border border-gray-100 bg-white shadow-sm">
               <div className="flex items-center justify-between border-b border-gray-50 px-6 py-4">
