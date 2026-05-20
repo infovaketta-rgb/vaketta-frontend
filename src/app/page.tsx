@@ -47,8 +47,8 @@ const GLOBAL_STYLES = `
   100% { transform: rotateY(360deg); }
 }
 @keyframes borderGlow {
-  0%,100% { box-shadow: 0 0 0 0 rgba(184,145,46,.0); }
-  50%      { box-shadow: 0 0 30px 4px rgba(184,145,46,.25); }
+  0%,100% { box-shadow: 0 0 0 0 rgba(139,92,246,.0); }
+  50%      { box-shadow: 0 0 30px 4px rgba(139,92,246,.25); }
 }
 .anim-float  { animation: float  6s ease-in-out infinite; }
 .anim-floatB { animation: floatB 8s ease-in-out infinite; }
@@ -106,7 +106,7 @@ function Nav() {
       <div className="mx-auto flex h-16 max-w-6xl items-center justify-between px-6">
         <Link href="/" className="flex items-center gap-2.5 group">
           <div className="relative">
-            <div className="absolute inset-0 rounded-lg bg-[#B8912E]/30 blur-md group-hover:blur-lg transition-all" />
+            <div className="absolute inset-0 rounded-lg bg-[#8B5CF6]/30 blur-md group-hover:blur-lg transition-all" />
             <img src="/vakettaVlogo.png" alt="Vaketta" className="relative h-8 w-8 object-contain" />
           </div>
           <span className="text-lg font-bold text-white">Vaketta</span>
@@ -116,14 +116,14 @@ function Nav() {
             <a key={item} href={`#${item.toLowerCase().replace(/ /g,"-")}`}
               className="text-sm font-medium text-white/60 transition hover:text-white relative group">
               {item}
-              <span className="absolute -bottom-0.5 left-0 h-px w-0 bg-[#B8912E] transition-all group-hover:w-full" />
+              <span className="absolute -bottom-0.5 left-0 h-px w-0 bg-[#8B5CF6] transition-all group-hover:w-full" />
             </a>
           ))}
         </nav>
         <div className="hidden items-center gap-3 md:flex">
           <Link href="/login" className="text-sm font-medium text-white/50 hover:text-white transition">Sign in</Link>
           <Link href="/get-started"
-            className="relative overflow-hidden rounded-lg bg-[#B8912E] px-4 py-2 text-sm font-semibold text-white shadow-lg shadow-[#B8912E]/30 transition hover:shadow-[#B8912E]/50 hover:scale-105 active:scale-95">
+            className="relative overflow-hidden rounded-lg bg-[#8B5CF6] px-4 py-2 text-sm font-semibold text-white shadow-lg shadow-[#8B5CF6]/30 transition hover:shadow-[#8B5CF6]/50 hover:scale-105 active:scale-95">
             <span className="absolute inset-0 -translate-x-full bg-white/20 skew-x-12 transition-transform hover:translate-x-full duration-700" />
             Get started
           </Link>
@@ -143,7 +143,7 @@ function Nav() {
             ))}
             <hr className="border-white/10" />
             <Link href="/login" className="text-sm font-medium text-white/60">Sign in</Link>
-            <Link href="/get-started" className="rounded-lg bg-[#B8912E] px-4 py-2.5 text-center text-sm font-bold text-white">Get started free</Link>
+            <Link href="/get-started" className="rounded-lg bg-[#8B5CF6] px-4 py-2.5 text-center text-sm font-bold text-white">Get started free</Link>
           </nav>
         </div>
       )}
@@ -173,7 +173,7 @@ function DashboardMockup() {
           {/* Stat row */}
           <div className="grid grid-cols-3 gap-2">
             {[
-              { label: "Messages today", val: "1,284", color: "text-[#B8912E]" },
+              { label: "Messages today", val: "1,284", color: "text-[#8B5CF6]" },
               { label: "Active bookings", val: "47", color: "text-emerald-400" },
               { label: "Revenue (MTD)", val: "₹2.4L", color: "text-[#7BA7FF]" },
             ].map((s) => (
@@ -189,7 +189,7 @@ function DashboardMockup() {
             <div className="flex items-end gap-1.5 h-14">
               {[40,65,50,80,60,90,75].map((h, i) => (
                 <div key={i} className="flex-1 rounded-t-sm transition-all"
-                  style={{ height: `${h}%`, background: `linear-gradient(to top, #B8912E, #e4b84a)`, opacity: .7 + i*.04 }} />
+                  style={{ height: `${h}%`, background: `linear-gradient(to top, #8B5CF6, #A78BFA)`, opacity: .7 + i*.04 }} />
               ))}
             </div>
           </div>
@@ -231,10 +231,10 @@ function DashboardMockup() {
       </div>
 
       {/* Floating AI badge */}
-      <div className="absolute -bottom-5 -left-6 anim-floatB rounded-xl border border-[#B8912E]/30 bg-[#B8912E]/15 backdrop-blur-md px-3 py-2 shadow-xl hidden sm:block">
+      <div className="absolute -bottom-5 -left-6 anim-floatB rounded-xl border border-[#8B5CF6]/30 bg-[#8B5CF6]/15 backdrop-blur-md px-3 py-2 shadow-xl hidden sm:block">
         <div className="flex items-center gap-1.5">
-          <span className="h-1.5 w-1.5 rounded-full bg-[#B8912E] animate-pulse" />
-          <p className="text-[10px] font-semibold text-[#B8912E]">AI replied · 0.3s</p>
+          <span className="h-1.5 w-1.5 rounded-full bg-[#8B5CF6] animate-pulse" />
+          <p className="text-[10px] font-semibold text-[#8B5CF6]">AI replied · 0.3s</p>
         </div>
       </div>
     </div>
@@ -258,7 +258,7 @@ export default function LandingPage() {
             <div className="absolute top-0 left-0 right-0 h-full"
               style={{ background: "radial-gradient(ellipse 80% 60% at 50% -10%, #1B52A8 0%, transparent 70%)" }} />
             <div className="absolute bottom-0 left-0 w-1/2 h-1/2"
-              style={{ background: "radial-gradient(ellipse 60% 50% at 20% 100%, #B8912E22 0%, transparent 70%)" }} />
+              style={{ background: "radial-gradient(ellipse 60% 50% at 20% 100%, #8B5CF622 0%, transparent 70%)" }} />
             <div className="absolute top-1/3 right-0 w-1/2 h-1/2"
               style={{ background: "radial-gradient(ellipse 50% 60% at 90% 40%, #1B52A830 0%, transparent 70%)" }} />
           </div>
@@ -270,22 +270,22 @@ export default function LandingPage() {
           {/* Floating orbs */}
           <div className="pointer-events-none absolute inset-0 overflow-hidden">
             <div className="anim-orb absolute top-1/4 left-1/3 h-80 w-80 rounded-full bg-[#1B52A8] blur-[100px]" />
-            <div className="anim-orb absolute top-2/3 right-1/4 h-64 w-64 rounded-full bg-[#B8912E] blur-[90px]" style={{ animationDelay: "2s" }} />
-            <div className="anim-orb absolute top-1/2 left-0 h-48 w-48 rounded-full bg-[#1B52A8] blur-[80px]" style={{ animationDelay: "1s" }} />
+            <div className="anim-orb absolute top-2/3 right-1/4 h-64 w-64 rounded-full bg-[#8B5CF6] blur-[90px]" style={{ animationDelay: "2s" }} />
+            <div className="anim-orb absolute top-1/2 left-0 h-48 w-48 rounded-full bg-[#7C3AED] blur-[80px]" style={{ animationDelay: "1s" }} />
           </div>
 
           <div className="relative mx-auto w-full max-w-6xl py-20">
             <div className="grid items-center gap-16 lg:grid-cols-2">
               {/* Left copy */}
               <div className="text-center lg:text-left">
-                <div className="anim-fadeUp inline-flex items-center gap-2 rounded-full border border-[#B8912E]/40 bg-[#B8912E]/10 px-4 py-1.5 mb-7">
-                  <span className="h-1.5 w-1.5 rounded-full bg-[#B8912E] animate-pulse" />
-                  <span className="text-xs font-semibold uppercase tracking-widest text-[#B8912E]">Now in early access</span>
+                <div className="anim-fadeUp inline-flex items-center gap-2 rounded-full border border-[#8B5CF6]/40 bg-[#8B5CF6]/10 px-4 py-1.5 mb-7">
+                  <span className="h-1.5 w-1.5 rounded-full bg-[#8B5CF6] animate-pulse" />
+                  <span className="text-xs font-semibold uppercase tracking-widest text-[#8B5CF6]">Now in early access</span>
                 </div>
 
                 <h1 className="anim-fadeUp text-5xl font-extrabold leading-[1.1] tracking-tight md:text-6xl lg:text-7xl"
                   style={{ animationDelay: ".1s",
-                    background: "linear-gradient(135deg,#fff 40%,#B8912E 100%)",
+                    background: "linear-gradient(135deg,#fff 40%,#8B5CF6 100%)",
                     backgroundSize: "200% 200%",
                     WebkitBackgroundClip: "text",
                     WebkitTextFillColor: "transparent",
@@ -301,7 +301,7 @@ export default function LandingPage() {
                 <div className="anim-fadeUp mt-9 flex flex-col sm:flex-row items-center gap-4 justify-center lg:justify-start"
                   style={{ animationDelay: ".35s" }}>
                   <Link href="/get-started"
-                    className="group relative inline-flex items-center gap-2 overflow-hidden rounded-xl bg-[#B8912E] px-8 py-4 text-sm font-bold text-white shadow-lg shadow-[#B8912E]/30 transition-all hover:scale-105 hover:shadow-[#B8912E]/50 active:scale-95">
+                    className="group relative inline-flex items-center gap-2 overflow-hidden rounded-xl bg-[#8B5CF6] px-8 py-4 text-sm font-bold text-white shadow-lg shadow-[#8B5CF6]/30 transition-all hover:scale-105 hover:shadow-[#8B5CF6]/50 active:scale-95">
                     <span className="absolute inset-0 bg-white/0 group-hover:bg-white/10 transition" />
                     Start for free
                     <svg className="h-4 w-4 transition-transform group-hover:translate-x-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -348,7 +348,7 @@ export default function LandingPage() {
               <div key={k} className="flex items-center gap-8 px-4">
                 {["WhatsApp Automation","AI-Powered Replies","Booking Management","Live Dashboard","Guest Communication","Revenue Analytics","Custom Flows","24/7 Operations"].map((t) => (
                   <span key={t} className="flex items-center gap-3 text-xs font-semibold uppercase tracking-widest text-white/30">
-                    <span className="h-1 w-1 rounded-full bg-[#B8912E]" />
+                    <span className="h-1 w-1 rounded-full bg-[#8B5CF6]" />
                     {t}
                   </span>
                 ))}
@@ -361,7 +361,7 @@ export default function LandingPage() {
         <section className="px-6 py-28 bg-[#070E1C]">
           <div className="mx-auto max-w-5xl">
             <div className="reveal mb-14 text-center">
-              <p className="mb-3 text-xs font-bold uppercase tracking-widest text-[#B8912E]">The problem</p>
+              <p className="mb-3 text-xs font-bold uppercase tracking-widest text-[#8B5CF6]">The problem</p>
               <h2 className="text-3xl font-bold md:text-4xl text-white">
                 Running a hotel is hard enough.<br />Your tools shouldn't make it harder.
               </h2>
@@ -389,7 +389,7 @@ export default function LandingPage() {
         <section className="px-6 py-28 bg-linear-to-b from-[#0a1628] to-[#070E1C]">
           <div className="mx-auto max-w-5xl">
             <div className="reveal mb-14 text-center">
-              <p className="mb-3 text-xs font-bold uppercase tracking-widest text-[#B8912E]">The solution</p>
+              <p className="mb-3 text-xs font-bold uppercase tracking-widest text-[#8B5CF6]">The solution</p>
               <h2 className="text-3xl font-bold md:text-4xl text-white">
                 One platform. Every operation.<br />Fully automated.
               </h2>
@@ -404,7 +404,7 @@ export default function LandingPage() {
                   grad: "from-emerald-500/15 to-transparent" },
                 { icon: "⚡", title: "Build workflows without code",
                   body: "Design multi-step conversation flows using a visual editor. No developers needed. Deploy in minutes, change any time.",
-                  grad: "from-[#B8912E]/15 to-transparent" },
+                  grad: "from-[#8B5CF6]/15 to-transparent" },
                 { icon: "📊", title: "See everything in real time",
                   body: "Live dashboards show conversations, bookings, revenue, and team activity. Make decisions with data that's always current.",
                   grad: "from-purple-500/15 to-transparent" },
@@ -428,7 +428,7 @@ export default function LandingPage() {
         <section id="product" className="px-6 py-28 bg-[#070E1C]">
           <div className="mx-auto max-w-5xl">
             <div className="reveal mb-14 text-center">
-              <p className="mb-3 text-xs font-bold uppercase tracking-widest text-[#B8912E]">Products</p>
+              <p className="mb-3 text-xs font-bold uppercase tracking-widest text-[#8B5CF6]">Products</p>
               <h2 className="text-3xl font-bold md:text-4xl text-white">
                 Start with what you need.<br />Expand when you're ready.
               </h2>
@@ -438,7 +438,7 @@ export default function LandingPage() {
                 { name: "Vaketta Chat", tag: "Communication", tagColor: "text-[#7BA7FF] bg-[#1B52A8]/20",
                   desc: "Automate guest conversations on WhatsApp. AI handles questions around the clock — your team steps in when it matters.",
                   features: ["WhatsApp & Instagram","AI-powered replies","Live handoff","Message history"], icon: "💬", featured: false },
-                { name: "Vaketta PMS", tag: "Property Management", tagColor: "text-[#B8912E] bg-[#B8912E]/15",
+                { name: "Vaketta PMS", tag: "Property Management", tagColor: "text-[#8B5CF6] bg-[#8B5CF6]/15",
                   desc: "A property management system built for hotels. Manage rooms, bookings, and guests from one clean dashboard.",
                   features: ["Booking management","Room availability","Guest records","Revenue analytics"], icon: "🏨", featured: true },
                 { name: "Vaketta Flow", tag: "Workflow Builder", tagColor: "text-emerald-400 bg-emerald-400/15",
@@ -446,11 +446,11 @@ export default function LandingPage() {
                   features: ["Visual flow editor","Conditional logic","Form collection","Action triggers"], icon: "🔀", featured: false },
               ].map((p, i) => (
                 <div key={p.name}
-                  className={`reveal card3d relative flex flex-col rounded-2xl border p-6 transition-all ${p.featured ? "border-[#B8912E]/50 bg-linear-to-b from-[#B8912E]/8 to-[#B8912E]/3" : "border-white/8 bg-white/4"}`}
+                  className={`reveal card3d relative flex flex-col rounded-2xl border p-6 transition-all ${p.featured ? "border-[#8B5CF6]/50 bg-linear-to-b from-[#8B5CF6]/8 to-[#8B5CF6]/3" : "border-white/8 bg-white/4"}`}
                   style={{ transitionDelay: `${i * .12}s` }}>
                   {p.featured && (
                     <>
-                      <div className="absolute -top-3 left-1/2 -translate-x-1/2 rounded-full bg-[#B8912E] px-3 py-0.5 text-[10px] font-bold uppercase tracking-widest text-white shadow-lg shadow-[#B8912E]/40">Most popular</div>
+                      <div className="absolute -top-3 left-1/2 -translate-x-1/2 rounded-full bg-[#8B5CF6] px-3 py-0.5 text-[10px] font-bold uppercase tracking-widest text-white shadow-lg shadow-[#8B5CF6]/40">Most popular</div>
                       <div className="absolute inset-0 rounded-2xl pointer-events-none" style={{ animation: "borderGlow 3s ease-in-out infinite" }} />
                     </>
                   )}
@@ -461,7 +461,7 @@ export default function LandingPage() {
                   <ul className="mt-auto space-y-2">
                     {p.features.map((f) => (
                       <li key={f} className="flex items-center gap-2 text-sm text-white/60">
-                        <svg className="h-3.5 w-3.5 shrink-0 text-[#B8912E]" fill="currentColor" viewBox="0 0 20 20">
+                        <svg className="h-3.5 w-3.5 shrink-0 text-[#8B5CF6]" fill="currentColor" viewBox="0 0 20 20">
                           <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
                         </svg>
                         {f}
@@ -478,11 +478,11 @@ export default function LandingPage() {
         <section id="how-it-works" className="px-6 py-28 bg-linear-to-b from-[#0a1628] to-[#070E1C]">
           <div className="mx-auto max-w-4xl">
             <div className="reveal mb-14 text-center">
-              <p className="mb-3 text-xs font-bold uppercase tracking-widest text-[#B8912E]">How it works</p>
+              <p className="mb-3 text-xs font-bold uppercase tracking-widest text-[#8B5CF6]">How it works</p>
               <h2 className="text-3xl font-bold md:text-4xl text-white">Up and running in three steps.</h2>
             </div>
             <div className="relative space-y-8">
-              <div className="absolute left-7 top-10 hidden h-[calc(100%-80px)] w-px bg-linear-to-b from-[#1B52A8] via-[#B8912E] to-transparent md:block" />
+              <div className="absolute left-7 top-10 hidden h-[calc(100%-80px)] w-px bg-linear-to-b from-[#1B52A8] via-[#8B5CF6] to-transparent md:block" />
               {[
                 { step: "01", title: "Submit your details", body: "Fill out a quick form. Tell us about your property and choose a plan. Our team verifies and creates your account." },
                 { step: "02", title: "Connect WhatsApp", body: "Link your WhatsApp Business account. We guide you through every step — no developer needed." },
@@ -490,9 +490,9 @@ export default function LandingPage() {
               ].map((s, i) => (
                 <div key={s.step} className={`reveal flex items-start gap-6 md:gap-10 ${i === 1 ? "md:flex-row-reverse" : ""}`}
                   style={{ transitionDelay: `${i * .15}s` }}>
-                  <div className="relative flex h-14 w-14 shrink-0 items-center justify-center rounded-2xl bg-[#0C1B33] border border-[#B8912E]/30 text-lg font-extrabold text-[#B8912E] shadow-xl shadow-[#B8912E]/10">
+                  <div className="relative flex h-14 w-14 shrink-0 items-center justify-center rounded-2xl bg-[#0C1B33] border border-[#8B5CF6]/30 text-lg font-extrabold text-[#8B5CF6] shadow-xl shadow-[#8B5CF6]/10">
                     {s.step}
-                    <div className="absolute inset-0 rounded-2xl bg-[#B8912E]/5" />
+                    <div className="absolute inset-0 rounded-2xl bg-[#8B5CF6]/5" />
                   </div>
                   <div className={`flex-1 rounded-2xl border border-white/8 bg-white/4 p-6 backdrop-blur-sm ${i === 1 ? "md:text-right" : ""}`}>
                     <h3 className="mb-2 text-lg font-bold text-white">{s.title}</h3>
@@ -508,7 +508,7 @@ export default function LandingPage() {
         <section className="px-6 py-28 bg-[#070E1C]">
           <div className="mx-auto max-w-5xl">
             <div className="reveal mb-14 text-center">
-              <p className="mb-3 text-xs font-bold uppercase tracking-widest text-[#B8912E]">Benefits</p>
+              <p className="mb-3 text-xs font-bold uppercase tracking-widest text-[#8B5CF6]">Benefits</p>
               <h2 className="text-3xl font-bold md:text-4xl text-white">The impact from day one.</h2>
             </div>
             <div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
@@ -521,7 +521,7 @@ export default function LandingPage() {
                 { metric: "<10m",title: "Setup time",                 body: "Connect WhatsApp, configure your first flow, and go live in under 10 minutes." },
               ].map((b, i) => (
                 <div key={b.title} className="reveal card3d rounded-2xl border border-white/8 bg-white/4 p-6" style={{ transitionDelay: `${i * .07}s` }}>
-                  <div className="mb-3 text-3xl font-extrabold bg-linear-to-r from-[#B8912E] to-[#e4b84a] bg-clip-text text-transparent">{b.metric}</div>
+                  <div className="mb-3 text-3xl font-extrabold bg-linear-to-r from-[#8B5CF6] to-[#A78BFA] bg-clip-text text-transparent">{b.metric}</div>
                   <h3 className="mb-1.5 font-bold text-white">{b.title}</h3>
                   <p className="text-sm leading-relaxed text-white/40">{b.body}</p>
                 </div>
@@ -534,7 +534,7 @@ export default function LandingPage() {
         <section className="px-6 py-28 bg-linear-to-b from-[#0a1628] to-[#070E1C]">
           <div className="mx-auto max-w-5xl">
             <div className="reveal mb-14 text-center">
-              <p className="mb-3 text-xs font-bold uppercase tracking-widest text-[#B8912E]">What people say</p>
+              <p className="mb-3 text-xs font-bold uppercase tracking-widest text-[#8B5CF6]">What people say</p>
               <h2 className="text-3xl font-bold text-white">Trusted by operators who care about efficiency.</h2>
             </div>
             <div className="grid gap-6 md:grid-cols-3">
@@ -546,7 +546,7 @@ export default function LandingPage() {
                 <div key={t.name} className="reveal card3d flex flex-col rounded-2xl border border-white/8 bg-white/4 p-6" style={{ transitionDelay: `${i * .12}s` }}>
                   <div className="mb-4 flex gap-0.5">
                     {[...Array(5)].map((_, j) => (
-                      <svg key={j} className="h-4 w-4 text-[#B8912E]" fill="currentColor" viewBox="0 0 20 20">
+                      <svg key={j} className="h-4 w-4 text-[#8B5CF6]" fill="currentColor" viewBox="0 0 20 20">
                         <path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z" />
                       </svg>
                     ))}
@@ -566,7 +566,7 @@ export default function LandingPage() {
         <section id="pricing" className="px-6 py-28 bg-[#070E1C]">
           <div className="mx-auto max-w-3xl text-center">
             <div className="reveal">
-              <p className="mb-3 text-xs font-bold uppercase tracking-widest text-[#B8912E]">Pricing</p>
+              <p className="mb-3 text-xs font-bold uppercase tracking-widest text-[#8B5CF6]">Pricing</p>
               <h2 className="text-3xl font-bold md:text-4xl text-white">Simple pricing. No surprises.</h2>
               <p className="mx-auto mt-4 max-w-xl text-base text-white/45">
                 Start with a free trial. Upgrade when you're ready. Every plan includes all core features.
@@ -579,9 +579,9 @@ export default function LandingPage() {
                 { name: "Growth", price: "₹5,999", period: "per month", features: ["Unlimited conversations","Unlimited AI replies","Dedicated support"], cta: "Get started", featured: false },
               ].map((plan) => (
                 <div key={plan.name}
-                  className={`card3d rounded-2xl border p-6 text-left relative overflow-hidden ${plan.featured ? "border-[#B8912E]/50 bg-linear-to-b from-[#B8912E]/10 to-[#B8912E]/3" : "border-white/8 bg-white/4"}`}>
+                  className={`card3d rounded-2xl border p-6 text-left relative overflow-hidden ${plan.featured ? "border-[#8B5CF6]/50 bg-linear-to-b from-[#8B5CF6]/10 to-[#8B5CF6]/3" : "border-white/8 bg-white/4"}`}>
                   {plan.featured && <div className="absolute inset-0 rounded-2xl pointer-events-none" style={{ animation: "borderGlow 3s ease-in-out infinite" }} />}
-                  <p className={`mb-1 text-xs font-bold uppercase tracking-widest ${plan.featured ? "text-[#B8912E]" : "text-white/30"}`}>{plan.name}</p>
+                  <p className={`mb-1 text-xs font-bold uppercase tracking-widest ${plan.featured ? "text-[#8B5CF6]" : "text-white/30"}`}>{plan.name}</p>
                   <div className="mb-1 flex items-end gap-1">
                     <span className="text-3xl font-extrabold text-white">{plan.price}</span>
                   </div>
@@ -589,7 +589,7 @@ export default function LandingPage() {
                   <ul className="mb-6 space-y-2">
                     {plan.features.map((f) => (
                       <li key={f} className="flex items-center gap-2 text-sm text-white/55">
-                        <svg className={`h-3.5 w-3.5 shrink-0 ${plan.featured ? "text-[#B8912E]" : "text-white/30"}`} fill="currentColor" viewBox="0 0 20 20">
+                        <svg className={`h-3.5 w-3.5 shrink-0 ${plan.featured ? "text-[#8B5CF6]" : "text-white/30"}`} fill="currentColor" viewBox="0 0 20 20">
                           <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
                         </svg>
                         {f}
@@ -597,7 +597,7 @@ export default function LandingPage() {
                     ))}
                   </ul>
                   <Link href="/get-started"
-                    className={`block rounded-lg py-2.5 text-center text-sm font-bold transition hover:scale-105 active:scale-95 ${plan.featured ? "bg-[#B8912E] text-white shadow-lg shadow-[#B8912E]/30 hover:bg-[#a07a26]" : "border border-white/15 text-white/70 hover:border-white/30 hover:text-white"}`}>
+                    className={`block rounded-lg py-2.5 text-center text-sm font-bold transition hover:scale-105 active:scale-95 ${plan.featured ? "bg-[#8B5CF6] text-white shadow-lg shadow-[#8B5CF6]/30 hover:bg-[#7C3AED]" : "border border-white/15 text-white/70 hover:border-white/30 hover:text-white"}`}>
                     {plan.cta}
                   </Link>
                 </div>
@@ -610,16 +610,16 @@ export default function LandingPage() {
         <section className="relative overflow-hidden px-6 py-36 text-center bg-[#070E1C]">
           <div className="pointer-events-none absolute inset-0">
             <div className="anim-orb absolute left-1/2 top-0 h-125 w-175 -translate-x-1/2 -translate-y-1/2 rounded-full bg-[#1B52A8] blur-[120px]" />
-            <div className="anim-orb absolute bottom-0 left-1/4 h-[300px] w-[400px] translate-y-1/2 rounded-full bg-[#B8912E] blur-[100px]" style={{ animationDelay: "2s" }} />
+            <div className="anim-orb absolute bottom-0 left-1/4 h-[300px] w-[400px] translate-y-1/2 rounded-full bg-[#8B5CF6] blur-[100px]" style={{ animationDelay: "2s" }} />
           </div>
           {/* Animated grid lines */}
           <div className="pointer-events-none absolute inset-0 opacity-[.03]"
             style={{ backgroundImage: "linear-gradient(#fff 1px,transparent 1px),linear-gradient(90deg,#fff 1px,transparent 1px)", backgroundSize: "40px 40px" }} />
 
           <div className="relative reveal">
-            <p className="mb-4 text-xs font-bold uppercase tracking-widest text-[#B8912E]">Get started today</p>
+            <p className="mb-4 text-xs font-bold uppercase tracking-widest text-[#8B5CF6]">Get started today</p>
             <h2 className="mx-auto max-w-3xl text-4xl font-extrabold leading-tight md:text-5xl"
-              style={{ background: "linear-gradient(135deg,#fff 50%,#B8912E 100%)", WebkitBackgroundClip: "text", WebkitTextFillColor: "transparent" }}>
+              style={{ background: "linear-gradient(135deg,#fff 50%,#8B5CF6 100%)", WebkitBackgroundClip: "text", WebkitTextFillColor: "transparent" }}>
               Your hotel deserves to run better.
             </h2>
             <p className="mx-auto mt-5 max-w-xl text-lg text-white/40">
@@ -627,7 +627,7 @@ export default function LandingPage() {
             </p>
             <div className="mt-10 flex flex-col items-center justify-center gap-4 sm:flex-row">
               <Link href="/get-started"
-                className="group relative inline-flex items-center gap-2 overflow-hidden rounded-xl bg-[#B8912E] px-10 py-4 text-sm font-bold text-white shadow-2xl shadow-[#B8912E]/30 transition-all hover:scale-105 hover:shadow-[#B8912E]/50 active:scale-95">
+                className="group relative inline-flex items-center gap-2 overflow-hidden rounded-xl bg-[#8B5CF6] px-10 py-4 text-sm font-bold text-white shadow-2xl shadow-[#8B5CF6]/30 transition-all hover:scale-105 hover:shadow-[#8B5CF6]/50 active:scale-95">
                 <span className="absolute inset-0 bg-white/0 group-hover:bg-white/10 transition" />
                 Start your free trial
                 <svg className="h-4 w-4 transition-transform group-hover:translate-x-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
