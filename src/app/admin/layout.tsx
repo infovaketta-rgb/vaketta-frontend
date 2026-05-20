@@ -5,6 +5,8 @@ import { usePathname, useRouter } from "next/navigation";
 import Link from "next/link";
 import { adminApiFetch } from "@/lib/adminApi";
 import { clearAdmin, getAdminName } from "@/lib/adminAuth";
+import { AdminSocketProvider, useSocket } from "@/context/SocketContext";
+import { useToastStore } from "@/store/toastStore";
 
 // ── Nav items ──────────────────────────────────────────────────────────────────
 
@@ -122,9 +124,11 @@ function AdminSidebar() {
   );
 }
 
-export default function AdminLayout({ children }: { children: React.ReactNode }) {
+function AdminLayoutInner({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
   const router   = useRouter();
+  const socket   = useSocket();
+  const { addToast } = useToastStore();
   const [checking, setChecking] = useState(true);
 
   const isLoginPage = pathname === "/admin/login";
@@ -135,6 +139,22 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
       .then(() => setChecking(false))
       .catch(() => router.replace("/admin/login"));
   }, [isLoginPage, router]);
+
+  useEffect(() => {
+    if (!socket) return;
+    const onHotelNew = ({ hotel }: { hotel: any }) => {
+      addToast(`New hotel registered: ${hotel.name}`, "success");
+    };
+    const onSubscriptionChanged = ({ hotelId: _hid, status }: { hotelId: string; status: string }) => {
+      addToast(`Subscription updated: ${status}`, "info");
+    };
+    socket.on("admin:hotel_new", onHotelNew);
+    socket.on("admin:subscription_changed", onSubscriptionChanged);
+    return () => {
+      socket.off("admin:hotel_new", onHotelNew);
+      socket.off("admin:subscription_changed", onSubscriptionChanged);
+    };
+  }, [socket]);
 
   if (isLoginPage) return <>{children}</>;
 
@@ -153,5 +173,13 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
         {children}
       </main>
     </div>
+  );
+}
+
+export default function AdminLayout({ children }: { children: React.ReactNode }) {
+  return (
+    <AdminSocketProvider>
+      <AdminLayoutInner>{children}</AdminLayoutInner>
+    </AdminSocketProvider>
   );
 }

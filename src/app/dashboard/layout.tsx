@@ -7,15 +7,16 @@ import { useToastStore } from "@/store/toastStore";
 import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { isAuthenticated } from "@/lib/auth";
-import { getSocket } from "@/lib/socket";  // ← add this
+import { HotelSocketProvider, useSocket } from "@/context/SocketContext";
 
 
-export default function DashboardLayout({
+function DashboardLayoutInner({
   children,
 }: {
   children: React.ReactNode;
 }) {
   const router = useRouter();
+  const socket = useSocket();
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const { addToast } = useToastStore();
   const [debugMode, setDebugMode]   = useState(false);
@@ -99,10 +100,8 @@ export default function DashboardLayout({
     setupPush().catch((err) => pushLog(`❌ error: ${err?.message ?? err}`));
   }, []);
 
-// ← add this
   useEffect(() => {
-    if (!isAuthenticated()) return;
-    const socket = getSocket();
+    if (!isAuthenticated() || !socket) return;
 
     const onStaffNotification = ({ guestName }: { guestName: string }) => {
       if (Notification.permission === "granted") {
@@ -133,7 +132,7 @@ export default function DashboardLayout({
       socket.off("booking:new", onBookingNew);
       socket.off("history:sync_progress", onHistorySync);
     };
-  }, []);
+  }, [socket]);
 
   return (
     <div className="flex h-screen min-h-0 w-full overflow-hidden">
@@ -201,5 +200,13 @@ export default function DashboardLayout({
         </div>
       )}
     </div>
+  );
+}
+
+export default function DashboardLayout({ children }: { children: React.ReactNode }) {
+  return (
+    <HotelSocketProvider>
+      <DashboardLayoutInner>{children}</DashboardLayoutInner>
+    </HotelSocketProvider>
   );
 }

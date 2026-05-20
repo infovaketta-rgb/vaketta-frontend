@@ -1,6 +1,7 @@
 import { io, Socket } from "socket.io-client";
 
 let socket: Socket | null = null;
+let adminSocket: Socket | null = null;
 
 export function getSocket() {
   const apiKey = localStorage.getItem("HOTEL_API_KEY");
@@ -24,5 +25,24 @@ export function resetSocket() {
   if (socket) {
     socket.disconnect();
     socket = null;
+  }
+}
+
+export function getAdminSocket(adminToken: string) {
+  if (!adminSocket) {
+    const url = process.env.NEXT_PUBLIC_API_BASE ?? "";
+    adminSocket = io(url, {
+      auth: { adminToken },
+      transports: ["websocket"],
+      withCredentials: true,
+    });
+  }
+  return adminSocket;
+}
+
+export function resetAdminSocket() {
+  if (adminSocket) {
+    adminSocket.disconnect();
+    adminSocket = null;
   }
 }

@@ -10,7 +10,14 @@
       "Bash(npm run:*)",
       "Bash(npx next:*)",
       "Bash(cd /c/Users/myoos/hotel-automation22122025 && grep -r \"BullMQ\\\\|bullmq\\\\|Queue\\\\|Worker\" --include=\"*.ts\" src/ | grep -E \"\\(import|from\\)\" | sort -u | head -30)",
-      "Read(//c/c/Users/myoos/hotel-automation22122025/**)"
+      "Read(//c/c/Users/myoos/hotel-automation22122025/**)",
+      "Bash(Get-ChildItem -Path \"c:\\\\Users\\\\myoos\\\\hotel-automation22122025\\\\src\" -Recurse -Filter \"*.ts\" -Filter \"*.js\")",
+      "Bash(Select-Object -First 50)",
+      "Bash(Format-Table FullName)",
+      "Bash(Get-ChildItem -Path \"c:\\\\Users\\\\myoos\\\\hotel-automation-frontend\\\\src\" -Recurse -Directory)",
+      "Bash(Select-Object -ExpandProperty FullName)",
+      "Bash(Get-ChildItem -Path src -Recurse -File -Name)",
+      "Bash(xargs grep -l \"Socket\\\\|io\\\\.\")"
     ]
   }
 }
