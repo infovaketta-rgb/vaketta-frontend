@@ -19,8 +19,8 @@ const GLOBAL_STYLES = `
   50%      { transform: translateY(-12px); }
 }
 @keyframes orbPulse {
-  0%,100% { opacity:.18; transform:scale(1); }
-  50%      { opacity:.32; transform:scale(1.12); }
+  0%,100% { opacity:.10; transform:scale(1); }
+  50%      { opacity:.20; transform:scale(1.12); }
 }
 @keyframes gradShift {
   0%,100% { background-position: 0% 50%; }
@@ -48,7 +48,7 @@ const GLOBAL_STYLES = `
 }
 @keyframes borderGlow {
   0%,100% { box-shadow: 0 0 0 0 rgba(139,92,246,.0); }
-  50%      { box-shadow: 0 0 30px 4px rgba(139,92,246,.25); }
+  50%      { box-shadow: 0 0 30px 4px rgba(139,92,246,.20); }
 }
 .anim-float  { animation: float  6s ease-in-out infinite; }
 .anim-floatB { animation: floatB 8s ease-in-out infinite; }
@@ -58,7 +58,12 @@ const GLOBAL_STYLES = `
 .reveal      { opacity:0; transform:translateY(28px); transition: opacity .65s ease, transform .65s ease; }
 .reveal.in   { opacity:1; transform:none; }
 .card3d      { transition: transform .4s ease, box-shadow .4s ease; transform-style: preserve-3d; }
-.card3d:hover{ transform: perspective(700px) rotateY(-6deg) rotateX(3deg) scale(1.03); box-shadow:0 32px 64px rgba(0,0,0,.25); }
+.card3d:hover{ transform: perspective(700px) rotateY(-6deg) rotateX(3deg) scale(1.03); box-shadow:0 24px 48px rgba(124,58,237,.14); }
+@media (prefers-reduced-motion: reduce) {
+  .anim-float,.anim-floatB,.anim-floatC,.anim-orb,.anim-fadeUp { animation: none !important; }
+  .reveal { opacity:1 !important; transform:none !important; transition:none; }
+  .card3d:hover { transform:none; }
+}
 `;
 
 // ── Reveal hook ───────────────────────────────────────────────────────────────
@@ -102,47 +107,46 @@ function Nav() {
     return () => window.removeEventListener("scroll", h);
   }, []);
   return (
-    <header className={`fixed inset-x-0 top-0 z-50 transition-all duration-500 ${scrolled ? "bg-[#0C1B33]/95 backdrop-blur-xl border-b border-white/8 shadow-2xl" : "bg-transparent"}`}>
+    <header className={`fixed inset-x-0 top-0 z-50 transition-all duration-500 ${scrolled ? "bg-white/90 backdrop-blur-xl border-b border-[#E8E4F3] shadow-sm" : "bg-transparent"}`}>
       <div className="mx-auto flex h-16 max-w-6xl items-center justify-between px-6">
         <Link href="/" className="flex items-center gap-2.5 group">
           <div className="relative">
-            <div className="absolute inset-0 rounded-lg bg-[#8B5CF6]/30 blur-md group-hover:blur-lg transition-all" />
+            <div className="absolute inset-0 rounded-lg bg-[#8B5CF6]/25 blur-md group-hover:blur-lg transition-all" />
             <img src="/vakettaVlogo.png" alt="Vaketta" className="relative h-8 w-8 object-contain" />
           </div>
-          <span className="text-lg font-bold text-white">Vaketta</span>
+          <span className="text-lg font-bold text-[#0C1B33]">Vaketta</span>
         </Link>
         <nav className="hidden items-center gap-8 md:flex">
           {["Product","How it works","Pricing"].map((item) => (
             <a key={item} href={`#${item.toLowerCase().replace(/ /g,"-")}`}
-              className="text-sm font-medium text-white/60 transition hover:text-white relative group">
+              className="text-sm font-medium text-slate-500 transition hover:text-[#0C1B33] relative group">
               {item}
               <span className="absolute -bottom-0.5 left-0 h-px w-0 bg-[#8B5CF6] transition-all group-hover:w-full" />
             </a>
           ))}
         </nav>
         <div className="hidden items-center gap-3 md:flex">
-          <Link href="/login" className="text-sm font-medium text-white/50 hover:text-white transition">Sign in</Link>
+          <Link href="/login" className="text-sm font-medium text-slate-500 hover:text-[#0C1B33] transition">Sign in</Link>
           <Link href="/get-started"
-            className="relative overflow-hidden rounded-lg bg-[#8B5CF6] px-4 py-2 text-sm font-semibold text-white shadow-lg shadow-[#8B5CF6]/30 transition hover:shadow-[#8B5CF6]/50 hover:scale-105 active:scale-95">
-            <span className="absolute inset-0 -translate-x-full bg-white/20 skew-x-12 transition-transform hover:translate-x-full duration-700" />
+            className="relative overflow-hidden rounded-lg bg-[#8B5CF6] px-4 py-2 text-sm font-semibold text-white shadow-lg shadow-[#8B5CF6]/25 transition hover:bg-[#7C3AED] hover:shadow-[#8B5CF6]/40 hover:scale-105 active:scale-95">
             Get started
           </Link>
         </div>
-        <button onClick={() => setOpen(v => !v)} className="flex h-9 w-9 items-center justify-center rounded-lg text-white md:hidden">
+        <button onClick={() => setOpen(v => !v)} aria-label="Toggle menu" className="flex h-9 w-9 items-center justify-center rounded-lg text-[#0C1B33] md:hidden">
           {open
             ? <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>
             : <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" /></svg>}
         </button>
       </div>
       {open && (
-        <div className="border-t border-white/10 bg-[#0C1B33]/95 backdrop-blur-xl px-6 py-4 md:hidden">
+        <div className="border-t border-[#E8E4F3] bg-white/95 backdrop-blur-xl px-6 py-4 md:hidden">
           <nav className="flex flex-col gap-3">
             {["Product","How it works","Pricing"].map((item) => (
               <a key={item} href={`#${item.toLowerCase().replace(/ /g,"-")}`} onClick={() => setOpen(false)}
-                className="text-sm font-medium text-white/70">{item}</a>
+                className="text-sm font-medium text-slate-600">{item}</a>
             ))}
-            <hr className="border-white/10" />
-            <Link href="/login" className="text-sm font-medium text-white/60">Sign in</Link>
+            <hr className="border-[#E8E4F3]" />
+            <Link href="/login" className="text-sm font-medium text-slate-500">Sign in</Link>
             <Link href="/get-started" className="rounded-lg bg-[#8B5CF6] px-4 py-2.5 text-center text-sm font-bold text-white">Get started free</Link>
           </nav>
         </div>
@@ -156,40 +160,40 @@ function DashboardMockup() {
   return (
     <div className="relative mx-auto w-full max-w-xl" style={{ perspective: "1200px" }}>
       {/* Main card */}
-      <div className="relative rounded-2xl border border-white/15 bg-[#0f2545]/80 shadow-2xl backdrop-blur-md overflow-hidden"
-        style={{ transform: "rotateY(-8deg) rotateX(6deg)", transformStyle: "preserve-3d", boxShadow: "0 40px 80px rgba(0,0,0,.5), 0 0 0 1px rgba(255,255,255,.08)" }}>
+      <div className="relative rounded-2xl border border-[#E8E4F3] bg-white overflow-hidden"
+        style={{ transform: "rotateY(-8deg) rotateX(6deg)", transformStyle: "preserve-3d", boxShadow: "0 40px 80px rgba(124,58,237,.18), 0 0 0 1px rgba(124,58,237,.04)" }}>
         {/* Shimmer sweep */}
         <div className="absolute inset-0 pointer-events-none overflow-hidden">
-          <div className="absolute inset-y-0 w-1/3 bg-linear-to-r from-transparent via-white/6 to-transparent" style={{ animation: "shimmer 3s ease-in-out infinite" }} />
+          <div className="absolute inset-y-0 w-1/3 bg-linear-to-r from-transparent via-[#8B5CF6]/5 to-transparent" style={{ animation: "shimmer 3s ease-in-out infinite" }} />
         </div>
         {/* Title bar */}
-        <div className="flex items-center gap-1.5 border-b border-white/8 px-4 py-3">
+        <div className="flex items-center gap-1.5 border-b border-[#E8E4F3] bg-[#F7F5FC] px-4 py-3">
           <div className="h-3 w-3 rounded-full bg-red-400/70" />
           <div className="h-3 w-3 rounded-full bg-yellow-400/70" />
           <div className="h-3 w-3 rounded-full bg-emerald-400/70" />
-          <span className="ml-3 text-xs text-white/30 font-mono">Vaketta Chat — Dashboard</span>
+          <span className="ml-3 text-xs text-slate-400 font-mono">Vaketta Chat — Dashboard</span>
         </div>
         <div className="p-4 space-y-3">
           {/* Stat row */}
           <div className="grid grid-cols-3 gap-2">
             {[
-              { label: "Messages today", val: "1,284", color: "text-[#8B5CF6]" },
-              { label: "Active bookings", val: "47", color: "text-emerald-400" },
-              { label: "Revenue (MTD)", val: "₹2.4L", color: "text-[#7BA7FF]" },
+              { label: "Messages today", val: "1,284", color: "text-[#7C3AED]" },
+              { label: "Active bookings", val: "47", color: "text-emerald-600" },
+              { label: "Revenue (MTD)", val: "₹2.4L", color: "text-[#1B52A8]" },
             ].map((s) => (
-              <div key={s.label} className="rounded-xl border border-white/8 bg-white/5 p-3">
-                <p className={`text-lg font-bold ${s.color}`}>{s.val}</p>
-                <p className="text-[10px] text-white/35 mt-0.5 leading-tight">{s.label}</p>
+              <div key={s.label} className="rounded-xl border border-[#E8E4F3] bg-[#F7F5FC] p-3">
+                <p className={`text-lg font-bold tabular-nums ${s.color}`}>{s.val}</p>
+                <p className="text-[10px] text-slate-400 mt-0.5 leading-tight">{s.label}</p>
               </div>
             ))}
           </div>
           {/* Chart bars */}
-          <div className="rounded-xl border border-white/8 bg-white/4 p-3">
-            <p className="text-[10px] font-semibold text-white/40 mb-2 uppercase tracking-widest">Revenue — last 7 days</p>
+          <div className="rounded-xl border border-[#E8E4F3] bg-white p-3">
+            <p className="text-[10px] font-semibold text-slate-400 mb-2 uppercase tracking-widest">Revenue — last 7 days</p>
             <div className="flex items-end gap-1.5 h-14">
               {[40,65,50,80,60,90,75].map((h, i) => (
                 <div key={i} className="flex-1 rounded-t-sm transition-all"
-                  style={{ height: `${h}%`, background: `linear-gradient(to top, #8B5CF6, #A78BFA)`, opacity: .7 + i*.04 }} />
+                  style={{ height: `${h}%`, background: `linear-gradient(to top, #7C3AED, #A78BFA)`, opacity: .7 + i*.04 }} />
               ))}
             </div>
           </div>
@@ -199,13 +203,13 @@ function DashboardMockup() {
               { name: "Anjali S.", msg: "What time is check-out?", time: "2m", status: "auto-replied" },
               { name: "Rohan M.", msg: "I'd like to book a room…",  time: "8m", status: "pending" },
             ].map((m) => (
-              <div key={m.name} className="flex items-center gap-2.5 rounded-xl border border-white/6 bg-white/3 px-3 py-2">
-                <div className="h-7 w-7 rounded-full bg-[#1B52A8]/40 flex items-center justify-center text-xs font-bold text-white/70">{m.name[0]}</div>
+              <div key={m.name} className="flex items-center gap-2.5 rounded-xl border border-[#E8E4F3] bg-white px-3 py-2">
+                <div className="h-7 w-7 rounded-full bg-[#8B5CF6]/15 flex items-center justify-center text-xs font-bold text-[#7C3AED]">{m.name[0]}</div>
                 <div className="flex-1 min-w-0">
-                  <p className="text-xs font-semibold text-white/80">{m.name}</p>
-                  <p className="text-[10px] text-white/35 truncate">{m.msg}</p>
+                  <p className="text-xs font-semibold text-[#0C1B33]">{m.name}</p>
+                  <p className="text-[10px] text-slate-400 truncate">{m.msg}</p>
                 </div>
-                <span className={`text-[9px] font-semibold rounded-full px-1.5 py-0.5 ${m.status === "auto-replied" ? "bg-emerald-400/15 text-emerald-400" : "bg-yellow-400/15 text-yellow-400"}`}>
+                <span className={`text-[9px] font-semibold rounded-full px-1.5 py-0.5 ${m.status === "auto-replied" ? "bg-emerald-50 text-emerald-600" : "bg-yellow-50 text-yellow-600"}`}>
                   {m.status}
                 </span>
               </div>
@@ -215,26 +219,26 @@ function DashboardMockup() {
       </div>
 
       {/* Floating notification card */}
-      <div className="absolute -top-6 -right-8 anim-float rounded-xl border border-white/15 bg-[#0f2545]/90 backdrop-blur-md px-3 py-2.5 shadow-xl hidden sm:block"
+      <div className="absolute -top-6 -right-8 anim-float rounded-xl border border-[#E8E4F3] bg-white px-3 py-2.5 shadow-xl hidden sm:block"
         style={{ transform: "rotateY(-4deg) rotateX(3deg)" }}>
         <div className="flex items-center gap-2">
-          <div className="h-7 w-7 rounded-full bg-emerald-400/20 flex items-center justify-center">
-            <svg className="h-3.5 w-3.5 text-emerald-400" fill="currentColor" viewBox="0 0 20 20">
+          <div className="h-7 w-7 rounded-full bg-emerald-50 flex items-center justify-center">
+            <svg className="h-3.5 w-3.5 text-emerald-600" fill="currentColor" viewBox="0 0 20 20">
               <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
             </svg>
           </div>
           <div>
-            <p className="text-[10px] font-semibold text-white/80">Booking confirmed</p>
-            <p className="text-[9px] text-white/35">Room 204 · 3 nights</p>
+            <p className="text-[10px] font-semibold text-[#0C1B33]">Booking confirmed</p>
+            <p className="text-[9px] text-slate-400">Room 204 · 3 nights</p>
           </div>
         </div>
       </div>
 
       {/* Floating AI badge */}
-      <div className="absolute -bottom-5 -left-6 anim-floatB rounded-xl border border-[#8B5CF6]/30 bg-[#8B5CF6]/15 backdrop-blur-md px-3 py-2 shadow-xl hidden sm:block">
+      <div className="absolute -bottom-5 -left-6 anim-floatB rounded-xl border border-[#8B5CF6]/30 bg-[#8B5CF6]/10 backdrop-blur-md px-3 py-2 shadow-xl hidden sm:block">
         <div className="flex items-center gap-1.5">
           <span className="h-1.5 w-1.5 rounded-full bg-[#8B5CF6] animate-pulse" />
-          <p className="text-[10px] font-semibold text-[#8B5CF6]">AI replied · 0.3s</p>
+          <p className="text-[10px] font-semibold text-[#7C3AED]">AI replied · 0.3s</p>
         </div>
       </div>
     </div>
@@ -248,7 +252,7 @@ export default function LandingPage() {
   return (
     <>
       <style dangerouslySetInnerHTML={{ __html: GLOBAL_STYLES }} />
-      <div className="min-h-screen bg-[#070E1C] font-sans text-white antialiased overflow-x-hidden">
+      <div className="min-h-screen bg-white font-sans text-[#0C1B33] antialiased overflow-x-hidden">
         <Nav />
 
         {/* ── HERO ────────────────────────────────────────────────────────── */}
@@ -256,21 +260,21 @@ export default function LandingPage() {
           {/* Mesh gradient background */}
           <div className="pointer-events-none absolute inset-0">
             <div className="absolute top-0 left-0 right-0 h-full"
-              style={{ background: "radial-gradient(ellipse 80% 60% at 50% -10%, #1B52A8 0%, transparent 70%)" }} />
+              style={{ background: "radial-gradient(ellipse 80% 60% at 50% -10%, rgba(139,92,246,.14) 0%, transparent 70%)" }} />
             <div className="absolute bottom-0 left-0 w-1/2 h-1/2"
-              style={{ background: "radial-gradient(ellipse 60% 50% at 20% 100%, #8B5CF622 0%, transparent 70%)" }} />
+              style={{ background: "radial-gradient(ellipse 60% 50% at 20% 100%, rgba(167,139,250,.12) 0%, transparent 70%)" }} />
             <div className="absolute top-1/3 right-0 w-1/2 h-1/2"
-              style={{ background: "radial-gradient(ellipse 50% 60% at 90% 40%, #1B52A830 0%, transparent 70%)" }} />
+              style={{ background: "radial-gradient(ellipse 50% 60% at 90% 40%, rgba(124,58,237,.10) 0%, transparent 70%)" }} />
           </div>
 
           {/* Animated grid */}
           <div className="pointer-events-none absolute inset-0 opacity-[.04]"
-            style={{ backgroundImage: "linear-gradient(#fff 1px,transparent 1px),linear-gradient(90deg,#fff 1px,transparent 1px)", backgroundSize: "60px 60px" }} />
+            style={{ backgroundImage: "linear-gradient(#0C1B33 1px,transparent 1px),linear-gradient(90deg,#0C1B33 1px,transparent 1px)", backgroundSize: "60px 60px" }} />
 
           {/* Floating orbs */}
           <div className="pointer-events-none absolute inset-0 overflow-hidden">
-            <div className="anim-orb absolute top-1/4 left-1/3 h-80 w-80 rounded-full bg-[#1B52A8] blur-[100px]" />
-            <div className="anim-orb absolute top-2/3 right-1/4 h-64 w-64 rounded-full bg-[#8B5CF6] blur-[90px]" style={{ animationDelay: "2s" }} />
+            <div className="anim-orb absolute top-1/4 left-1/3 h-80 w-80 rounded-full bg-[#8B5CF6] blur-[100px]" />
+            <div className="anim-orb absolute top-2/3 right-1/4 h-64 w-64 rounded-full bg-[#A78BFA] blur-[90px]" style={{ animationDelay: "2s" }} />
             <div className="anim-orb absolute top-1/2 left-0 h-48 w-48 rounded-full bg-[#7C3AED] blur-[80px]" style={{ animationDelay: "1s" }} />
           </div>
 
@@ -278,14 +282,14 @@ export default function LandingPage() {
             <div className="grid items-center gap-16 lg:grid-cols-2">
               {/* Left copy */}
               <div className="text-center lg:text-left">
-                <div className="anim-fadeUp inline-flex items-center gap-2 rounded-full border border-[#8B5CF6]/40 bg-[#8B5CF6]/10 px-4 py-1.5 mb-7">
+                <div className="anim-fadeUp inline-flex items-center gap-2 rounded-full border border-[#8B5CF6]/30 bg-[#8B5CF6]/8 px-4 py-1.5 mb-7">
                   <span className="h-1.5 w-1.5 rounded-full bg-[#8B5CF6] animate-pulse" />
-                  <span className="text-xs font-semibold uppercase tracking-widest text-[#8B5CF6]">Now in early access</span>
+                  <span className="text-xs font-semibold uppercase tracking-widest text-[#7C3AED]">Now in early access</span>
                 </div>
 
                 <h1 className="anim-fadeUp text-5xl font-extrabold leading-[1.1] tracking-tight md:text-6xl lg:text-7xl"
                   style={{ animationDelay: ".1s",
-                    background: "linear-gradient(135deg,#fff 40%,#8B5CF6 100%)",
+                    background: "linear-gradient(135deg,#0C1B33 35%,#7C3AED 100%)",
                     backgroundSize: "200% 200%",
                     WebkitBackgroundClip: "text",
                     WebkitTextFillColor: "transparent",
@@ -293,7 +297,7 @@ export default function LandingPage() {
                   Run your hotel.<br />Without the chaos.
                 </h1>
 
-                <p className="anim-fadeUp mt-6 max-w-lg mx-auto lg:mx-0 text-lg leading-relaxed text-white/55"
+                <p className="anim-fadeUp mt-6 max-w-lg mx-auto lg:mx-0 text-lg leading-relaxed text-slate-600"
                   style={{ animationDelay: ".25s" }}>
                   Vaketta automates guest communication, bookings, and operations — all from one dashboard. Powered by WhatsApp AI.
                 </p>
@@ -301,20 +305,19 @@ export default function LandingPage() {
                 <div className="anim-fadeUp mt-9 flex flex-col sm:flex-row items-center gap-4 justify-center lg:justify-start"
                   style={{ animationDelay: ".35s" }}>
                   <Link href="/get-started"
-                    className="group relative inline-flex items-center gap-2 overflow-hidden rounded-xl bg-[#8B5CF6] px-8 py-4 text-sm font-bold text-white shadow-lg shadow-[#8B5CF6]/30 transition-all hover:scale-105 hover:shadow-[#8B5CF6]/50 active:scale-95">
-                    <span className="absolute inset-0 bg-white/0 group-hover:bg-white/10 transition" />
+                    className="group relative inline-flex items-center gap-2 overflow-hidden rounded-xl bg-[#8B5CF6] px-8 py-4 text-sm font-bold text-white shadow-lg shadow-[#8B5CF6]/25 transition-all hover:bg-[#7C3AED] hover:scale-105 hover:shadow-[#8B5CF6]/40 active:scale-95">
                     Start for free
                     <svg className="h-4 w-4 transition-transform group-hover:translate-x-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M13 7l5 5m0 0l-5 5m5-5H6" />
                     </svg>
                   </Link>
                   <a href="#how-it-works"
-                    className="inline-flex items-center gap-2 rounded-xl border border-white/15 px-8 py-4 text-sm font-semibold text-white/70 transition hover:border-white/30 hover:text-white">
+                    className="inline-flex items-center gap-2 rounded-xl border border-[#E8E4F3] bg-white px-8 py-4 text-sm font-semibold text-slate-600 transition hover:border-[#8B5CF6]/40 hover:text-[#0C1B33]">
                     See how it works
                   </a>
                 </div>
 
-                <p className="anim-fadeUp mt-5 text-xs text-white/25" style={{ animationDelay: ".45s" }}>
+                <p className="anim-fadeUp mt-5 text-xs text-slate-400" style={{ animationDelay: ".45s" }}>
                   No credit card required · Setup in under 10 minutes
                 </p>
               </div>
@@ -326,15 +329,15 @@ export default function LandingPage() {
             </div>
 
             {/* Stats strip */}
-            <div className="mt-20 grid grid-cols-3 gap-px overflow-hidden rounded-2xl border border-white/8 bg-white/5">
+            <div className="mt-20 grid grid-cols-3 gap-px overflow-hidden rounded-2xl border border-[#E8E4F3] bg-[#E8E4F3] shadow-sm">
               {[
                 { label: "Messages automated daily", value: 10, suffix: "k+" },
                 { label: "Hours saved per week", value: 40, suffix: "+" },
                 { label: "Customer satisfaction", value: 98, suffix: "%" },
               ].map((s) => (
-                <div key={s.label} className="bg-white/3 px-6 py-6 text-center backdrop-blur-sm hover:bg-white/6 transition">
-                  <div className="text-3xl font-extrabold text-white"><Counter to={s.value} suffix={s.suffix} /></div>
-                  <div className="mt-1 text-xs text-white/35">{s.label}</div>
+                <div key={s.label} className="bg-white px-6 py-6 text-center transition hover:bg-[#F7F5FC]">
+                  <div className="text-3xl font-extrabold tabular-nums text-[#0C1B33]"><Counter to={s.value} suffix={s.suffix} /></div>
+                  <div className="mt-1 text-xs text-slate-500">{s.label}</div>
                 </div>
               ))}
             </div>
@@ -342,12 +345,12 @@ export default function LandingPage() {
         </section>
 
         {/* ── TICKER ──────────────────────────────────────────────────────── */}
-        <div className="border-y border-white/6 bg-white/3 py-3 overflow-hidden">
+        <div className="border-y border-[#E8E4F3] bg-[#F7F5FC] py-3 overflow-hidden">
           <div className="flex whitespace-nowrap" style={{ animation: "ticker 22s linear infinite" }}>
             {[...Array(2)].map((_, k) => (
               <div key={k} className="flex items-center gap-8 px-4">
                 {["WhatsApp Automation","AI-Powered Replies","Booking Management","Live Dashboard","Guest Communication","Revenue Analytics","Custom Flows","24/7 Operations"].map((t) => (
-                  <span key={t} className="flex items-center gap-3 text-xs font-semibold uppercase tracking-widest text-white/30">
+                  <span key={t} className="flex items-center gap-3 text-xs font-semibold uppercase tracking-widest text-slate-400">
                     <span className="h-1 w-1 rounded-full bg-[#8B5CF6]" />
                     {t}
                   </span>
@@ -358,11 +361,11 @@ export default function LandingPage() {
         </div>
 
         {/* ── PROBLEM ─────────────────────────────────────────────────────── */}
-        <section className="px-6 py-28 bg-[#070E1C]">
+        <section className="px-6 py-28 bg-white">
           <div className="mx-auto max-w-5xl">
             <div className="reveal mb-14 text-center">
-              <p className="mb-3 text-xs font-bold uppercase tracking-widest text-[#8B5CF6]">The problem</p>
-              <h2 className="text-3xl font-bold md:text-4xl text-white">
+              <p className="mb-3 text-xs font-bold uppercase tracking-widest text-[#7C3AED]">The problem</p>
+              <h2 className="text-3xl font-bold md:text-4xl text-[#0C1B33]">
                 Running a hotel is hard enough.<br />Your tools shouldn't make it harder.
               </h2>
             </div>
@@ -375,10 +378,10 @@ export default function LandingPage() {
                 { icon: "📉", title: "Growth is limited by capacity",
                   body: "You can't scale without adding more staff. Every new guest adds pressure without automation." },
               ].map((c, i) => (
-                <div key={c.title} className="reveal card3d rounded-2xl border border-white/8 bg-white/4 p-6" style={{ transitionDelay: `${i * .1}s` }}>
-                  <div className="mb-4 flex h-12 w-12 items-center justify-center rounded-2xl bg-red-500/10 text-2xl">{c.icon}</div>
-                  <h3 className="mb-2 font-bold text-white">{c.title}</h3>
-                  <p className="text-sm leading-relaxed text-white/45">{c.body}</p>
+                <div key={c.title} className="reveal card3d rounded-2xl border border-[#E8E4F3] bg-white p-6 shadow-sm" style={{ transitionDelay: `${i * .1}s` }}>
+                  <div className="mb-4 flex h-12 w-12 items-center justify-center rounded-2xl bg-red-50 text-2xl">{c.icon}</div>
+                  <h3 className="mb-2 font-bold text-[#0C1B33]">{c.title}</h3>
+                  <p className="text-sm leading-relaxed text-slate-600">{c.body}</p>
                 </div>
               ))}
             </div>
@@ -386,38 +389,30 @@ export default function LandingPage() {
         </section>
 
         {/* ── FEATURES ────────────────────────────────────────────────────── */}
-        <section className="px-6 py-28 bg-linear-to-b from-[#0a1628] to-[#070E1C]">
+        <section className="px-6 py-28 bg-linear-to-b from-[#F7F5FC] to-white">
           <div className="mx-auto max-w-5xl">
             <div className="reveal mb-14 text-center">
-              <p className="mb-3 text-xs font-bold uppercase tracking-widest text-[#8B5CF6]">The solution</p>
-              <h2 className="text-3xl font-bold md:text-4xl text-white">
+              <p className="mb-3 text-xs font-bold uppercase tracking-widest text-[#7C3AED]">The solution</p>
+              <h2 className="text-3xl font-bold md:text-4xl text-[#0C1B33]">
                 One platform. Every operation.<br />Fully automated.
               </h2>
             </div>
             <div className="grid gap-6 md:grid-cols-2">
               {[
                 { icon: "💬", title: "Automate guest communication",
-                  body: "Connect WhatsApp. Vaketta handles incoming messages, answers questions, and routes complex requests to your team — 24 hours a day.",
-                  grad: "from-[#1B52A8]/20 to-transparent" },
+                  body: "Connect WhatsApp. Vaketta handles incoming messages, answers questions, and routes complex requests to your team — 24 hours a day." },
                 { icon: "📅", title: "Manage bookings without the chaos",
-                  body: "Guests book directly through chat. Your team sees availability, confirmations, cancellations, and guest history in one place.",
-                  grad: "from-emerald-500/15 to-transparent" },
+                  body: "Guests book directly through chat. Your team sees availability, confirmations, cancellations, and guest history in one place." },
                 { icon: "⚡", title: "Build workflows without code",
-                  body: "Design multi-step conversation flows using a visual editor. No developers needed. Deploy in minutes, change any time.",
-                  grad: "from-[#8B5CF6]/15 to-transparent" },
+                  body: "Design multi-step conversation flows using a visual editor. No developers needed. Deploy in minutes, change any time." },
                 { icon: "📊", title: "See everything in real time",
-                  body: "Live dashboards show conversations, bookings, revenue, and team activity. Make decisions with data that's always current.",
-                  grad: "from-purple-500/15 to-transparent" },
+                  body: "Live dashboards show conversations, bookings, revenue, and team activity. Make decisions with data that's always current." },
               ].map((c, i) => (
-                <div key={c.title} className={`reveal card3d relative overflow-hidden rounded-2xl border border-white/8 p-6 bg-linear-to-br ${c.grad} bg-white/4`}
+                <div key={c.title} className="reveal card3d relative overflow-hidden rounded-2xl border border-[#E8E4F3] bg-white p-6 shadow-sm"
                   style={{ transitionDelay: `${i * .1}s` }}>
-                  <div className="absolute inset-0 pointer-events-none overflow-hidden rounded-2xl">
-                    <div className="absolute inset-0 opacity-0 hover:opacity-100 transition-opacity duration-500"
-                      style={{ background: "radial-gradient(circle at 50% 0%, rgba(255,255,255,.06), transparent 70%)" }} />
-                  </div>
                   <div className="mb-4 text-3xl">{c.icon}</div>
-                  <h3 className="mb-2 font-bold text-white text-lg">{c.title}</h3>
-                  <p className="text-sm leading-relaxed text-white/50">{c.body}</p>
+                  <h3 className="mb-2 font-bold text-[#0C1B33] text-lg">{c.title}</h3>
+                  <p className="text-sm leading-relaxed text-slate-600">{c.body}</p>
                 </div>
               ))}
             </div>
@@ -425,42 +420,42 @@ export default function LandingPage() {
         </section>
 
         {/* ── PRODUCT MODULES ─────────────────────────────────────────────── */}
-        <section id="product" className="px-6 py-28 bg-[#070E1C]">
+        <section id="product" className="px-6 py-28 bg-white">
           <div className="mx-auto max-w-5xl">
             <div className="reveal mb-14 text-center">
-              <p className="mb-3 text-xs font-bold uppercase tracking-widest text-[#8B5CF6]">Products</p>
-              <h2 className="text-3xl font-bold md:text-4xl text-white">
+              <p className="mb-3 text-xs font-bold uppercase tracking-widest text-[#7C3AED]">Products</p>
+              <h2 className="text-3xl font-bold md:text-4xl text-[#0C1B33]">
                 Start with what you need.<br />Expand when you're ready.
               </h2>
             </div>
             <div className="grid gap-6 md:grid-cols-3">
               {[
-                { name: "Vaketta Chat", tag: "Communication", tagColor: "text-[#7BA7FF] bg-[#1B52A8]/20",
+                { name: "Vaketta Chat", tag: "Communication", tagColor: "text-[#1B52A8] bg-[#1B52A8]/10",
                   desc: "Automate guest conversations on WhatsApp. AI handles questions around the clock — your team steps in when it matters.",
                   features: ["WhatsApp & Instagram","AI-powered replies","Live handoff","Message history"], icon: "💬", featured: false },
-                { name: "Vaketta PMS", tag: "Property Management", tagColor: "text-[#8B5CF6] bg-[#8B5CF6]/15",
+                { name: "Vaketta PMS", tag: "Property Management", tagColor: "text-[#7C3AED] bg-[#8B5CF6]/12",
                   desc: "A property management system built for hotels. Manage rooms, bookings, and guests from one clean dashboard.",
                   features: ["Booking management","Room availability","Guest records","Revenue analytics"], icon: "🏨", featured: true },
-                { name: "Vaketta Flow", tag: "Workflow Builder", tagColor: "text-emerald-400 bg-emerald-400/15",
+                { name: "Vaketta Flow", tag: "Workflow Builder", tagColor: "text-emerald-600 bg-emerald-50",
                   desc: "Build automated conversation flows using a visual drag-and-drop editor. No code required.",
                   features: ["Visual flow editor","Conditional logic","Form collection","Action triggers"], icon: "🔀", featured: false },
               ].map((p, i) => (
                 <div key={p.name}
-                  className={`reveal card3d relative flex flex-col rounded-2xl border p-6 transition-all ${p.featured ? "border-[#8B5CF6]/50 bg-linear-to-b from-[#8B5CF6]/8 to-[#8B5CF6]/3" : "border-white/8 bg-white/4"}`}
+                  className={`reveal card3d relative flex flex-col rounded-2xl border p-6 transition-all ${p.featured ? "border-[#8B5CF6]/40 bg-linear-to-b from-[#8B5CF6]/6 to-white shadow-md" : "border-[#E8E4F3] bg-white shadow-sm"}`}
                   style={{ transitionDelay: `${i * .12}s` }}>
                   {p.featured && (
                     <>
-                      <div className="absolute -top-3 left-1/2 -translate-x-1/2 rounded-full bg-[#8B5CF6] px-3 py-0.5 text-[10px] font-bold uppercase tracking-widest text-white shadow-lg shadow-[#8B5CF6]/40">Most popular</div>
+                      <div className="absolute -top-3 left-1/2 -translate-x-1/2 rounded-full bg-[#8B5CF6] px-3 py-0.5 text-[10px] font-bold uppercase tracking-widest text-white shadow-lg shadow-[#8B5CF6]/30">Most popular</div>
                       <div className="absolute inset-0 rounded-2xl pointer-events-none" style={{ animation: "borderGlow 3s ease-in-out infinite" }} />
                     </>
                   )}
                   <div className="mb-4 text-4xl">{p.icon}</div>
                   <span className={`mb-3 w-fit rounded-full px-2.5 py-0.5 text-[11px] font-semibold ${p.tagColor}`}>{p.tag}</span>
-                  <h3 className="mb-2 text-lg font-bold text-white">{p.name}</h3>
-                  <p className="mb-5 text-sm leading-relaxed text-white/45">{p.desc}</p>
+                  <h3 className="mb-2 text-lg font-bold text-[#0C1B33]">{p.name}</h3>
+                  <p className="mb-5 text-sm leading-relaxed text-slate-600">{p.desc}</p>
                   <ul className="mt-auto space-y-2">
                     {p.features.map((f) => (
-                      <li key={f} className="flex items-center gap-2 text-sm text-white/60">
+                      <li key={f} className="flex items-center gap-2 text-sm text-slate-600">
                         <svg className="h-3.5 w-3.5 shrink-0 text-[#8B5CF6]" fill="currentColor" viewBox="0 0 20 20">
                           <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
                         </svg>
@@ -475,11 +470,11 @@ export default function LandingPage() {
         </section>
 
         {/* ── HOW IT WORKS ────────────────────────────────────────────────── */}
-        <section id="how-it-works" className="px-6 py-28 bg-linear-to-b from-[#0a1628] to-[#070E1C]">
+        <section id="how-it-works" className="px-6 py-28 bg-linear-to-b from-[#F7F5FC] to-white">
           <div className="mx-auto max-w-4xl">
             <div className="reveal mb-14 text-center">
-              <p className="mb-3 text-xs font-bold uppercase tracking-widest text-[#8B5CF6]">How it works</p>
-              <h2 className="text-3xl font-bold md:text-4xl text-white">Up and running in three steps.</h2>
+              <p className="mb-3 text-xs font-bold uppercase tracking-widest text-[#7C3AED]">How it works</p>
+              <h2 className="text-3xl font-bold md:text-4xl text-[#0C1B33]">Up and running in three steps.</h2>
             </div>
             <div className="relative space-y-8">
               <div className="absolute left-7 top-10 hidden h-[calc(100%-80px)] w-px bg-linear-to-b from-[#1B52A8] via-[#8B5CF6] to-transparent md:block" />
@@ -490,13 +485,12 @@ export default function LandingPage() {
               ].map((s, i) => (
                 <div key={s.step} className={`reveal flex items-start gap-6 md:gap-10 ${i === 1 ? "md:flex-row-reverse" : ""}`}
                   style={{ transitionDelay: `${i * .15}s` }}>
-                  <div className="relative flex h-14 w-14 shrink-0 items-center justify-center rounded-2xl bg-[#0C1B33] border border-[#8B5CF6]/30 text-lg font-extrabold text-[#8B5CF6] shadow-xl shadow-[#8B5CF6]/10">
+                  <div className="relative flex h-14 w-14 shrink-0 items-center justify-center rounded-2xl bg-white border border-[#8B5CF6]/30 text-lg font-extrabold text-[#7C3AED] shadow-md shadow-[#8B5CF6]/10">
                     {s.step}
-                    <div className="absolute inset-0 rounded-2xl bg-[#8B5CF6]/5" />
                   </div>
-                  <div className={`flex-1 rounded-2xl border border-white/8 bg-white/4 p-6 backdrop-blur-sm ${i === 1 ? "md:text-right" : ""}`}>
-                    <h3 className="mb-2 text-lg font-bold text-white">{s.title}</h3>
-                    <p className="text-sm leading-relaxed text-white/45">{s.body}</p>
+                  <div className={`flex-1 rounded-2xl border border-[#E8E4F3] bg-white p-6 shadow-sm ${i === 1 ? "md:text-right" : ""}`}>
+                    <h3 className="mb-2 text-lg font-bold text-[#0C1B33]">{s.title}</h3>
+                    <p className="text-sm leading-relaxed text-slate-600">{s.body}</p>
                   </div>
                 </div>
               ))}
@@ -505,11 +499,11 @@ export default function LandingPage() {
         </section>
 
         {/* ── BENEFITS ────────────────────────────────────────────────────── */}
-        <section className="px-6 py-28 bg-[#070E1C]">
+        <section className="px-6 py-28 bg-white">
           <div className="mx-auto max-w-5xl">
             <div className="reveal mb-14 text-center">
-              <p className="mb-3 text-xs font-bold uppercase tracking-widest text-[#8B5CF6]">Benefits</p>
-              <h2 className="text-3xl font-bold md:text-4xl text-white">The impact from day one.</h2>
+              <p className="mb-3 text-xs font-bold uppercase tracking-widest text-[#7C3AED]">Benefits</p>
+              <h2 className="text-3xl font-bold md:text-4xl text-[#0C1B33]">The impact from day one.</h2>
             </div>
             <div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
               {[
@@ -520,10 +514,10 @@ export default function LandingPage() {
                 { metric: "24/7",title: "Always available",           body: "Guests can get help and make bookings even when your team is offline." },
                 { metric: "<10m",title: "Setup time",                 body: "Connect WhatsApp, configure your first flow, and go live in under 10 minutes." },
               ].map((b, i) => (
-                <div key={b.title} className="reveal card3d rounded-2xl border border-white/8 bg-white/4 p-6" style={{ transitionDelay: `${i * .07}s` }}>
-                  <div className="mb-3 text-3xl font-extrabold bg-linear-to-r from-[#8B5CF6] to-[#A78BFA] bg-clip-text text-transparent">{b.metric}</div>
-                  <h3 className="mb-1.5 font-bold text-white">{b.title}</h3>
-                  <p className="text-sm leading-relaxed text-white/40">{b.body}</p>
+                <div key={b.title} className="reveal card3d rounded-2xl border border-[#E8E4F3] bg-white p-6 shadow-sm" style={{ transitionDelay: `${i * .07}s` }}>
+                  <div className="mb-3 text-3xl font-extrabold bg-linear-to-r from-[#7C3AED] to-[#A78BFA] bg-clip-text text-transparent">{b.metric}</div>
+                  <h3 className="mb-1.5 font-bold text-[#0C1B33]">{b.title}</h3>
+                  <p className="text-sm leading-relaxed text-slate-600">{b.body}</p>
                 </div>
               ))}
             </div>
@@ -531,11 +525,11 @@ export default function LandingPage() {
         </section>
 
         {/* ── TESTIMONIALS ────────────────────────────────────────────────── */}
-        <section className="px-6 py-28 bg-linear-to-b from-[#0a1628] to-[#070E1C]">
+        <section className="px-6 py-28 bg-linear-to-b from-[#F7F5FC] to-white">
           <div className="mx-auto max-w-5xl">
             <div className="reveal mb-14 text-center">
-              <p className="mb-3 text-xs font-bold uppercase tracking-widest text-[#8B5CF6]">What people say</p>
-              <h2 className="text-3xl font-bold text-white">Trusted by operators who care about efficiency.</h2>
+              <p className="mb-3 text-xs font-bold uppercase tracking-widest text-[#7C3AED]">What people say</p>
+              <h2 className="text-3xl font-bold text-[#0C1B33]">Trusted by operators who care about efficiency.</h2>
             </div>
             <div className="grid gap-6 md:grid-cols-3">
               {[
@@ -543,7 +537,7 @@ export default function LandingPage() {
                 { quote: "The booking flow alone saves us two hours every day. Guests confirm through WhatsApp without our staff lifting a finger.", name: "Arjun K.", role: "Operations Manager · Munnar Hill Resort" },
                 { quote: "I was sceptical about automation, but the setup was so simple. It genuinely feels like we hired an extra team member.", name: "Fatima R.", role: "Director · Varkala Beach Hotel" },
               ].map((t, i) => (
-                <div key={t.name} className="reveal card3d flex flex-col rounded-2xl border border-white/8 bg-white/4 p-6" style={{ transitionDelay: `${i * .12}s` }}>
+                <div key={t.name} className="reveal card3d flex flex-col rounded-2xl border border-[#E8E4F3] bg-white p-6 shadow-sm" style={{ transitionDelay: `${i * .12}s` }}>
                   <div className="mb-4 flex gap-0.5">
                     {[...Array(5)].map((_, j) => (
                       <svg key={j} className="h-4 w-4 text-[#8B5CF6]" fill="currentColor" viewBox="0 0 20 20">
@@ -551,10 +545,10 @@ export default function LandingPage() {
                       </svg>
                     ))}
                   </div>
-                  <p className="flex-1 text-sm leading-relaxed text-white/55 italic">"{t.quote}"</p>
-                  <div className="mt-5 border-t border-white/8 pt-4">
-                    <p className="text-sm font-bold text-white">{t.name}</p>
-                    <p className="text-xs text-white/30">{t.role}</p>
+                  <p className="flex-1 text-sm leading-relaxed text-slate-600 italic">"{t.quote}"</p>
+                  <div className="mt-5 border-t border-[#E8E4F3] pt-4">
+                    <p className="text-sm font-bold text-[#0C1B33]">{t.name}</p>
+                    <p className="text-xs text-slate-400">{t.role}</p>
                   </div>
                 </div>
               ))}
@@ -563,12 +557,12 @@ export default function LandingPage() {
         </section>
 
         {/* ── PRICING ─────────────────────────────────────────────────────── */}
-        <section id="pricing" className="px-6 py-28 bg-[#070E1C]">
+        <section id="pricing" className="px-6 py-28 bg-white">
           <div className="mx-auto max-w-3xl text-center">
             <div className="reveal">
-              <p className="mb-3 text-xs font-bold uppercase tracking-widest text-[#8B5CF6]">Pricing</p>
-              <h2 className="text-3xl font-bold md:text-4xl text-white">Simple pricing. No surprises.</h2>
-              <p className="mx-auto mt-4 max-w-xl text-base text-white/45">
+              <p className="mb-3 text-xs font-bold uppercase tracking-widest text-[#7C3AED]">Pricing</p>
+              <h2 className="text-3xl font-bold md:text-4xl text-[#0C1B33]">Simple pricing. No surprises.</h2>
+              <p className="mx-auto mt-4 max-w-xl text-base text-slate-600">
                 Start with a free trial. Upgrade when you're ready. Every plan includes all core features.
               </p>
             </div>
@@ -579,17 +573,17 @@ export default function LandingPage() {
                 { name: "Growth", price: "₹5,999", period: "per month", features: ["Unlimited conversations","Unlimited AI replies","Dedicated support"], cta: "Get started", featured: false },
               ].map((plan) => (
                 <div key={plan.name}
-                  className={`card3d rounded-2xl border p-6 text-left relative overflow-hidden ${plan.featured ? "border-[#8B5CF6]/50 bg-linear-to-b from-[#8B5CF6]/10 to-[#8B5CF6]/3" : "border-white/8 bg-white/4"}`}>
+                  className={`card3d rounded-2xl border p-6 text-left relative overflow-hidden ${plan.featured ? "border-[#8B5CF6]/40 bg-linear-to-b from-[#8B5CF6]/8 to-white shadow-md" : "border-[#E8E4F3] bg-white shadow-sm"}`}>
                   {plan.featured && <div className="absolute inset-0 rounded-2xl pointer-events-none" style={{ animation: "borderGlow 3s ease-in-out infinite" }} />}
-                  <p className={`mb-1 text-xs font-bold uppercase tracking-widest ${plan.featured ? "text-[#8B5CF6]" : "text-white/30"}`}>{plan.name}</p>
+                  <p className={`mb-1 text-xs font-bold uppercase tracking-widest ${plan.featured ? "text-[#7C3AED]" : "text-slate-400"}`}>{plan.name}</p>
                   <div className="mb-1 flex items-end gap-1">
-                    <span className="text-3xl font-extrabold text-white">{plan.price}</span>
+                    <span className="text-3xl font-extrabold text-[#0C1B33]">{plan.price}</span>
                   </div>
-                  <p className={`mb-5 text-xs ${plan.featured ? "text-white/40" : "text-white/25"}`}>{plan.period}</p>
+                  <p className={`mb-5 text-xs ${plan.featured ? "text-slate-500" : "text-slate-400"}`}>{plan.period}</p>
                   <ul className="mb-6 space-y-2">
                     {plan.features.map((f) => (
-                      <li key={f} className="flex items-center gap-2 text-sm text-white/55">
-                        <svg className={`h-3.5 w-3.5 shrink-0 ${plan.featured ? "text-[#8B5CF6]" : "text-white/30"}`} fill="currentColor" viewBox="0 0 20 20">
+                      <li key={f} className="flex items-center gap-2 text-sm text-slate-600">
+                        <svg className={`h-3.5 w-3.5 shrink-0 ${plan.featured ? "text-[#8B5CF6]" : "text-slate-400"}`} fill="currentColor" viewBox="0 0 20 20">
                           <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
                         </svg>
                         {f}
@@ -597,7 +591,7 @@ export default function LandingPage() {
                     ))}
                   </ul>
                   <Link href="/get-started"
-                    className={`block rounded-lg py-2.5 text-center text-sm font-bold transition hover:scale-105 active:scale-95 ${plan.featured ? "bg-[#8B5CF6] text-white shadow-lg shadow-[#8B5CF6]/30 hover:bg-[#7C3AED]" : "border border-white/15 text-white/70 hover:border-white/30 hover:text-white"}`}>
+                    className={`block rounded-lg py-2.5 text-center text-sm font-bold transition hover:scale-105 active:scale-95 ${plan.featured ? "bg-[#8B5CF6] text-white shadow-lg shadow-[#8B5CF6]/25 hover:bg-[#7C3AED]" : "border border-[#E8E4F3] text-slate-600 hover:border-[#8B5CF6]/40 hover:text-[#0C1B33]"}`}>
                     {plan.cta}
                   </Link>
                 </div>
@@ -607,44 +601,43 @@ export default function LandingPage() {
         </section>
 
         {/* ── FINAL CTA ───────────────────────────────────────────────────── */}
-        <section className="relative overflow-hidden px-6 py-36 text-center bg-[#070E1C]">
+        <section className="relative overflow-hidden px-6 py-36 text-center bg-linear-to-b from-white to-[#F7F5FC]">
           <div className="pointer-events-none absolute inset-0">
-            <div className="anim-orb absolute left-1/2 top-0 h-125 w-175 -translate-x-1/2 -translate-y-1/2 rounded-full bg-[#1B52A8] blur-[120px]" />
-            <div className="anim-orb absolute bottom-0 left-1/4 h-[300px] w-[400px] translate-y-1/2 rounded-full bg-[#8B5CF6] blur-[100px]" style={{ animationDelay: "2s" }} />
+            <div className="anim-orb absolute left-1/2 top-0 h-125 w-175 -translate-x-1/2 -translate-y-1/2 rounded-full bg-[#8B5CF6] blur-[120px]" />
+            <div className="anim-orb absolute bottom-0 left-1/4 h-[300px] w-[400px] translate-y-1/2 rounded-full bg-[#A78BFA] blur-[100px]" style={{ animationDelay: "2s" }} />
           </div>
           {/* Animated grid lines */}
           <div className="pointer-events-none absolute inset-0 opacity-[.03]"
-            style={{ backgroundImage: "linear-gradient(#fff 1px,transparent 1px),linear-gradient(90deg,#fff 1px,transparent 1px)", backgroundSize: "40px 40px" }} />
+            style={{ backgroundImage: "linear-gradient(#0C1B33 1px,transparent 1px),linear-gradient(90deg,#0C1B33 1px,transparent 1px)", backgroundSize: "40px 40px" }} />
 
           <div className="relative reveal">
-            <p className="mb-4 text-xs font-bold uppercase tracking-widest text-[#8B5CF6]">Get started today</p>
+            <p className="mb-4 text-xs font-bold uppercase tracking-widest text-[#7C3AED]">Get started today</p>
             <h2 className="mx-auto max-w-3xl text-4xl font-extrabold leading-tight md:text-5xl"
-              style={{ background: "linear-gradient(135deg,#fff 50%,#8B5CF6 100%)", WebkitBackgroundClip: "text", WebkitTextFillColor: "transparent" }}>
+              style={{ background: "linear-gradient(135deg,#0C1B33 45%,#7C3AED 100%)", WebkitBackgroundClip: "text", WebkitTextFillColor: "transparent" }}>
               Your hotel deserves to run better.
             </h2>
-            <p className="mx-auto mt-5 max-w-xl text-lg text-white/40">
+            <p className="mx-auto mt-5 max-w-xl text-lg text-slate-600">
               Join hotels already using Vaketta to automate operations and serve guests better.
             </p>
             <div className="mt-10 flex flex-col items-center justify-center gap-4 sm:flex-row">
               <Link href="/get-started"
-                className="group relative inline-flex items-center gap-2 overflow-hidden rounded-xl bg-[#8B5CF6] px-10 py-4 text-sm font-bold text-white shadow-2xl shadow-[#8B5CF6]/30 transition-all hover:scale-105 hover:shadow-[#8B5CF6]/50 active:scale-95">
-                <span className="absolute inset-0 bg-white/0 group-hover:bg-white/10 transition" />
+                className="group relative inline-flex items-center gap-2 overflow-hidden rounded-xl bg-[#8B5CF6] px-10 py-4 text-sm font-bold text-white shadow-xl shadow-[#8B5CF6]/25 transition-all hover:bg-[#7C3AED] hover:scale-105 hover:shadow-[#8B5CF6]/40 active:scale-95">
                 Start your free trial
                 <svg className="h-4 w-4 transition-transform group-hover:translate-x-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M13 7l5 5m0 0l-5 5m5-5H6" />
                 </svg>
               </Link>
               <a href="mailto:support@vaketta.com"
-                className="rounded-xl border border-white/15 px-10 py-4 text-sm font-semibold text-white/60 transition hover:border-white/30 hover:text-white">
+                className="rounded-xl border border-[#E8E4F3] bg-white px-10 py-4 text-sm font-semibold text-slate-600 transition hover:border-[#8B5CF6]/40 hover:text-[#0C1B33]">
                 Talk to us
               </a>
             </div>
-            <p className="mt-6 text-xs text-white/20">No credit card required · Cancel anytime · Setup in minutes</p>
+            <p className="mt-6 text-xs text-slate-400">No credit card required · Cancel anytime · Setup in minutes</p>
           </div>
         </section>
 
         {/* ── FOOTER ──────────────────────────────────────────────────────── */}
-        <footer className="border-t border-white/8 bg-[#040A14] px-6 py-14">
+        <footer className="border-t border-[#E8E4F3] bg-[#0C1B33] px-6 py-14">
           <div className="mx-auto max-w-5xl">
             <div className="flex flex-col items-start justify-between gap-10 md:flex-row">
               <div className="max-w-xs">
@@ -652,29 +645,29 @@ export default function LandingPage() {
                   <img src="/vakettaVlogo.png" alt="Vaketta" className="h-7 w-7 object-contain" />
                   <span className="text-base font-bold text-white">Vaketta</span>
                 </div>
-                <p className="text-sm leading-relaxed text-white/30">AI-powered business automation for hotels and service businesses.</p>
-                <p className="mt-3 text-xs text-white/15">Varkala, Kerala, India</p>
+                <p className="text-sm leading-relaxed text-white/45">AI-powered business automation for hotels and service businesses.</p>
+                <p className="mt-3 text-xs text-white/25">Varkala, Kerala, India</p>
               </div>
               <div className="grid grid-cols-2 gap-x-16 gap-y-2 text-sm">
                 <div className="space-y-2">
-                  <p className="mb-3 text-xs font-bold uppercase tracking-widest text-white/20">Product</p>
+                  <p className="mb-3 text-xs font-bold uppercase tracking-widest text-white/30">Product</p>
                   {["Vaketta Chat","Vaketta PMS","Vaketta Flow"].map((l) => (
-                    <p key={l}><a href="#product" className="text-white/35 transition hover:text-white">{l}</a></p>
+                    <p key={l}><a href="#product" className="text-white/50 transition hover:text-white">{l}</a></p>
                   ))}
                 </div>
                 <div className="space-y-2">
-                  <p className="mb-3 text-xs font-bold uppercase tracking-widest text-white/20">Company</p>
-                  <p><Link href="/privacy-policy" className="text-white/35 transition hover:text-white">Privacy Policy</Link></p>
-                  <p><Link href="/terms" className="text-white/35 transition hover:text-white">Terms of Service</Link></p>
-                  <p><Link href="/data-deletion" className="text-white/35 transition hover:text-white">Data Deletion</Link></p>
-                  <p><a href="mailto:support@vaketta.com" className="text-white/35 transition hover:text-white">Support</a></p>
-                  <p><Link href="/login" className="text-white/35 transition hover:text-white">Sign in</Link></p>
+                  <p className="mb-3 text-xs font-bold uppercase tracking-widest text-white/30">Company</p>
+                  <p><Link href="/privacy-policy" className="text-white/50 transition hover:text-white">Privacy Policy</Link></p>
+                  <p><Link href="/terms" className="text-white/50 transition hover:text-white">Terms of Service</Link></p>
+                  <p><Link href="/data-deletion" className="text-white/50 transition hover:text-white">Data Deletion</Link></p>
+                  <p><a href="mailto:support@vaketta.com" className="text-white/50 transition hover:text-white">Support</a></p>
+                  <p><Link href="/login" className="text-white/50 transition hover:text-white">Sign in</Link></p>
                 </div>
               </div>
             </div>
-            <div className="mt-10 flex flex-col items-center justify-between gap-3 border-t border-white/6 pt-6 text-xs text-white/15 sm:flex-row">
+            <div className="mt-10 flex flex-col items-center justify-between gap-3 border-t border-white/10 pt-6 text-xs text-white/30 sm:flex-row">
               <p>© {new Date().getFullYear()} Vaketta. All rights reserved.</p>
-              <p>Made with care in India 🇮🇳</p>
+              <p>Made with care in India</p>
             </div>
           </div>
         </footer>

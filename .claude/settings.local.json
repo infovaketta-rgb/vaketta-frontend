@@ -27,7 +27,8 @@
       "PowerShell(& \"$env:LOCALAPPDATA\\\\Microsoft\\\\WindowsApps\\\\winget.exe\" install --id Python.Python.3.12 -e --source winget --accept-package-agreements --accept-source-agreements --disable-interactivity)",
       "PowerShell($py = \"C:\\\\Users\\\\myoos\\\\AppData\\\\Local\\\\Programs\\\\Python\\\\Python312\\\\python.exe\"; & $py --version; & $py \"C:\\\\Users\\\\myoos\\\\.claude\\\\skills\\\\ui-ux-pro-max\\\\scripts\\\\search.py\" \"hotel management SaaS staff dashboard admin panel professional data-dense\" --design-system -p \"Vaketta Chat\")",
       "PowerShell($py = \"C:\\\\Users\\\\myoos\\\\AppData\\\\Local\\\\Programs\\\\Python\\\\Python312\\\\python.exe\"; Set-Location \"C:\\\\Users\\\\myoos\\\\hotel-automation-frontend\"; & $py \"C:\\\\Users\\\\myoos\\\\.claude\\\\skills\\\\ui-ux-pro-max\\\\scripts\\\\search.py\" \"hotel management SaaS staff dashboard admin panel professional data-dense\" --design-system --persist -p \"Vaketta Chat\" -f markdown 2>&1 | Select-Object -First 5; \"---\"; Get-ChildItem \"C:\\\\Users\\\\myoos\\\\hotel-automation-frontend\\\\design-system\" -Recurse -ErrorAction SilentlyContinue | Select-Object FullName)",
-      "Bash(echo \"EXIT: $?\")"
+      "Bash(echo \"EXIT: $?\")",
+      "PowerShell($py = \"C:\\\\Users\\\\myoos\\\\AppData\\\\Local\\\\Programs\\\\Python\\\\Python312\\\\python.exe\"; & $py \"C:\\\\Users\\\\myoos\\\\.claude\\\\skills\\\\ui-ux-pro-max\\\\scripts\\\\search.py\" \"SaaS landing page light white minimal purple violet professional\" --domain color -n 3; \"===STYLE===\"; & $py \"C:\\\\Users\\\\myoos\\\\.claude\\\\skills\\\\ui-ux-pro-max\\\\scripts\\\\search.py\" \"light minimal SaaS clean\" --domain style -n 2)"
     ]
   }
 }
