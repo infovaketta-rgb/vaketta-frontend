@@ -4,7 +4,7 @@ import { useEffect, useRef, useState } from "react";
 import { usePathname, useRouter } from "next/navigation";
 import { getHotelName, getUserName, getUserRole, logout } from "@/lib/auth";
 import { apiFetch } from "@/lib/api";
-import { getSocket } from "@/lib/socket";
+import { useSocket } from "@/context/SocketContext";
 import { useMounted } from "@/lib/useMounted";
 import { saveLocale } from "@/lib/locale";
 
@@ -44,6 +44,7 @@ function getInitials(name: string | null): string {
 
 export default function TopBar({ onMenuClick }: { onMenuClick?: () => void }) {
   const mounted    = useMounted();
+  const socket     = useSocket();
   const pathname   = usePathname();
   const router     = useRouter();
 
@@ -88,8 +89,7 @@ export default function TopBar({ onMenuClick }: { onMenuClick?: () => void }) {
 
   // Live unread count via socket
   useEffect(() => {
-    if (!mounted) return;
-    const socket = getSocket();
+    if (!mounted || !socket) return;
 
     const onNewMessage = ({ message }: { message: any }) => {
       if (message.direction === "IN") {
@@ -111,7 +111,7 @@ export default function TopBar({ onMenuClick }: { onMenuClick?: () => void }) {
       socket.off("message:new", onNewMessage);
       socket.off("message:read", onRead);
     };
-  }, [mounted]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [mounted, socket]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Close user menu on outside click
   useEffect(() => {

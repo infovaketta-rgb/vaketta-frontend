@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { apiFetch } from "@/lib/api";
 import { useMounted } from "@/lib/useMounted";
+import { useSocket } from "@/context/SocketContext";
 import { SkeletonStatCard, SkeletonTableRow } from "@/components/Skeleton";
 import ErrorBoundary from "@/components/ErrorBoundary";
 import BookingsBarChart from "@/components/dashboard/BookingsBarChart";
@@ -14,6 +15,7 @@ import { formatCurrency } from "@/lib/locale";
 
 export default function DashboardPage() {
   const mounted = useMounted();
+  const socket  = useSocket();
   const [data, setData] = useState<DashboardPayload | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
@@ -42,6 +44,22 @@ export default function DashboardPage() {
       cancelled = true;
     };
   }, [mounted]);
+
+  // Refresh stats in real-time when bookings change
+  useEffect(() => {
+    if (!mounted || !socket) return;
+    const refresh = () => {
+      apiFetch("/dashboard")
+        .then((json) => setData(json as DashboardPayload))
+        .catch(() => {});
+    };
+    socket.on("booking:new", refresh);
+    socket.on("booking:updated", refresh);
+    return () => {
+      socket.off("booking:new", refresh);
+      socket.off("booking:updated", refresh);
+    };
+  }, [mounted, socket]);
 
   if (!mounted) {
     return null;

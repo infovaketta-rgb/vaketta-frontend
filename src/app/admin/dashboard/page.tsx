@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { adminApiFetch } from "@/lib/adminApi";
 import { useMounted } from "@/lib/useMounted";
+import { useSocket } from "@/context/SocketContext";
 
 interface HotelRow {
   id: string;
@@ -45,6 +46,7 @@ function KpiCard({ label, value, icon, accent }: {
 export default function AdminDashboardPage() {
   const mounted = useMounted();
   const router  = useRouter();
+  const socket  = useSocket();
   const [stats,        setStats]        = useState<Stats | null>(null);
   const [recentHotels, setRecentHotels] = useState<HotelRow[]>([]);
   const [loading,      setLoading]      = useState(true);
@@ -71,6 +73,36 @@ export default function AdminDashboardPage() {
 
     return () => { cancelled = true; };
   }, [mounted, router]);
+
+  // Real-time: new hotels appear without refresh
+  useEffect(() => {
+    if (!mounted || !socket) return;
+    const onHotelNew = ({ hotel }: { hotel: Partial<HotelRow> & { id: string } }) => {
+      const row: HotelRow = {
+        id: hotel.id,
+        name: hotel.name ?? "",
+        phone: hotel.phone ?? "",
+        createdAt: hotel.createdAt ?? new Date().toISOString(),
+        _count: hotel._count ?? { users: 0, guests: 0, bookings: 0 },
+      };
+      setStats((prev) => (prev ? { ...prev, totalHotels: prev.totalHotels + 1 } : prev));
+      setRecentHotels((prev) =>
+        prev.some((h) => h.id === row.id) ? prev : [row, ...prev].slice(0, 10)
+      );
+    };
+    const onHotelDeleted = ({ hotelId }: { hotelId: string }) => {
+      setStats((prev) =>
+        prev ? { ...prev, totalHotels: Math.max(0, prev.totalHotels - 1) } : prev
+      );
+      setRecentHotels((prev) => prev.filter((h) => h.id !== hotelId));
+    };
+    socket.on("admin:hotel_new", onHotelNew);
+    socket.on("admin:hotel_deleted", onHotelDeleted);
+    return () => {
+      socket.off("admin:hotel_new", onHotelNew);
+      socket.off("admin:hotel_deleted", onHotelDeleted);
+    };
+  }, [mounted, socket]);
 
   if (!mounted) return null;
 

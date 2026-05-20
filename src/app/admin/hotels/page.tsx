@@ -6,6 +6,7 @@ import { adminApiFetch } from "@/lib/adminApi";
 import { logAdminAction } from "@/lib/adminAudit";
 import { SkeletonRow } from "@/components/admin/SkeletonRow";
 import { useMounted } from "@/lib/useMounted";
+import { useSocket } from "@/context/SocketContext";
 
 interface Hotel {
   id: string;
@@ -22,6 +23,7 @@ const inputCls =
 
 export default function AdminHotelsPage() {
   const mounted = useMounted();
+  const socket  = useSocket();
   const [hotels, setHotels] = useState<Hotel[]>([]);
   const [total, setTotal] = useState(0);
   const [pages, setPages] = useState(1);
@@ -75,6 +77,41 @@ export default function AdminHotelsPage() {
 
     return () => { cancelled = true; };
   }, [mounted, page, debouncedSearch]);
+
+  // Real-time hotel list updates
+  useEffect(() => {
+    if (!mounted || !socket) return;
+
+    const onHotelNew = ({ hotel }: { hotel: Partial<Hotel> & { id: string } }) => {
+      const row: Hotel = {
+        id: hotel.id,
+        name: hotel.name ?? "",
+        phone: hotel.phone ?? "",
+        createdAt: hotel.createdAt ?? new Date().toISOString(),
+        _count: hotel._count ?? { users: 0, guests: 0, bookings: 0 },
+      };
+      setHotels((prev) => (prev.some((h) => h.id === row.id) ? prev : [row, ...prev]));
+      setTotal((t) => t + 1);
+    };
+
+    const onHotelUpdated = ({ hotel }: { hotel: Partial<Hotel> & { id: string } }) => {
+      setHotels((prev) => prev.map((h) => (h.id === hotel.id ? { ...h, ...hotel } : h)));
+    };
+
+    const onHotelDeleted = ({ hotelId }: { hotelId: string }) => {
+      setHotels((prev) => prev.filter((h) => h.id !== hotelId));
+      setTotal((t) => Math.max(0, t - 1));
+    };
+
+    socket.on("admin:hotel_new", onHotelNew);
+    socket.on("admin:hotel_updated", onHotelUpdated);
+    socket.on("admin:hotel_deleted", onHotelDeleted);
+    return () => {
+      socket.off("admin:hotel_new", onHotelNew);
+      socket.off("admin:hotel_updated", onHotelUpdated);
+      socket.off("admin:hotel_deleted", onHotelDeleted);
+    };
+  }, [mounted, socket]);
 
   async function handleCreate(e: React.FormEvent) {
     e.preventDefault();

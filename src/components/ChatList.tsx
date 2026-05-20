@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import { apiFetch } from "@/lib/api";
-import { getSocket } from "@/lib/socket";
+import { useSocket } from "@/context/SocketContext";
 import { useChatStore } from "@/store/chatStore";
 import { useMounted } from "@/lib/useMounted";
 import { useToastStore } from "@/store/toastStore";
@@ -191,6 +191,7 @@ function RowDropdown({ onDelete, onSelect, onClear, onClose }: DropdownProps) {
 
 export default function ChatList() {
   const mounted = useMounted();
+  const socket = useSocket();
   const [conversations, setConversations] = useState<Conversation[]>([]);
   const conversationsRef = useRef<Conversation[]>([]);
   const [search, setSearch] = useState("");
@@ -233,8 +234,7 @@ export default function ChatList() {
 
   // Socket: update conversation list in real-time
   useEffect(() => {
-    if (!mounted) return;
-    const socket = getSocket();
+    if (!mounted || !socket) return;
 
     const onNewMessage = ({ message }: { message: any }) => {
       if (!conversationsRef.current.some((c) => c.guestId === message.guestId)) {
@@ -277,7 +277,7 @@ export default function ChatList() {
       socket.off("message:new", onNewMessage);
       socket.off("message:read", onRead);
     };
-  }, [mounted, selectedGuestId]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [mounted, selectedGuestId, socket]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // ── Actions ─────────────────────────────────────────────────────────────────
 

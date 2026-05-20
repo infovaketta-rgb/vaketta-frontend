@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import dynamic from "next/dynamic";
 import { apiFetch } from "@/lib/api";
 import { useMounted } from "@/lib/useMounted";
+import { useSocket } from "@/context/SocketContext";
 import { SkeletonTableRow } from "@/components/Skeleton";
 import { useToastStore } from "@/store/toastStore";
 
@@ -20,6 +21,7 @@ const inputClass =
 export default function BookingsPage() {
   const mounted = useMounted();
   const router  = useRouter();
+  const socket  = useSocket();
   const { addToast } = useToastStore();
   const [bookings, setBookings] = useState<any[]>([]);
   const [loadError, setLoadError] = useState("");
@@ -58,6 +60,37 @@ export default function BookingsPage() {
       setLoadError(err.message || "Failed to load bookings.");
     }).finally(() => setLoading(false));
   }, [mounted, page]);
+
+  // Real-time booking updates
+  useEffect(() => {
+    if (!mounted || !socket) return;
+
+    const onBookingNew = ({ booking }: { booking: any }) => {
+      if (!booking) return;
+      setBookings((prev) =>
+        prev.some((b) => b.id === booking.id) ? prev : [booking, ...prev]
+      );
+    };
+
+    const onBookingUpdated = (payload: { bookingId?: string; status?: string; booking?: any }) => {
+      if (payload.booking) {
+        setBookings((prev) =>
+          prev.map((b) => (b.id === payload.booking.id ? { ...b, ...payload.booking } : b))
+        );
+      } else if (payload.bookingId && payload.status) {
+        setBookings((prev) =>
+          prev.map((b) => (b.id === payload.bookingId ? { ...b, status: payload.status } : b))
+        );
+      }
+    };
+
+    socket.on("booking:new", onBookingNew);
+    socket.on("booking:updated", onBookingUpdated);
+    return () => {
+      socket.off("booking:new", onBookingNew);
+      socket.off("booking:updated", onBookingUpdated);
+    };
+  }, [mounted, socket]);
 
   // Close menu on outside click
   useEffect(() => {

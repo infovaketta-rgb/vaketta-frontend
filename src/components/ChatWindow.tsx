@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import { apiFetch } from "@/lib/api";
-import { getSocket } from "@/lib/socket";
+import { useSocket } from "@/context/SocketContext";
 import { useChatStore, type TemplateBubbleMeta } from "@/store/chatStore";
 import { useMounted } from "@/lib/useMounted";
 import BookingForm from "./BookingForm";
@@ -594,6 +594,7 @@ function DeletePopup({
 
 export default function ChatWindow() {
   const mounted = useMounted();
+  const socket = useSocket();
   const [showBooking, setShowBooking] = useState(false);
   const [sending, setSending] = useState(false);
   const [loading, setLoading] = useState(false);
@@ -707,8 +708,7 @@ export default function ChatWindow() {
 
   // Socket
   useEffect(() => {
-    if (!mounted) return;
-    const socket = getSocket();
+    if (!mounted || !socket) return;
 
     const onNewMessage = ({ message }: { message: any }) => addMessage(message);
     const onRead = ({ guestId: readGuestId }: { guestId: string }) => markMessagesRead(readGuestId);
@@ -757,7 +757,7 @@ return () => {
   socket.off("message:undo", onUndo);
   socket.off("message:media_ready", onMediaReady);
 };
-  }, [mounted, guestId]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [mounted, guestId, socket]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Close attachment menu on outside click
   useEffect(() => {

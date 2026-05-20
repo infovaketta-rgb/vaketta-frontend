@@ -17,7 +17,17 @@
       "Bash(Get-ChildItem -Path \"c:\\\\Users\\\\myoos\\\\hotel-automation-frontend\\\\src\" -Recurse -Directory)",
       "Bash(Select-Object -ExpandProperty FullName)",
       "Bash(Get-ChildItem -Path src -Recurse -File -Name)",
-      "Bash(xargs grep -l \"Socket\\\\|io\\\\.\")"
+      "Bash(xargs grep -l \"Socket\\\\|io\\\\.\")",
+      "PowerShell($p = \\(Get-Command python -ErrorAction SilentlyContinue\\); if \\($p\\) { python --version } else { \"python not found\" }; $p3 = \\(Get-Command py -ErrorAction SilentlyContinue\\); if \\($p3\\) { py --version } else { \"py launcher not found\" })",
+      "Read(//c/Users/myoos/.claude/skills/ui-ux-pro-max/**)",
+      "Read(//c/Users/myoos/.claude/skills/ui-ux-pro-max/data/**)",
+      "Read(//c/Users/myoos/.claude/skills/ui-ux-pro-max/scripts/**)",
+      "PowerShell(winget install --id Python.Python.3.12 -e --source winget --accept-package-agreements --accept-source-agreements)",
+      "PowerShell($w = Get-ChildItem \"$env:LOCALAPPDATA\\\\Microsoft\\\\WindowsApps\\\\winget.exe\" -ErrorAction SilentlyContinue; if \\($w\\) { $w.FullName } else { \"winget.exe not found in WindowsApps\" }; Get-AppxPackage -Name \"Microsoft.DesktopAppInstaller\" -ErrorAction SilentlyContinue | Select-Object -ExpandProperty Version)",
+      "PowerShell(& \"$env:LOCALAPPDATA\\\\Microsoft\\\\WindowsApps\\\\winget.exe\" install --id Python.Python.3.12 -e --source winget --accept-package-agreements --accept-source-agreements --disable-interactivity)",
+      "PowerShell($py = \"C:\\\\Users\\\\myoos\\\\AppData\\\\Local\\\\Programs\\\\Python\\\\Python312\\\\python.exe\"; & $py --version; & $py \"C:\\\\Users\\\\myoos\\\\.claude\\\\skills\\\\ui-ux-pro-max\\\\scripts\\\\search.py\" \"hotel management SaaS staff dashboard admin panel professional data-dense\" --design-system -p \"Vaketta Chat\")",
+      "PowerShell($py = \"C:\\\\Users\\\\myoos\\\\AppData\\\\Local\\\\Programs\\\\Python\\\\Python312\\\\python.exe\"; Set-Location \"C:\\\\Users\\\\myoos\\\\hotel-automation-frontend\"; & $py \"C:\\\\Users\\\\myoos\\\\.claude\\\\skills\\\\ui-ux-pro-max\\\\scripts\\\\search.py\" \"hotel management SaaS staff dashboard admin panel professional data-dense\" --design-system --persist -p \"Vaketta Chat\" -f markdown 2>&1 | Select-Object -First 5; \"---\"; Get-ChildItem \"C:\\\\Users\\\\myoos\\\\hotel-automation-frontend\\\\design-system\" -Recurse -ErrorAction SilentlyContinue | Select-Object FullName)",
+      "Bash(echo \"EXIT: $?\")"
     ]
   }
 }
