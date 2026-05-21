@@ -1,5 +1,5 @@
 "use client";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { logout } from "@/lib/auth";
 
 export default function Login() {
@@ -7,6 +7,13 @@ export default function Login() {
   const [password, setPassword] = useState("");
   const [loading, setLoading]   = useState(false);
   const [error, setError]       = useState("");
+  const [notice, setNotice]     = useState("");
+
+  useEffect(() => {
+    if (new URLSearchParams(window.location.search).get("reset") === "1") {
+      setNotice("Password reset successfully. Please sign in with your new password.");
+    }
+  }, []);
 
   async function handleLogin() {
     setError("");
@@ -125,9 +132,17 @@ export default function Login() {
             </div>
 
             <div>
-              <label className="block text-xs font-semibold uppercase tracking-wider text-[#0C1B33]/60 mb-1.5">
-                Password
-              </label>
+              <div className="mb-1.5 flex items-center justify-between">
+                <label className="block text-xs font-semibold uppercase tracking-wider text-[#0C1B33]/60">
+                  Password
+                </label>
+                <a
+                  href="/forgot-password"
+                  className="text-xs font-semibold text-[#1B52A8] transition hover:text-[#163F82] hover:underline"
+                >
+                  Forgot password?
+                </a>
+              </div>
               <input
                 type="password"
                 value={password}
@@ -137,6 +152,12 @@ export default function Login() {
                 className="w-full rounded-xl border border-[#E5E0D4] bg-white px-4 py-3 text-sm text-[#0C1B33] placeholder-slate-400 shadow-sm transition focus:border-[#1B52A8] focus:outline-none focus:ring-2 focus:ring-[#1B52A8]/20"
               />
             </div>
+
+            {notice && (
+              <div className="rounded-lg border border-emerald-200 bg-emerald-50 px-4 py-2.5 text-xs text-emerald-700">
+                {notice}
+              </div>
+            )}
 
             {error && (
               <div className="rounded-lg border border-red-200 bg-red-50 px-4 py-2.5 text-xs text-red-700">
