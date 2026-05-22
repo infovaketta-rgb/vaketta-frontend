@@ -177,6 +177,13 @@ function AdminLayoutInner({ children }: { children: React.ReactNode }) {
 }
 
 export default function AdminLayout({ children }: { children: React.ReactNode }) {
+  const pathname = usePathname();
+
+  // Login page must NOT mount the socket provider: it would call adminApiFetch
+  // for a socket token while unauthenticated → 401 → redirect to /admin/login →
+  // remount → 401 → infinite reload loop.
+  if (pathname === "/admin/login") return <>{children}</>;
+
   return (
     <AdminSocketProvider>
       <AdminLayoutInner>{children}</AdminLayoutInner>
