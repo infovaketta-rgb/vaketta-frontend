@@ -42,8 +42,9 @@ export default function RoomTypesPage() {
   }, [mounted]);
 
   function getMainPhoto(rt: RoomType): string | null {
-    const main = rt.photos.find((p) => p.isMain);
-    return main?.url ?? rt.photos[0]?.url ?? null;
+    const photos = rt.photos ?? [];
+    const main = photos.find((p) => p.isMain);
+    return main?.url ?? photos[0]?.url ?? null;
   }
 
   function guestLabel(rt: RoomType) {
@@ -71,7 +72,7 @@ export default function RoomTypesPage() {
           ...(form.totalRooms  ? { totalRooms:  Number(form.totalRooms)  } : {}),
         }),
       });
-      setRoomTypes((prev) => [...prev, created]);
+      setRoomTypes((prev) => [...prev, { ...created, photos: created.photos ?? [] }]);
       setForm(emptyForm);
       setShowForm(false);
       router.push(`/dashboard/room-types/${created.id}`);
