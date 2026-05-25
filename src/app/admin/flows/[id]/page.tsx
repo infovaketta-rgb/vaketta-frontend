@@ -241,6 +241,13 @@ export default function AdminFlowCanvasPage() {
             ...(nodes.some((n) => n.type === "check_availability")
               ? ["availabilityResult", "availabilityCount"] : []),
           ]))}
+          dateVars={nodes
+            .filter((n) => n.type === "question" && (n.data as any).questionType === "date" && (n.data as any).variableName)
+            .map((n) => ({
+              value:  (n.data as any).variableName as string,
+              label:  `{{${(n.data as any).variableName}}}`,
+              nodeId: n.id,
+            }))}
           onChange={updateNodeData}
           onDelete={deleteNode}
         />

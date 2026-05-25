@@ -365,6 +365,15 @@ export default function FlowCanvasPage() {
       ? ["availabilityResult", "availabilityCount"] : []),
   ]));
 
+  // Date-question variables — used by the Minimum Date dropdown in the inspector.
+  const dateVars = nodes
+    .filter((n) => n.type === "question" && (n.data as any).questionType === "date" && (n.data as any).variableName)
+    .map((n) => ({
+      value:  (n.data as any).variableName as string,
+      label:  `{{${(n.data as any).variableName}}}`,
+      nodeId: n.id,
+    }));
+
   const rightPanel = showSimulator
     ? (
       <FlowSimulator
@@ -389,6 +398,7 @@ export default function FlowCanvasPage() {
         readOnly={readOnly}
         hotelCtx={hotelCtx}
         definedVars={definedVars}
+        dateVars={dateVars}
         approvedTemplates={approvedTemplates}
         savedReplies={savedReplies}
         onChange={updateNodeData}

@@ -26,6 +26,8 @@ interface Props {
   readOnly:          boolean;
   hotelCtx?:         HotelContext | null;
   definedVars?:      string[];
+  /** Date-question variables from other nodes — feeds the Minimum Date dropdown. */
+  dateVars?:         { value: string; label: string; nodeId: string }[];
   approvedTemplates?: ApprovedTemplate[];
   savedReplies?:     SavedReplyOption[];
   onChange:          (id: string, data: Record<string, unknown>) => void;
@@ -97,7 +99,7 @@ function VarSelect({
 // ── Main component ─────────────────────────────────────────────────────────────
 
 export default function NodeInspectorPanel({
-  node, readOnly, hotelCtx, definedVars = [], approvedTemplates = [], savedReplies = [], onChange, onDelete,
+  node, readOnly, hotelCtx, definedVars = [], dateVars = [], approvedTemplates = [], savedReplies = [], onChange, onDelete,
 }: Props) {
   const inp = "w-full rounded-lg border border-gray-200 px-2.5 py-1.5 text-xs text-gray-800 focus:outline-none focus:ring-2 focus:ring-[#7A3F91] disabled:bg-gray-50 disabled:text-gray-400";
 
@@ -256,6 +258,11 @@ export default function NodeInspectorPanel({
         const d = node.data as QuestionNodeData;
         const qt = d.questionType ?? "text";
 
+        // Date variables collected by other date questions — selectable as a minimum date.
+        const priorDateVars = dateVars
+          .filter((v) => v.nodeId !== node.id && v.value)
+          .filter((v, i, arr) => arr.findIndex((x) => x.value === v.value) === i);
+
         return (
           <>
             {/* Question type selector */}
@@ -338,8 +345,12 @@ export default function NodeInspectorPanel({
                   <Label>Minimum date</Label>
                   <select disabled={readOnly} className={inp} value={d.dateMin ?? "none"}
                     onChange={(e) => set({ dateMin: e.target.value })}>
-                    <option value="none">No minimum</option>
+                    <option value="none">— No minimum —</option>
                     <option value="today">Today (reject past dates)</option>
+                    {priorDateVars.length > 0 && <option disabled>── Variables ──</option>}
+                    {priorDateVars.map((v) => (
+                      <option key={v.value} value={v.value}>{v.label}</option>
+                    ))}
                   </select>
                 </div>
                 <div>
