@@ -38,7 +38,8 @@ export type NodeType =
   | "send_template"
   | "send_saved_reply"
   | "delay"
-  | "options";
+  | "options"
+  | "advanced_room_allocation"; // multi-room allocation (occupancy + extra-bed); see backend nodes/advancedRoomAllocation.ts
 
 // ── Node data interfaces ──────────────────────────────────────────────────────
 
@@ -231,6 +232,23 @@ export interface OptionsNodeData {
   [key: string]:    unknown;
 }
 
+/**
+ * advanced_room_allocation — multi-room allocator with extra-bed logic.
+ * Reads bookingCheckIn/Out + bookingAdults/Children from flowVars, suggests
+ * an allocation, and writes the standard booking output keys on confirm.
+ * See backend src/automation/nodes/advancedRoomAllocation.ts.
+ */
+export interface AdvancedRoomAllocationNodeData {
+  baseAdults?:       number;  // default 2
+  maxAdults?:        number;  // default 3
+  maxChildren?:      number;  // default 1
+  extraAdultCharge?: number;  // per night, default 0
+  allowExtraBed?:    boolean; // default false
+  childAgeLimit?:    number;  // informational
+  label?:            string;
+  [key: string]:     unknown;
+}
+
 export type FlowNodeData =
   | StartNodeData
   | MessageNodeData
@@ -242,7 +260,8 @@ export type FlowNodeData =
   | EndNodeData
   | SendTemplateNodeData
   | DelayNodeData
-  | OptionsNodeData;
+  | OptionsNodeData
+  | AdvancedRoomAllocationNodeData;
 
 // ── React Flow typed node/edge ─────────────────────────────────────────────────
 

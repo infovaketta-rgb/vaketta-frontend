@@ -32,8 +32,9 @@ const CATEGORIES: { title: string; items: PaletteItem[] }[] = [
   {
     title: "Hotel",
     items: [
-      { type: "show_rooms",         label: "Show Rooms",         icon: "🏨", desc: "Display room list + collect pick",    color: "bg-blue-50  border-blue-400  text-blue-700  hover:bg-blue-100"  },
-      { type: "check_availability", label: "Check Availability", icon: "📅", desc: "Route: available / unavailable",      color: "bg-teal-50  border-teal-300  text-teal-700  hover:bg-teal-100"  },
+      { type: "show_rooms",                label: "Show Rooms",          icon: "🏨", desc: "Display room list + collect pick",    color: "bg-blue-50  border-blue-400  text-blue-700  hover:bg-blue-100"  },
+      { type: "advanced_room_allocation",  label: "Room Allocation",     icon: "🛏", desc: "Multi-room + extra-bed allocator",   color: "bg-blue-50  border-blue-300  text-blue-700  hover:bg-blue-100"  },
+      { type: "check_availability",        label: "Check Availability",  icon: "📅", desc: "Route: available / unavailable",      color: "bg-teal-50  border-teal-300  text-teal-700  hover:bg-teal-100"  },
       { type: "time_condition",     label: "Time Condition",     icon: "🕐", desc: "Route by business hours / weekend",   color: "bg-indigo-50 border-indigo-300 text-indigo-700 hover:bg-indigo-100" },
       { type: "show_menu",          label: "Show Menu",          icon: "📋", desc: "Emit hotel's WhatsApp menu inline",   color: "bg-purple-50 border-purple-300 text-purple-700 hover:bg-purple-100" },
     ],
