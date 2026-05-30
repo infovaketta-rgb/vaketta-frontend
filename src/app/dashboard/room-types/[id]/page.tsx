@@ -25,6 +25,12 @@ type RoomType = {
   totalRooms: number;
   description: string | null;
   carouselButtonLabel: string | null;
+  baseAdults: number | null;
+  baseChildren: number | null;
+  extraAdultCharge: number | null;
+  allowExtraBed: boolean;
+  extraBedCharge: number | null;
+  childAgeLimit: number | null;
   createdAt: string;
   photos: RoomPhoto[];
 };
@@ -43,11 +49,14 @@ export default function RoomTypeDetailPage() {
   const [deletingPhotoId, setDeletingPhotoId] = useState<string | null>(null);
   const [dragOver, setDragOver] = useState(false);
   const [draggedPhotoId, setDraggedPhotoId] = useState<string | null>(null);
+  const [showOccupancy, setShowOccupancy] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const [form, setForm] = useState({
     name: "", basePrice: "", capacity: "", maxAdults: "", maxChildren: "", totalRooms: "", description: "",
     carouselButtonLabel: "",
+    baseAdults: "", baseChildren: "", extraAdultCharge: "", extraBedCharge: "", childAgeLimit: "",
+    allowExtraBed: false,
   });
 
   useEffect(() => {
@@ -64,6 +73,12 @@ export default function RoomTypeDetailPage() {
           totalRooms:          String(rt.totalRooms),
           description:         rt.description ?? "",
           carouselButtonLabel: rt.carouselButtonLabel ?? "",
+          baseAdults:          rt.baseAdults       != null ? String(rt.baseAdults)       : "",
+          baseChildren:        rt.baseChildren     != null ? String(rt.baseChildren)     : "",
+          extraAdultCharge:    rt.extraAdultCharge != null ? String(rt.extraAdultCharge) : "",
+          extraBedCharge:      rt.extraBedCharge   != null ? String(rt.extraBedCharge)   : "",
+          childAgeLimit:       rt.childAgeLimit    != null ? String(rt.childAgeLimit)    : "",
+          allowExtraBed:       rt.allowExtraBed ?? false,
         });
       })
       .catch(() => setError("Failed to load room type"))
@@ -86,6 +101,13 @@ export default function RoomTypeDetailPage() {
           ...(form.description ? { description: form.description         } : {}),
           // Send the trimmed label even if blank, so users can clear back to default
           carouselButtonLabel: form.carouselButtonLabel.trim(),
+          // Occupancy & pricing — blank fields are omitted (reset to default server-side)
+          ...(form.baseAdults       !== "" ? { baseAdults:       Number(form.baseAdults)       } : {}),
+          ...(form.baseChildren     !== "" ? { baseChildren:     Number(form.baseChildren)     } : {}),
+          ...(form.extraAdultCharge !== "" ? { extraAdultCharge: Number(form.extraAdultCharge) } : {}),
+          allowExtraBed: form.allowExtraBed,
+          ...(form.allowExtraBed && form.extraBedCharge !== "" ? { extraBedCharge: Number(form.extraBedCharge) } : {}),
+          ...(form.childAgeLimit    !== "" ? { childAgeLimit:    Number(form.childAgeLimit)    } : {}),
         }),
       });
       setRoomType((prev) => prev ? { ...prev, ...updated } : prev);
@@ -306,6 +328,85 @@ export default function RoomTypeDetailPage() {
                   className={inp} placeholder="3" />
               </div>
             </div>
+          </div>
+
+          {/* Occupancy & Pricing Rules (collapsible, collapsed by default) */}
+          <div className="bg-white rounded-2xl border border-gray-100 shadow-sm">
+            <button
+              type="button"
+              onClick={() => setShowOccupancy((v) => !v)}
+              className="w-full flex items-center justify-between p-6 text-left">
+              <div>
+                <h2 className="text-sm font-semibold text-[#2B0D3E]">Occupancy &amp; Pricing Rules</h2>
+                <p className="text-xs text-gray-400 mt-0.5">Per-room pricing for the advanced room allocation bot node. All optional.</p>
+              </div>
+              <svg className={`w-4 h-4 text-gray-400 shrink-0 transition-transform ${showOccupancy ? "rotate-180" : ""}`}
+                fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+              </svg>
+            </button>
+
+            {showOccupancy && (
+              <div className="px-6 pb-6 pt-4 space-y-4 border-t border-gray-100">
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <label className={lbl}>Base Adults</label>
+                    <input type="number" min={1} value={form.baseAdults}
+                      onChange={(e) => setForm((p) => ({ ...p, baseAdults: e.target.value }))}
+                      className={inp} placeholder="2" />
+                    <p className="text-[11px] text-gray-400 mt-1">Number of adults included in the base price</p>
+                  </div>
+                  <div>
+                    <label className={lbl}>Base Children</label>
+                    <input type="number" min={0} value={form.baseChildren}
+                      onChange={(e) => setForm((p) => ({ ...p, baseChildren: e.target.value }))}
+                      className={inp} placeholder="0" />
+                    <p className="text-[11px] text-gray-400 mt-1">Number of children included in the base price</p>
+                  </div>
+                </div>
+
+                <div>
+                  <label className={lbl}>Extra Adult Charge (per night)</label>
+                  <div className="relative">
+                    <span className="absolute left-3 top-1/2 -translate-y-1/2 text-sm text-gray-400">₹</span>
+                    <input type="number" min={0} value={form.extraAdultCharge}
+                      onChange={(e) => setForm((p) => ({ ...p, extraAdultCharge: e.target.value }))}
+                      className={`${inp} pl-7`} placeholder="0" />
+                  </div>
+                  <p className="text-[11px] text-gray-400 mt-1">Additional charge per adult above the base adults</p>
+                </div>
+
+                <div className="flex items-center justify-between">
+                  <label className="text-xs font-medium text-gray-600">Allow Extra Bed</label>
+                  <button type="button" role="switch" aria-checked={form.allowExtraBed}
+                    onClick={() => setForm((p) => ({ ...p, allowExtraBed: !p.allowExtraBed }))}
+                    className={`relative inline-flex h-6 w-11 items-center rounded-full transition ${form.allowExtraBed ? "bg-[#7A3F91]" : "bg-gray-200"}`}>
+                    <span className={`inline-block h-4 w-4 transform rounded-full bg-white shadow transition ${form.allowExtraBed ? "translate-x-6" : "translate-x-1"}`} />
+                  </button>
+                </div>
+
+                {form.allowExtraBed && (
+                  <div>
+                    <label className={lbl}>Extra Bed Charge (per night)</label>
+                    <div className="relative">
+                      <span className="absolute left-3 top-1/2 -translate-y-1/2 text-sm text-gray-400">₹</span>
+                      <input type="number" min={0} value={form.extraBedCharge}
+                        onChange={(e) => setForm((p) => ({ ...p, extraBedCharge: e.target.value }))}
+                        className={`${inp} pl-7`} placeholder="0" />
+                    </div>
+                    <p className="text-[11px] text-gray-400 mt-1">Per night charge for the extra bed</p>
+                  </div>
+                )}
+
+                <div>
+                  <label className={lbl}>Child Age Limit</label>
+                  <input type="number" min={0} max={17} value={form.childAgeLimit}
+                    onChange={(e) => setForm((p) => ({ ...p, childAgeLimit: e.target.value }))}
+                    className={inp} placeholder="e.g. 8" />
+                  <p className="text-[11px] text-gray-400 mt-1">Children above this age are charged as adults. Leave blank to disable.</p>
+                </div>
+              </div>
+            )}
           </div>
         </div>
 

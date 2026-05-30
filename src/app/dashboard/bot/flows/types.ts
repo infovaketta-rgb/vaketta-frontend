@@ -240,10 +240,12 @@ export interface OptionsNodeData {
  */
 export interface AdvancedRoomAllocationNodeData {
   baseAdults?:       number;  // default 2
+  baseChildren?:     number;  // default 0
   maxAdults?:        number;  // default 3
   maxChildren?:      number;  // default 1
   extraAdultCharge?: number;  // per night, default 0
   allowExtraBed?:    boolean; // default false
+  extraBedCharge?:   number;  // per night, default 0
   childAgeLimit?:    number;  // informational
   label?:            string;
   [key: string]:     unknown;

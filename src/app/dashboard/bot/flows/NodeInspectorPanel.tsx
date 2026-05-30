@@ -8,6 +8,7 @@ import type {
   QuestionNodeData,
   CheckAvailabilityNodeData,
   ShowRoomsNodeData,
+  AdvancedRoomAllocationNodeData,
   ActionNodeData,
   JumpNodeData,
   ApprovedTemplate,
@@ -618,6 +619,97 @@ export default function NodeInspectorPanel({
                 <p className="text-[10px] text-gray-400">A = adults · C = children</p>
               </SectionBox>
             )}
+          </>
+        );
+      })()}
+
+      {/* ══════════════════════════════════════════════════════════════════════ */}
+      {/* advanced_room_allocation                                              */}
+      {/* ══════════════════════════════════════════════════════════════════════ */}
+      {node.type === "advanced_room_allocation" && (() => {
+        const d = node.data as AdvancedRoomAllocationNodeData;
+        return (
+          <>
+            <div className="space-y-1">
+              <p className="text-[10px] font-bold uppercase tracking-wide text-gray-600">Room Allocation Config</p>
+              <p className="text-[10px] text-gray-500 leading-relaxed">
+                These are fallback values used when a room type has no occupancy rules
+                configured. Room type settings always take priority.
+              </p>
+            </div>
+
+            <div className="grid grid-cols-2 gap-2">
+              <div>
+                <Label>Base Adults (fallback)</Label>
+                <input type="number" min={1} max={10} disabled={readOnly} className={inp}
+                  value={d.baseAdults ?? ""} placeholder="2"
+                  onChange={(e) => set({ baseAdults: e.target.value === "" ? 2 : Number(e.target.value) })} />
+                <p className="mt-0.5 text-[10px] text-gray-400">Adults included in base price if not set on room type</p>
+              </div>
+              <div>
+                <Label>Base Children (fallback)</Label>
+                <input type="number" min={0} max={10} disabled={readOnly} className={inp}
+                  value={d.baseChildren ?? ""} placeholder="0"
+                  onChange={(e) => set({ baseChildren: e.target.value === "" ? 0 : Number(e.target.value) })} />
+                <p className="mt-0.5 text-[10px] text-gray-400">Children included in base price if not set on room type</p>
+              </div>
+            </div>
+
+            <div className="grid grid-cols-2 gap-2">
+              <div>
+                <Label>Max Adults per Room (fallback)</Label>
+                <input type="number" min={1} max={20} disabled={readOnly} className={inp}
+                  value={d.maxAdults ?? ""} placeholder="3"
+                  onChange={(e) => set({ maxAdults: e.target.value === "" ? 3 : Number(e.target.value) })} />
+                <p className="mt-0.5 text-[10px] text-gray-400">Hard cap per room if not set on room type</p>
+              </div>
+              <div>
+                <Label>Max Children per Room (fallback)</Label>
+                <input type="number" min={0} max={10} disabled={readOnly} className={inp}
+                  value={d.maxChildren ?? ""} placeholder="1"
+                  onChange={(e) => set({ maxChildren: e.target.value === "" ? 1 : Number(e.target.value) })} />
+                <p className="mt-0.5 text-[10px] text-gray-400">Hard cap per room if not set on room type</p>
+              </div>
+            </div>
+
+            <div>
+              <Label>Extra Adult Charge / night (fallback)</Label>
+              <div className="relative">
+                <span className="absolute left-2.5 top-1/2 -translate-y-1/2 text-xs text-gray-400">₹</span>
+                <input type="number" min={0} disabled={readOnly} className={`${inp} pl-6`}
+                  value={d.extraAdultCharge ?? ""} placeholder="0"
+                  onChange={(e) => set({ extraAdultCharge: e.target.value === "" ? 0 : Number(e.target.value) })} />
+              </div>
+              <p className="mt-0.5 text-[10px] text-gray-400">Per adult per night above base adults</p>
+            </div>
+
+            <label className="flex items-center gap-2 cursor-pointer">
+              <input type="checkbox" disabled={readOnly} checked={!!d.allowExtraBed}
+                onChange={(e) => set({ allowExtraBed: e.target.checked })}
+                className="rounded border-gray-300 text-[#7A3F91] focus:ring-[#7A3F91]" />
+              <span className="text-xs text-gray-700 font-medium">Allow Extra Bed (fallback)</span>
+            </label>
+
+            {d.allowExtraBed && (
+              <div>
+                <Label>Extra Bed Charge / night (fallback)</Label>
+                <div className="relative">
+                  <span className="absolute left-2.5 top-1/2 -translate-y-1/2 text-xs text-gray-400">₹</span>
+                  <input type="number" min={0} disabled={readOnly} className={`${inp} pl-6`}
+                    value={d.extraBedCharge ?? ""} placeholder="0"
+                    onChange={(e) => set({ extraBedCharge: e.target.value === "" ? 0 : Number(e.target.value) })} />
+                </div>
+                <p className="mt-0.5 text-[10px] text-gray-400">Per night charge for the extra bed</p>
+              </div>
+            )}
+
+            <div>
+              <Label>Child Age Limit (fallback)</Label>
+              <input type="number" min={0} max={17} disabled={readOnly} className={inp}
+                value={d.childAgeLimit ?? ""} placeholder="Optional"
+                onChange={(e) => set({ childAgeLimit: e.target.value === "" ? null : Number(e.target.value) })} />
+              <p className="mt-0.5 text-[10px] text-gray-400">Children above this age charged as adults. Leave blank to disable.</p>
+            </div>
           </>
         );
       })()}
