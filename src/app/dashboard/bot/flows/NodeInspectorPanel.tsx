@@ -638,6 +638,25 @@ export default function NodeInspectorPanel({
               </p>
             </div>
 
+            {/* Guest Count Variables — flowVars the node reads for adults/children/ages */}
+            <SectionBox title="Guest Count Variables" color="teal">
+              <div>
+                <VarSelect label="Number of Adults" value={d.adultsVar ?? ""} vars={definedVars} disabled={readOnly}
+                  onChange={(v) => set({ adultsVar: v })} />
+                <p className="mt-0.5 text-[10px] text-gray-500">Variable holding the adult count. Defaults to bookingAdults.</p>
+              </div>
+              <div>
+                <VarSelect label="Number of Children" value={d.childrenVar ?? ""} vars={definedVars} disabled={readOnly}
+                  onChange={(v) => set({ childrenVar: v })} />
+                <p className="mt-0.5 text-[10px] text-gray-500">Variable holding the child count. Defaults to bookingChildren.</p>
+              </div>
+              <div>
+                <VarSelect label="Children Ages (optional)" value={d.childrenAgesVar ?? ""} vars={definedVars} disabled={readOnly}
+                  onChange={(v) => set({ childrenAgesVar: v })} />
+                <p className="mt-0.5 text-[10px] text-gray-500">Optional. Variable holding children&apos;s ages, e.g. &quot;6, 9&quot;. Used for display only for now.</p>
+              </div>
+            </SectionBox>
+
             <div className="grid grid-cols-2 gap-2">
               <div>
                 <Label>Base Adults (fallback)</Label>

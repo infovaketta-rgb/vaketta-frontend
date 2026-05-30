@@ -247,6 +247,9 @@ export interface AdvancedRoomAllocationNodeData {
   allowExtraBed?:    boolean; // default false
   extraBedCharge?:   number;  // per night, default 0
   childAgeLimit?:    number;  // informational
+  adultsVar?:        string;  // flowVar holding number of adults
+  childrenVar?:      string;  // flowVar holding number of children
+  childrenAgesVar?:  string;  // flowVar holding children ages (CSV/text)
   label?:            string;
   [key: string]:     unknown;
 }
