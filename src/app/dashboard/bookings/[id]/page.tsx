@@ -189,8 +189,14 @@ export default function BookingDetailPage() {
             </p>
             <dl className="grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-3 text-sm">
               <div>
-                <dt className="text-[#0C1B33]/50">Room Type</dt>
-                <dd className="mt-0.5 font-medium text-[#0C1B33]">{booking.roomType?.name ?? "—"}</dd>
+                <dt className="text-[#0C1B33]/50">
+                  {booking.rooms?.length > 0 ? "Rooms" : "Room Type"}
+                </dt>
+                <dd className="mt-0.5 font-medium text-[#0C1B33]">
+                  {booking.rooms?.length > 0
+                    ? `${booking.rooms.length} room${booking.rooms.length !== 1 ? "s" : ""}`
+                    : (booking.roomType?.name ?? "—")}
+                </dd>
               </div>
               <div>
                 <dt className="text-[#0C1B33]/50">Duration</dt>
@@ -205,6 +211,34 @@ export default function BookingDetailPage() {
                 <dd className="mt-0.5 font-medium text-[#0C1B33]">{formatDate(booking.checkOut)}</dd>
               </div>
             </dl>
+
+            {/* Per-room breakdown for group bookings */}
+            {booking.rooms?.length > 0 && (
+              <div className="mt-4 border-t border-[#E5E0D4] pt-4">
+                <p className="mb-2 text-xs font-semibold uppercase tracking-wider text-[#0C1B33]/40">
+                  Room Breakdown
+                </p>
+                <div className="flex flex-col gap-2">
+                  {booking.rooms.map((r: any, i: number) => (
+                    <div key={r.id} className="flex items-center justify-between text-sm">
+                      <div className="text-[#0C1B33]/70">
+                        <span className="font-medium text-[#0C1B33]">
+                          Room {i + 1} — {r.roomType?.name ?? "Room"}
+                        </span>
+                        <span className="ml-2 text-xs text-[#0C1B33]/50">
+                          {r.adults} adult{r.adults !== 1 ? "s" : ""}
+                          {r.children > 0 ? `, ${r.children} child${r.children !== 1 ? "ren" : ""}` : ""}
+                          {r.extraBed ? " + extra bed" : ""}
+                        </span>
+                      </div>
+                      <span className="font-medium text-[#0C1B33]">
+                        {formatCurrency(r.totalPrice)}
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
           </div>
 
           {/* Payment card */}
@@ -213,11 +247,27 @@ export default function BookingDetailPage() {
               Payment
             </p>
             <div className="flex flex-col gap-2 text-sm">
-              <Row label="Price per night" value={formatCurrency(booking.pricePerNight ?? 0)} />
-              <Row
-                label={`${nights} night${nights !== 1 ? "s" : ""} × ${formatCurrency(booking.pricePerNight ?? 0)}`}
-                value={formatCurrency(booking.totalPrice ?? 0)}
-              />
+              {booking.rooms?.length > 0 ? (
+                // Group booking — show subtotals per room then grand total
+                <>
+                  {booking.rooms.map((r: any, i: number) => (
+                    <Row
+                      key={r.id}
+                      label={`Room ${i + 1} (${r.roomType?.name ?? "Room"}) × ${nights}n`}
+                      value={formatCurrency(r.totalPrice)}
+                    />
+                  ))}
+                </>
+              ) : (
+                // Single-room booking — existing behaviour
+                <>
+                  <Row label="Price per night" value={formatCurrency(booking.pricePerNight ?? 0)} />
+                  <Row
+                    label={`${nights} night${nights !== 1 ? "s" : ""} × ${formatCurrency(booking.pricePerNight ?? 0)}`}
+                    value={formatCurrency(booking.totalPrice ?? 0)}
+                  />
+                </>
+              )}
               <hr className="border-[#E5E0D4] my-1" />
               <Row
                 label="Total"
