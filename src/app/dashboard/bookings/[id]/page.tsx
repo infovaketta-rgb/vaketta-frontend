@@ -24,10 +24,16 @@ export default function BookingDetailPage() {
 
   // Edit modal state
   const [editing,     setEditing]     = useState(false);
-  const [editForm,    setEditForm]    = useState({
-    guestName: "", roomTypeId: "", checkIn: "", checkOut: "",
-    pricePerNight: "", advancePaid: "",
-  });
+  const [editStep,    setEditStep]    = useState<"select" | "fields">("select");
+  // Booking-level fields (always editable)
+  const [editHeader, setEditHeader] = useState({ guestName: "", checkIn: "", checkOut: "", advancePaid: "" });
+  // Which room IDs the user selected to edit (step 1)
+  const [selectedRoomIds, setSelectedRoomIds] = useState<Set<string>>(new Set());
+  // Per-room edits: roomId → { roomTypeId, pricePerNight }
+  const [roomEdits, setRoomEdits] = useState<Record<string, { roomTypeId: string; pricePerNight: string }>>({});
+  // Single-room path (no children)
+  const [editForm, setEditForm] = useState({ roomTypeId: "", pricePerNight: "" });
+  const [applyPriceToAll, setApplyPriceToAll] = useState(false);
   const [editError,   setEditError]   = useState("");
   const [editLoading, setEditLoading] = useState(false);
 
@@ -42,15 +48,29 @@ export default function BookingDetailPage() {
       .finally(() => setLoading(false));
   }, [mounted, id]);
 
+  const isGroupBooking = (booking?.rooms?.length ?? 0) > 0;
+
   function openEdit() {
-    setEditForm({
-      guestName:     booking.guestName || "",
-      roomTypeId:    booking.roomTypeId || "",
-      checkIn:       booking.checkIn?.slice(0, 10) || "",
-      checkOut:      booking.checkOut?.slice(0, 10) || "",
-      pricePerNight: String(booking.pricePerNight || ""),
-      advancePaid:   String(booking.advancePaid || ""),
+    setEditHeader({
+      guestName:   booking.guestName  || "",
+      checkIn:     booking.checkIn?.slice(0, 10)  || "",
+      checkOut:    booking.checkOut?.slice(0, 10) || "",
+      advancePaid: String(booking.advancePaid ?? ""),
     });
+    if (isGroupBooking) {
+      // Pre-fill per-room edits from current values
+      const initial: Record<string, { roomTypeId: string; pricePerNight: string }> = {};
+      for (const r of booking.rooms) {
+        initial[r.id] = { roomTypeId: r.roomTypeId, pricePerNight: String(r.pricePerNight) };
+      }
+      setRoomEdits(initial);
+      setSelectedRoomIds(new Set());
+      setEditStep("select");
+    } else {
+      setEditForm({ roomTypeId: booking.roomTypeId || "", pricePerNight: String(booking.pricePerNight || "") });
+      setEditStep("fields");
+    }
+    setApplyPriceToAll(false);
     setEditError("");
     setEditing(true);
   }
@@ -60,17 +80,32 @@ export default function BookingDetailPage() {
     setEditError("");
     setEditLoading(true);
     try {
-      const updated = await apiFetch(`/bookings/${id}`, {
-        method: "PATCH",
-        body: JSON.stringify({
-          guestName:     editForm.guestName,
-          roomTypeId:    editForm.roomTypeId,
-          checkIn:       editForm.checkIn,
-          checkOut:      editForm.checkOut,
-          pricePerNight: Number(editForm.pricePerNight),
-          advancePaid:   Number(editForm.advancePaid),
-        }),
-      });
+      let body: Record<string, unknown> = {
+        guestName:   editHeader.guestName,
+        checkIn:     editHeader.checkIn,
+        checkOut:    editHeader.checkOut,
+        advancePaid: Number(editHeader.advancePaid),
+      };
+
+      if (isGroupBooking) {
+        // Build rooms array for selected rooms
+        const roomsPayload = [...selectedRoomIds].map((rid) => {
+          const edit = roomEdits[rid]!;
+          return { id: rid, roomTypeId: edit.roomTypeId, pricePerNight: Number(edit.pricePerNight) };
+        });
+        // "Apply price to all" overrides price on every room
+        if (applyPriceToAll && selectedRoomIds.size === 1) {
+          const price = Number(roomEdits[[...selectedRoomIds][0]!]?.pricePerNight ?? 0);
+          body.rooms = booking.rooms.map((r: any) => ({ id: r.id, pricePerNight: price, roomTypeId: roomEdits[r.id]?.roomTypeId ?? r.roomTypeId }));
+        } else {
+          body.rooms = roomsPayload;
+        }
+      } else {
+        body.roomTypeId    = editForm.roomTypeId;
+        body.pricePerNight = Number(editForm.pricePerNight);
+      }
+
+      const updated = await apiFetch(`/bookings/${id}`, { method: "PATCH", body: JSON.stringify(body) });
       setBooking(updated);
       setEditing(false);
     } catch (err: any) {
@@ -388,10 +423,25 @@ export default function BookingDetailPage() {
 
       {/* Edit modal */}
       {editing && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
-          <div className="bg-white rounded-2xl shadow-xl w-full max-w-md mx-4 p-6">
-            <div className="flex items-center justify-between mb-5">
-              <h2 className="text-base font-semibold text-[#0C1B33]">Edit Booking</h2>
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
+          <div className="bg-white rounded-2xl shadow-xl w-full max-w-lg max-h-[90vh] flex flex-col">
+            {/* Header */}
+            <div className="flex items-center justify-between px-6 pt-6 pb-4 border-b border-[#E5E0D4] shrink-0">
+              <div className="flex items-center gap-3">
+                {isGroupBooking && editStep === "fields" && (
+                  <button
+                    onClick={() => setEditStep("select")}
+                    className="text-[#1B52A8] text-sm hover:underline"
+                  >
+                    ← Back
+                  </button>
+                )}
+                <h2 className="text-base font-semibold text-[#0C1B33]">
+                  {isGroupBooking
+                    ? editStep === "select" ? "Select Rooms to Edit" : "Edit Booking"
+                    : "Edit Booking"}
+                </h2>
+              </div>
               <button
                 onClick={() => setEditing(false)}
                 className="text-slate-400 hover:text-slate-600 transition text-xl leading-none"
@@ -399,100 +449,284 @@ export default function BookingDetailPage() {
                 ×
               </button>
             </div>
-            <form onSubmit={handleEdit} className="flex flex-col gap-3">
-              <div>
-                <label className="block text-xs font-medium text-[#0C1B33]/60 mb-1">Guest Name</label>
-                <input
-                  type="text"
-                  value={editForm.guestName}
-                  onChange={(e) => setEditForm((f) => ({ ...f, guestName: e.target.value }))}
-                  className={inputClass}
-                />
-              </div>
-              <div>
-                <label className="block text-xs font-medium text-[#0C1B33]/60 mb-1">Room Type</label>
-                <select
-                  value={editForm.roomTypeId}
-                  onChange={(e) => {
-                    const rt = roomTypes.find((r) => r.id === e.target.value);
-                    setEditForm((f) => ({
-                      ...f,
-                      roomTypeId: e.target.value,
-                      pricePerNight: rt ? String(rt.basePrice) : f.pricePerNight,
-                    }));
-                  }}
-                  className={inputClass}
-                >
-                  <option value="">Select room type</option>
-                  {roomTypes.map((r) => (
-                    <option key={r.id} value={r.id}>
-                      {r.name} — ₹{r.basePrice}/night
-                    </option>
-                  ))}
-                </select>
-              </div>
-              <div className="flex gap-3">
-                <div className="flex-1">
-                  <label className="block text-xs font-medium text-[#0C1B33]/60 mb-1">Check In</label>
-                  <input
-                    type="date"
-                    value={editForm.checkIn}
-                    onChange={(e) => setEditForm((f) => ({ ...f, checkIn: e.target.value }))}
-                    className={inputClass}
-                  />
+
+            <div className="overflow-y-auto flex-1 px-6 py-4">
+              <form id="edit-form" onSubmit={handleEdit} className="flex flex-col gap-4">
+
+                {/* ── Booking-level fields (always shown) ── */}
+                <div>
+                  <p className="text-xs font-semibold uppercase tracking-wider text-[#0C1B33]/40 mb-3">
+                    Booking Details
+                  </p>
+                  <div className="flex flex-col gap-3">
+                    <div>
+                      <label className="block text-xs font-medium text-[#0C1B33]/60 mb-1">Guest Name</label>
+                      <input
+                        type="text"
+                        value={editHeader.guestName}
+                        onChange={(e) => setEditHeader((h) => ({ ...h, guestName: e.target.value }))}
+                        className={inputClass}
+                      />
+                    </div>
+                    <div className="flex gap-3">
+                      <div className="flex-1">
+                        <label className="block text-xs font-medium text-[#0C1B33]/60 mb-1">Check In</label>
+                        <input
+                          type="date"
+                          value={editHeader.checkIn}
+                          onChange={(e) => setEditHeader((h) => ({ ...h, checkIn: e.target.value }))}
+                          className={inputClass}
+                        />
+                      </div>
+                      <div className="flex-1">
+                        <label className="block text-xs font-medium text-[#0C1B33]/60 mb-1">Check Out</label>
+                        <input
+                          type="date"
+                          value={editHeader.checkOut}
+                          onChange={(e) => setEditHeader((h) => ({ ...h, checkOut: e.target.value }))}
+                          className={inputClass}
+                        />
+                      </div>
+                    </div>
+                    <div>
+                      <label className="block text-xs font-medium text-[#0C1B33]/60 mb-1">Advance Paid (₹)</label>
+                      <input
+                        type="number"
+                        min={0}
+                        step="0.01"
+                        value={editHeader.advancePaid}
+                        onChange={(e) => setEditHeader((h) => ({ ...h, advancePaid: e.target.value }))}
+                        className={inputClass}
+                      />
+                    </div>
+                  </div>
                 </div>
-                <div className="flex-1">
-                  <label className="block text-xs font-medium text-[#0C1B33]/60 mb-1">Check Out</label>
-                  <input
-                    type="date"
-                    value={editForm.checkOut}
-                    onChange={(e) => setEditForm((f) => ({ ...f, checkOut: e.target.value }))}
-                    className={inputClass}
-                  />
+
+                {/* ── Group booking: step 1 — room selection ── */}
+                {isGroupBooking && editStep === "select" && (
+                  <div>
+                    <div className="flex items-center justify-between mb-3">
+                      <p className="text-xs font-semibold uppercase tracking-wider text-[#0C1B33]/40">
+                        Rooms
+                      </p>
+                      <button
+                        type="button"
+                        className="text-xs text-[#1B52A8] hover:underline"
+                        onClick={() => {
+                          const allIds = new Set<string>(booking.rooms.map((r: any) => r.id as string));
+                          setSelectedRoomIds(
+                            selectedRoomIds.size === booking.rooms.length ? new Set() : allIds
+                          );
+                        }}
+                      >
+                        {selectedRoomIds.size === booking.rooms.length ? "Deselect all" : "Select all rooms"}
+                      </button>
+                    </div>
+                    <div className="flex flex-col gap-2">
+                      {booking.rooms.map((r: any, i: number) => (
+                        <label
+                          key={r.id}
+                          className="flex items-center gap-3 rounded-lg border border-[#E5E0D4] px-4 py-3 cursor-pointer hover:bg-[#F4F2ED] transition"
+                        >
+                          <input
+                            type="checkbox"
+                            checked={selectedRoomIds.has(r.id)}
+                            onChange={() => {
+                              setSelectedRoomIds((prev) => {
+                                const next = new Set(prev);
+                                next.has(r.id) ? next.delete(r.id) : next.add(r.id);
+                                return next;
+                              });
+                            }}
+                            className="accent-[#1B52A8] w-4 h-4 shrink-0"
+                          />
+                          <div className="flex-1 min-w-0">
+                            <p className="text-sm font-medium text-[#0C1B33]">
+                              Room {i + 1} — {r.roomType?.name ?? "Room"}
+                            </p>
+                            <p className="text-xs text-[#0C1B33]/50 mt-0.5">
+                              {r.adults} adult{r.adults !== 1 ? "s" : ""}
+                              {r.children > 0 ? `, ${r.children} child${r.children !== 1 ? "ren" : ""}` : ""}
+                              {r.extraBed ? " + extra bed" : ""}
+                              {" · "}₹{r.pricePerNight.toLocaleString("en-IN")}/night
+                            </p>
+                          </div>
+                        </label>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {/* ── Group booking: step 2 — per-room fields ── */}
+                {isGroupBooking && editStep === "fields" && (
+                  <div>
+                    <p className="text-xs font-semibold uppercase tracking-wider text-[#0C1B33]/40 mb-3">
+                      Room Edits
+                      {selectedRoomIds.size > 1 && (
+                        <span className="ml-1 normal-case font-normal text-[#0C1B33]/40">
+                          — changes apply to all {selectedRoomIds.size} selected rooms
+                        </span>
+                      )}
+                    </p>
+                    {booking.rooms
+                      .filter((r: any) => selectedRoomIds.has(r.id))
+                      .map((r: any, i: number) => {
+                        const edit = roomEdits[r.id] ?? { roomTypeId: r.roomTypeId, pricePerNight: String(r.pricePerNight) };
+                        const isFirst = i === 0;
+                        return (
+                          <div key={r.id} className="mb-4">
+                            {selectedRoomIds.size > 1 && (
+                              <p className="text-xs font-medium text-[#0C1B33]/60 mb-2">
+                                Room {booking.rooms.findIndex((x: any) => x.id === r.id) + 1} — {r.roomType?.name ?? "Room"}
+                              </p>
+                            )}
+                            <div className="flex gap-3">
+                              <div className="flex-1">
+                                <label className="block text-xs font-medium text-[#0C1B33]/60 mb-1">Room Type</label>
+                                <select
+                                  value={edit.roomTypeId}
+                                  onChange={(e) => {
+                                    const rt = roomTypes.find((x) => x.id === e.target.value);
+                                    const newPrice = rt ? String(rt.basePrice) : edit.pricePerNight;
+                                    if (selectedRoomIds.size > 1) {
+                                      // Bulk: apply to all selected rooms
+                                      setRoomEdits((prev) => {
+                                        const next = { ...prev };
+                                        for (const rid of selectedRoomIds) {
+                                          next[rid] = { ...next[rid]!, roomTypeId: e.target.value, pricePerNight: newPrice };
+                                        }
+                                        return next;
+                                      });
+                                    } else {
+                                      setRoomEdits((prev) => ({ ...prev, [r.id]: { ...edit, roomTypeId: e.target.value, pricePerNight: newPrice } }));
+                                    }
+                                  }}
+                                  className={inputClass}
+                                >
+                                  {roomTypes.map((x) => (
+                                    <option key={x.id} value={x.id}>{x.name} — ₹{x.basePrice}/night</option>
+                                  ))}
+                                </select>
+                              </div>
+                              <div className="flex-1">
+                                <label className="block text-xs font-medium text-[#0C1B33]/60 mb-1">Price / Night (₹)</label>
+                                <input
+                                  type="number"
+                                  min={0}
+                                  step="0.01"
+                                  value={edit.pricePerNight}
+                                  onChange={(e) => {
+                                    if (selectedRoomIds.size > 1) {
+                                      setRoomEdits((prev) => {
+                                        const next = { ...prev };
+                                        for (const rid of selectedRoomIds) {
+                                          next[rid] = { ...next[rid]!, pricePerNight: e.target.value };
+                                        }
+                                        return next;
+                                      });
+                                    } else {
+                                      setRoomEdits((prev) => ({ ...prev, [r.id]: { ...edit, pricePerNight: e.target.value } }));
+                                    }
+                                  }}
+                                  className={inputClass}
+                                />
+                              </div>
+                            </div>
+                            {/* "Apply to all" shortcut — only when exactly 1 room selected */}
+                            {selectedRoomIds.size === 1 && isFirst && (
+                              <label className="flex items-center gap-2 mt-2 cursor-pointer">
+                                <input
+                                  type="checkbox"
+                                  checked={applyPriceToAll}
+                                  onChange={(e) => setApplyPriceToAll(e.target.checked)}
+                                  className="accent-[#1B52A8] w-4 h-4"
+                                />
+                                <span className="text-xs text-[#0C1B33]/60">Apply this price to all rooms in booking</span>
+                              </label>
+                            )}
+                          </div>
+                        );
+                      })}
+                  </div>
+                )}
+
+                {/* ── Single-room booking fields ── */}
+                {!isGroupBooking && (
+                  <div className="flex gap-3">
+                    <div className="flex-1">
+                      <label className="block text-xs font-medium text-[#0C1B33]/60 mb-1">Room Type</label>
+                      <select
+                        value={editForm.roomTypeId}
+                        onChange={(e) => {
+                          const rt = roomTypes.find((r) => r.id === e.target.value);
+                          setEditForm((f) => ({ ...f, roomTypeId: e.target.value, pricePerNight: rt ? String(rt.basePrice) : f.pricePerNight }));
+                        }}
+                        className={inputClass}
+                      >
+                        <option value="">Select room type</option>
+                        {roomTypes.map((r) => (
+                          <option key={r.id} value={r.id}>{r.name} — ₹{r.basePrice}/night</option>
+                        ))}
+                      </select>
+                    </div>
+                    <div className="flex-1">
+                      <label className="block text-xs font-medium text-[#0C1B33]/60 mb-1">Price / Night (₹)</label>
+                      <input
+                        type="number"
+                        min={0}
+                        step="0.01"
+                        value={editForm.pricePerNight}
+                        onChange={(e) => setEditForm((f) => ({ ...f, pricePerNight: e.target.value }))}
+                        className={inputClass}
+                      />
+                    </div>
+                  </div>
+                )}
+
+                {editError && <p className="text-xs text-red-600">{editError}</p>}
+              </form>
+            </div>
+
+            {/* Footer buttons */}
+            <div className="px-6 pb-6 pt-4 border-t border-[#E5E0D4] shrink-0">
+              {isGroupBooking && editStep === "select" ? (
+                <div className="flex gap-2">
+                  <button
+                    type="button"
+                    disabled={selectedRoomIds.size === 0}
+                    onClick={() => setEditStep("fields")}
+                    className="flex-1 rounded-lg bg-[#1B52A8] py-2 text-sm font-medium text-white hover:bg-[#163F82] transition disabled:opacity-40"
+                  >
+                    Continue ({selectedRoomIds.size} room{selectedRoomIds.size !== 1 ? "s" : ""} selected)
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setEditing(false)}
+                    className="flex-1 rounded-lg border border-[#E5E0D4] py-2 text-sm font-medium text-[#0C1B33]/70 hover:bg-[#F4F2ED] transition"
+                  >
+                    Cancel
+                  </button>
                 </div>
-              </div>
-              <div className="flex gap-3">
-                <div className="flex-1">
-                  <label className="block text-xs font-medium text-[#0C1B33]/60 mb-1">Price / Night (₹)</label>
-                  <input
-                    type="number"
-                    min={0}
-                    step="0.01"
-                    value={editForm.pricePerNight}
-                    onChange={(e) => setEditForm((f) => ({ ...f, pricePerNight: e.target.value }))}
-                    className={inputClass}
-                  />
+              ) : (
+                <div className="flex gap-2">
+                  <button
+                    type="submit"
+                    form="edit-form"
+                    disabled={editLoading}
+                    className="flex-1 rounded-lg bg-[#1B52A8] py-2 text-sm font-medium text-white hover:bg-[#163F82] transition disabled:opacity-50"
+                  >
+                    {editLoading ? "Saving…" : "Save Changes"}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setEditing(false)}
+                    className="flex-1 rounded-lg border border-[#E5E0D4] py-2 text-sm font-medium text-[#0C1B33]/70 hover:bg-[#F4F2ED] transition"
+                  >
+                    Cancel
+                  </button>
                 </div>
-                <div className="flex-1">
-                  <label className="block text-xs font-medium text-[#0C1B33]/60 mb-1">Advance Paid (₹)</label>
-                  <input
-                    type="number"
-                    min={0}
-                    step="0.01"
-                    value={editForm.advancePaid}
-                    onChange={(e) => setEditForm((f) => ({ ...f, advancePaid: e.target.value }))}
-                    className={inputClass}
-                  />
-                </div>
-              </div>
-              {editError && <p className="text-xs text-red-600">{editError}</p>}
-              <div className="flex gap-2 mt-1">
-                <button
-                  type="submit"
-                  disabled={editLoading}
-                  className="flex-1 rounded-lg bg-[#1B52A8] py-2 text-sm font-medium text-white hover:bg-[#163F82] transition disabled:opacity-50"
-                >
-                  {editLoading ? "Saving…" : "Save Changes"}
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setEditing(false)}
-                  className="flex-1 rounded-lg border border-[#E5E0D4] py-2 text-sm font-medium text-[#0C1B33]/70 hover:bg-[#F4F2ED] transition"
-                >
-                  Cancel
-                </button>
-              </div>
-            </form>
+              )}
+            </div>
           </div>
         </div>
       )}
