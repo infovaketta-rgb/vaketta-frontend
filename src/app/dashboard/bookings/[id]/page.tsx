@@ -253,7 +253,7 @@ export default function BookingDetailPage() {
                   {booking.rooms.map((r: any, i: number) => (
                     <Row
                       key={r.id}
-                      label={`Room ${i + 1} (${r.roomType?.name ?? "Room"}) × ${nights}n`}
+                      label={`Room ${i + 1} (${r.roomType?.name ?? "Room"}) ${formatCurrency(r.pricePerNight)}/night × ${nights} night${nights !== 1 ? "s" : ""}`}
                       value={formatCurrency(r.totalPrice)}
                     />
                   ))}
