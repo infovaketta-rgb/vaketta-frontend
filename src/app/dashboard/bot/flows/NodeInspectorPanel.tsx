@@ -19,6 +19,8 @@ import type {
   OptionsItem,
 } from "./types";
 import { SYSTEM_VARS } from "./NodePalette";
+import VarPickerButton from "./VarPickerButton";
+import type { VarGroup } from "./nodeOutputs/collectUpstreamVars";
 
 type SavedReplyOption = { id: string; name: string; category: string | null; variables: string[] };
 
@@ -27,6 +29,8 @@ interface Props {
   readOnly:          boolean;
   hotelCtx?:         HotelContext | null;
   definedVars?:      string[];
+  /** Typed, source-grouped variables available to this node (upstream + system). */
+  varGroups?:        VarGroup[];
   /** Date-question variables from other nodes — feeds the Minimum Date dropdown. */
   dateVars?:         { value: string; label: string; nodeId: string }[];
   approvedTemplates?: ApprovedTemplate[];
@@ -100,7 +104,7 @@ function VarSelect({
 // ── Main component ─────────────────────────────────────────────────────────────
 
 export default function NodeInspectorPanel({
-  node, readOnly, hotelCtx, definedVars = [], dateVars = [], approvedTemplates = [], savedReplies = [], onChange, onDelete,
+  node, readOnly, hotelCtx, definedVars = [], varGroups = [], dateVars = [], approvedTemplates = [], savedReplies = [], onChange, onDelete,
 }: Props) {
   const inp = "w-full rounded-lg border border-gray-200 px-2.5 py-1.5 text-xs text-gray-800 focus:outline-none focus:ring-2 focus:ring-[#7A3F91] disabled:bg-gray-50 disabled:text-gray-400";
 
@@ -239,7 +243,11 @@ export default function NodeInspectorPanel({
       {node.type === "message" && (
         <>
           <div>
-            <Label>Message text</Label>
+            <div className="mb-1 flex items-center justify-between gap-2">
+              <Label>Message text</Label>
+              <VarPickerButton groups={varGroups} readOnly={readOnly}
+                onInsert={(v) => insertVar(v, (token) => set({ text: ((node.data as any).text ?? "") + token }))} />
+            </div>
             <textarea disabled={readOnly} rows={4} className={`${inp} resize-none`}
               value={(node.data as any).text ?? ""}
               onBlur={trackSel}
@@ -722,13 +730,9 @@ export default function NodeInspectorPanel({
               </div>
             )}
 
-            <div>
-              <Label>Child Age Limit (fallback)</Label>
-              <input type="number" min={0} max={17} disabled={readOnly} className={inp}
-                value={d.childAgeLimit ?? ""} placeholder="Optional"
-                onChange={(e) => set({ childAgeLimit: e.target.value === "" ? null : Number(e.target.value) })} />
-              <p className="mt-0.5 text-[10px] text-gray-400">Children above this age charged as adults. Leave blank to disable.</p>
-            </div>
+            <p className="mt-0.5 text-[10px] text-gray-400">
+              Children above the hotel-wide age limit (Settings) are counted as adults.
+            </p>
           </>
         );
       })()}

@@ -30,7 +30,6 @@ type RoomType = {
   extraAdultCharge: number | null;
   allowExtraBed: boolean;
   extraBedCharge: number | null;
-  childAgeLimit: number | null;
   createdAt: string;
   photos: RoomPhoto[];
 };
@@ -55,7 +54,7 @@ export default function RoomTypeDetailPage() {
   const [form, setForm] = useState({
     name: "", basePrice: "", capacity: "", maxAdults: "", maxChildren: "", totalRooms: "", description: "",
     carouselButtonLabel: "",
-    baseAdults: "", baseChildren: "", extraAdultCharge: "", extraBedCharge: "", childAgeLimit: "",
+    baseAdults: "", baseChildren: "", extraAdultCharge: "", extraBedCharge: "",
     allowExtraBed: false,
   });
 
@@ -77,7 +76,6 @@ export default function RoomTypeDetailPage() {
           baseChildren:        rt.baseChildren     != null ? String(rt.baseChildren)     : "",
           extraAdultCharge:    rt.extraAdultCharge != null ? String(rt.extraAdultCharge) : "",
           extraBedCharge:      rt.extraBedCharge   != null ? String(rt.extraBedCharge)   : "",
-          childAgeLimit:       rt.childAgeLimit    != null ? String(rt.childAgeLimit)    : "",
           allowExtraBed:       rt.allowExtraBed ?? false,
         });
       })
@@ -107,7 +105,6 @@ export default function RoomTypeDetailPage() {
           ...(form.extraAdultCharge !== "" ? { extraAdultCharge: Number(form.extraAdultCharge) } : {}),
           allowExtraBed: form.allowExtraBed,
           ...(form.allowExtraBed && form.extraBedCharge !== "" ? { extraBedCharge: Number(form.extraBedCharge) } : {}),
-          ...(form.childAgeLimit    !== "" ? { childAgeLimit:    Number(form.childAgeLimit)    } : {}),
         }),
       });
       setRoomType((prev) => prev ? { ...prev, ...updated } : prev);
@@ -397,14 +394,6 @@ export default function RoomTypeDetailPage() {
                     <p className="text-[11px] text-gray-400 mt-1">Per night charge for the extra bed</p>
                   </div>
                 )}
-
-                <div>
-                  <label className={lbl}>Child Age Limit</label>
-                  <input type="number" min={0} max={17} value={form.childAgeLimit}
-                    onChange={(e) => setForm((p) => ({ ...p, childAgeLimit: e.target.value }))}
-                    className={inp} placeholder="e.g. 8" />
-                  <p className="text-[11px] text-gray-400 mt-1">Children above this age are charged as adults. Leave blank to disable.</p>
-                </div>
               </div>
             )}
           </div>

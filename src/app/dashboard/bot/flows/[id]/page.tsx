@@ -38,6 +38,7 @@ import DelayNode            from "../nodes/DelayNode";
 import OptionsNode           from "../nodes/OptionsNode";
 import DeletableEdge         from "../DeletableEdge";
 import NodePalette, { SYSTEM_VARS } from "../NodePalette";
+import { collectUpstreamVars } from "../nodeOutputs/collectUpstreamVars";
 import CanvasToolbar         from "../CanvasToolbar";
 import NodeInspectorPanel    from "../NodeInspectorPanel";
 import FlowSimulator         from "../FlowSimulator";
@@ -374,6 +375,13 @@ export default function FlowCanvasPage() {
       nodeId: n.id,
     }));
 
+  // Typed, source-grouped variables available to the selected node (system +
+  // upstream node outputs from the registry). Drives the {{ }} variable picker.
+  const varGroups = useMemo(
+    () => (selectedNode ? collectUpstreamVars(selectedNode.id, nodes, edges) : []),
+    [selectedNode, nodes, edges],
+  );
+
   const rightPanel = showSimulator
     ? (
       <FlowSimulator
@@ -398,6 +406,7 @@ export default function FlowCanvasPage() {
         readOnly={readOnly}
         hotelCtx={hotelCtx}
         definedVars={definedVars}
+        varGroups={varGroups}
         dateVars={dateVars}
         approvedTemplates={approvedTemplates}
         savedReplies={savedReplies}
