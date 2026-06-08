@@ -377,10 +377,9 @@ export default function FlowCanvasPage() {
 
   // Typed, source-grouped variables available to the selected node (system +
   // upstream node outputs from the registry). Drives the {{ }} variable picker.
-  const varGroups = useMemo(
-    () => (selectedNode ? collectUpstreamVars(selectedNode.id, nodes, edges) : []),
-    [selectedNode, nodes, edges],
-  );
+  // Plain computation (not a hook) — this lives below the early returns above, so
+  // it must not be a useMemo (would violate the Rules of Hooks → React error #310).
+  const varGroups = selectedNode ? collectUpstreamVars(selectedNode.id, nodes, edges) : [];
 
   const rightPanel = showSimulator
     ? (
