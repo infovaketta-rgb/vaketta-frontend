@@ -665,6 +665,27 @@ export default function NodeInspectorPanel({
               </div>
             </SectionBox>
 
+            {/* Plan & display options (Piece 1D / 2D) */}
+            <SectionBox title="Plan & Display Options" color="purple">
+              <label className="flex items-center gap-2 cursor-pointer">
+                <input type="checkbox" disabled={readOnly} checked={!!d.sendRoomDescriptions}
+                  onChange={(e) => set({ sendRoomDescriptions: e.target.checked })}
+                  className="rounded border-gray-300 text-[#7A3F91] focus:ring-[#7A3F91]" />
+                <span className="text-xs text-gray-700 font-medium">Send room descriptions before carousel</span>
+              </label>
+              <p className="mt-0.5 text-[10px] text-gray-500">When on, the bot sends a text listing each available room type with its description and price before the room cards.</p>
+              <div className="mt-2">
+                <Label>Max plans to show</Label>
+                <input type="number" min={1} max={8} disabled={readOnly} className={inp}
+                  value={d.maxPlans ?? ""} placeholder="4"
+                  onChange={(e) => {
+                    const n = e.target.value === "" ? 4 : Number(e.target.value);
+                    set({ maxPlans: Math.min(8, Math.max(1, n)) });
+                  }} />
+                <p className="mt-0.5 text-[10px] text-gray-500">How many room plans to offer the guest (1–8, default 4).</p>
+              </div>
+            </SectionBox>
+
             <div className="grid grid-cols-2 gap-2">
               <div>
                 <Label>Base Adults (fallback)</Label>
