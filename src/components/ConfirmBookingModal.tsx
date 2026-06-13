@@ -59,53 +59,67 @@ export default function ConfirmBookingModal({ bookingId, onDone, onClose }: Prop
   const [channel,        setChannel]        = useState<string>("");
   const [options,        setOptions]        = useState<MessageOption[]>([]);
 
-  const [selectedId,    setSelectedId]    = useState<string>("");
-  const [preview,       setPreview]       = useState<string>("");
-  const [loadingPrev,   setLoadingPrev]   = useState(false);
+  // selectedId tracks the currently chosen option; preview is its interpolated body
+  const [selectedId,  setSelectedId]  = useState<string>("");
+  const [preview,     setPreview]     = useState<string>("");
+  const [loadingPrev, setLoadingPrev] = useState(false);
 
   const [submitting, setSubmitting] = useState(false);
 
-  // Abort controller ref so in-flight preview requests don't race
-  const previewAbort = useRef<AbortController | null>(null);
+  // Track the id that was loaded into `preview` so we only re-fetch on real changes
+  const loadedPreviewFor = useRef<string>("");
+  const previewAbort     = useRef<AbortController | null>(null);
 
-  // 1. Load options on mount
+  // Guard: don't fetch if bookingId is falsy (defensive, callers should gate this)
   useEffect(() => {
+    if (!bookingId) {
+      console.warn("[ConfirmBookingModal] bookingId is falsy — skipping fetch");
+      setLoadingOptions(false);
+      setOptionsErr("No booking selected.");
+      return;
+    }
+
     apiFetch(`/bookings/${bookingId}/confirm-options`)
       .then((data: OptionsResponse) => {
         setChannel(data.channel);
         setOptions(data.options);
         if (data.options.length > 0) {
           const first = data.options[0]!;
+          // Use bodyPreview from the options response directly — no second fetch needed
           setSelectedId(first.id);
           setPreview(first.bodyPreview);
+          loadedPreviewFor.current = first.id;
         }
       })
       .catch((e: any) => setOptionsErr(e.message || "Failed to load message options"))
       .finally(() => setLoadingOptions(false));
   }, [bookingId]);
 
-  // 2. Fetch fresh preview whenever selection changes (after initial load)
-  const isFirstRender = useRef(true);
+  // Fetch a fresh preview when the selection changes to an id we haven't loaded yet
   useEffect(() => {
-    if (isFirstRender.current) { isFirstRender.current = false; return; }
-    if (!selectedId) return;
+    // Skip: no id, no channel yet, or already loaded for this id
+    if (!selectedId || !channel || !bookingId || loadedPreviewFor.current === selectedId) return;
 
     previewAbort.current?.abort();
     const ctrl = new AbortController();
     previewAbort.current = ctrl;
 
-    const param = channel === "INSTAGRAM" ? `savedReplyId=${selectedId}` : `templateId=${selectedId}`;
+    const param = channel === "INSTAGRAM"
+      ? `savedReplyId=${encodeURIComponent(selectedId)}`
+      : `templateId=${encodeURIComponent(selectedId)}`;
 
     setLoadingPrev(true);
     apiFetch(`/bookings/${bookingId}/confirm-preview?${param}`)
-      .then((d: { messagePreview: string }) => {
-        if (!ctrl.signal.aborted) setPreview(d.messagePreview ?? "");
+      .then((d: { messagePreview: string | null }) => {
+        if (ctrl.signal.aborted) return;
+        setPreview(d.messagePreview ?? "");
+        loadedPreviewFor.current = selectedId;
       })
       .catch(() => { /* keep previous preview on error */ })
       .finally(() => { if (!ctrl.signal.aborted) setLoadingPrev(false); });
 
     return () => ctrl.abort();
-  }, [selectedId, bookingId, channel]);
+  }, [selectedId, channel, bookingId]);
 
   async function submit(sendMessage: boolean) {
     setSubmitting(true);
@@ -127,8 +141,8 @@ export default function ConfirmBookingModal({ bookingId, onDone, onClose }: Prop
     }
   }
 
-  const noOptions   = !loadingOptions && options.length === 0;
-  const sendDisabled = submitting || loadingOptions || !!optionsErr || !selectedId;
+  const noOptions   = !loadingOptions && !optionsErr && options.length === 0;
+  const sendDisabled = submitting || loadingOptions || !!optionsErr || noOptions || !selectedId;
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
@@ -149,14 +163,12 @@ export default function ConfirmBookingModal({ bookingId, onDone, onClose }: Prop
         {/* Body */}
         <div className="px-6 py-5 flex flex-col gap-4">
 
-          {/* Loading spinner */}
           {loadingOptions && (
             <div className="flex items-center justify-center py-6">
               <div className="h-6 w-6 animate-spin rounded-full border-4 border-gray-200 border-t-[#1B52A8]" />
             </div>
           )}
 
-          {/* Options error */}
           {optionsErr && (
             <p className="text-sm text-red-500">{optionsErr}</p>
           )}
@@ -169,43 +181,71 @@ export default function ConfirmBookingModal({ bookingId, onDone, onClose }: Prop
                 {channel === "INSTAGRAM" ? <InstagramBadge /> : <WhatsAppBadge />}
               </div>
 
-              {/* Message selector */}
-              {noOptions ? (
-                <p className="text-sm text-[#0C1B33]/50">
-                  {channel === "INSTAGRAM"
-                    ? "No saved replies configured. Add one in Settings to send a message."
-                    : "No approved WhatsApp templates. Approve a template to send a message."}
-                </p>
-              ) : (
-                <div>
-                  <label className="block text-xs font-medium text-[#0C1B33]/60 mb-1.5">
-                    {channel === "INSTAGRAM" ? "Saved Reply" : "Template"}
-                  </label>
-                  <select
-                    value={selectedId}
-                    onChange={(e) => setSelectedId(e.target.value)}
-                    disabled={submitting}
-                    className={selectClass}
-                  >
-                    {options.map((o) => (
-                      <option key={o.id} value={o.id}>
-                        {o.name}
-                        {o.language ? ` (${o.language})` : ""}
-                        {o.category ? ` — ${o.category}` : ""}
-                      </option>
-                    ))}
-                  </select>
-                </div>
+              {/* ── WhatsApp template selector ── */}
+              {channel === "WHATSAPP" && (
+                noOptions ? (
+                  <p className="text-sm text-[#0C1B33]/50">
+                    No approved WhatsApp templates found. Approve a template to send a message.
+                  </p>
+                ) : (
+                  <div>
+                    <label className="block text-xs font-medium text-[#0C1B33]/60 mb-1.5">
+                      WhatsApp Template
+                    </label>
+                    <select
+                      value={selectedId}
+                      onChange={(e) => setSelectedId(e.target.value)}
+                      disabled={submitting}
+                      className={selectClass}
+                    >
+                      {options.map((o) => (
+                        <option key={o.id} value={o.id}>
+                          {o.name}{o.language ? ` (${o.language})` : ""}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                )
               )}
 
-              {/* Preview pane */}
+              {/* ── Instagram saved reply selector ── */}
+              {channel === "INSTAGRAM" && (
+                noOptions ? (
+                  <p className="text-sm text-[#0C1B33]/50">
+                    No saved replies configured. Add one in Settings to send a message.
+                  </p>
+                ) : (
+                  <div>
+                    <label className="block text-xs font-medium text-[#0C1B33]/60 mb-1.5">
+                      Saved Reply
+                    </label>
+                    <select
+                      value={selectedId}
+                      onChange={(e) => setSelectedId(e.target.value)}
+                      disabled={submitting}
+                      className={selectClass}
+                    >
+                      {options.map((o) => (
+                        <option key={o.id} value={o.id}>
+                          {o.name}{o.category ? ` — ${o.category}` : ""}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                )
+              )}
+
+              {/* Preview pane — shown whenever a selection exists */}
               {selectedId && (
-                <div className="rounded-xl border border-[#E5E0D4] bg-[#F4F2ED] p-4 relative">
+                <div className="rounded-xl border border-[#E5E0D4] bg-[#F4F2ED] p-4">
                   <p className="text-xs font-semibold uppercase tracking-wider text-[#0C1B33]/40 mb-2">
                     Message Preview
                   </p>
                   {loadingPrev ? (
-                    <div className="h-4 w-3/4 animate-pulse rounded bg-[#E5E0D4]" />
+                    <div className="space-y-2">
+                      <div className="h-3 w-full animate-pulse rounded bg-[#E5E0D4]" />
+                      <div className="h-3 w-4/5 animate-pulse rounded bg-[#E5E0D4]" />
+                    </div>
                   ) : (
                     <p className="text-sm text-[#0C1B33] whitespace-pre-wrap leading-relaxed">
                       {preview}
@@ -221,7 +261,7 @@ export default function ConfirmBookingModal({ bookingId, onDone, onClose }: Prop
         <div className="px-6 pb-6 pt-2 flex flex-col gap-2">
           <button
             onClick={() => submit(true)}
-            disabled={sendDisabled || noOptions}
+            disabled={sendDisabled}
             className="w-full rounded-lg bg-emerald-500 py-2 text-sm font-medium text-white hover:bg-emerald-600 transition disabled:opacity-50"
           >
             {submitting ? "Confirming…" : "Confirm & Send Message"}
