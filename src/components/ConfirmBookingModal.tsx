@@ -1,12 +1,25 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { apiFetch } from "@/lib/api";
 import { useToastStore } from "@/store/toastStore";
 
+interface MessageOption {
+  id: string;
+  name: string;
+  language?: string;
+  category?: string | null;
+  bodyPreview: string;
+}
+
+interface OptionsResponse {
+  channel: string;
+  options: MessageOption[];
+}
+
 interface Props {
   bookingId: string;
-  onDone: (confirmed: boolean) => void;
+  onDone: () => void;
   onClose: () => void;
 }
 
@@ -35,41 +48,92 @@ function InstagramBadge() {
   );
 }
 
+const selectClass =
+  "w-full rounded-lg border border-[#E5E0D4] px-3 py-2 text-sm text-[#0C1B33] bg-white focus:outline-none focus:ring-2 focus:ring-[#1B52A8]/25 focus:border-[#1B52A8]";
+
 export default function ConfirmBookingModal({ bookingId, onDone, onClose }: Props) {
   const { addToast } = useToastStore();
-  const [loading,    setLoading]    = useState(true);
-  const [submitting, setSubmitting] = useState(false);
-  const [preview,    setPreview]    = useState<{ channel: string; messagePreview: string } | null>(null);
-  const [previewErr, setPreviewErr] = useState("");
 
+  const [loadingOptions, setLoadingOptions] = useState(true);
+  const [optionsErr,     setOptionsErr]     = useState("");
+  const [channel,        setChannel]        = useState<string>("");
+  const [options,        setOptions]        = useState<MessageOption[]>([]);
+
+  const [selectedId,    setSelectedId]    = useState<string>("");
+  const [preview,       setPreview]       = useState<string>("");
+  const [loadingPrev,   setLoadingPrev]   = useState(false);
+
+  const [submitting, setSubmitting] = useState(false);
+
+  // Abort controller ref so in-flight preview requests don't race
+  const previewAbort = useRef<AbortController | null>(null);
+
+  // 1. Load options on mount
   useEffect(() => {
-    apiFetch(`/bookings/${bookingId}/confirm-preview`)
-      .then((d) => setPreview(d))
-      .catch((e: any) => setPreviewErr(e.message || "Failed to load preview"))
-      .finally(() => setLoading(false));
+    apiFetch(`/bookings/${bookingId}/confirm-options`)
+      .then((data: OptionsResponse) => {
+        setChannel(data.channel);
+        setOptions(data.options);
+        if (data.options.length > 0) {
+          const first = data.options[0]!;
+          setSelectedId(first.id);
+          setPreview(first.bodyPreview);
+        }
+      })
+      .catch((e: any) => setOptionsErr(e.message || "Failed to load message options"))
+      .finally(() => setLoadingOptions(false));
   }, [bookingId]);
+
+  // 2. Fetch fresh preview whenever selection changes (after initial load)
+  const isFirstRender = useRef(true);
+  useEffect(() => {
+    if (isFirstRender.current) { isFirstRender.current = false; return; }
+    if (!selectedId) return;
+
+    previewAbort.current?.abort();
+    const ctrl = new AbortController();
+    previewAbort.current = ctrl;
+
+    const param = channel === "INSTAGRAM" ? `savedReplyId=${selectedId}` : `templateId=${selectedId}`;
+
+    setLoadingPrev(true);
+    apiFetch(`/bookings/${bookingId}/confirm-preview?${param}`)
+      .then((d: { messagePreview: string }) => {
+        if (!ctrl.signal.aborted) setPreview(d.messagePreview ?? "");
+      })
+      .catch(() => { /* keep previous preview on error */ })
+      .finally(() => { if (!ctrl.signal.aborted) setLoadingPrev(false); });
+
+    return () => ctrl.abort();
+  }, [selectedId, bookingId, channel]);
 
   async function submit(sendMessage: boolean) {
     setSubmitting(true);
     try {
+      const body: Record<string, unknown> = { sendMessage };
+      if (sendMessage && selectedId) {
+        if (channel === "INSTAGRAM") body.savedReplyId = selectedId;
+        else body.templateId = selectedId;
+      }
       await apiFetch(`/bookings/${bookingId}/confirm`, {
         method: "POST",
-        body: JSON.stringify({ sendMessage }),
+        body: JSON.stringify(body),
       });
-      addToast(
-        sendMessage ? "Booking confirmed and message sent" : "Booking confirmed",
-        "success"
-      );
-      onDone(true);
+      addToast(sendMessage ? "Booking confirmed and message sent" : "Booking confirmed", "success");
+      onDone();
     } catch (e: any) {
       addToast(e.message || "Failed to confirm booking", "error");
       setSubmitting(false);
     }
   }
 
+  const noOptions   = !loadingOptions && options.length === 0;
+  const sendDisabled = submitting || loadingOptions || !!optionsErr || !selectedId;
+
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
       <div className="bg-white rounded-2xl shadow-xl w-full max-w-md flex flex-col">
+
         {/* Header */}
         <div className="flex items-center justify-between px-6 pt-5 pb-4 border-b border-[#E5E0D4]">
           <h2 className="text-base font-semibold text-[#0C1B33]">Confirm Booking</h2>
@@ -83,32 +147,72 @@ export default function ConfirmBookingModal({ bookingId, onDone, onClose }: Prop
         </div>
 
         {/* Body */}
-        <div className="px-6 py-5">
-          {loading && (
-            <div className="flex items-center justify-center py-8">
+        <div className="px-6 py-5 flex flex-col gap-4">
+
+          {/* Loading spinner */}
+          {loadingOptions && (
+            <div className="flex items-center justify-center py-6">
               <div className="h-6 w-6 animate-spin rounded-full border-4 border-gray-200 border-t-[#1B52A8]" />
             </div>
           )}
 
-          {previewErr && (
-            <p className="text-sm text-red-500">{previewErr}</p>
+          {/* Options error */}
+          {optionsErr && (
+            <p className="text-sm text-red-500">{optionsErr}</p>
           )}
 
-          {!loading && preview && (
+          {!loadingOptions && !optionsErr && (
             <>
-              <div className="flex items-center gap-2 mb-3">
+              {/* Channel badge */}
+              <div className="flex items-center gap-2">
                 <span className="text-xs text-[#0C1B33]/50">Channel:</span>
-                {preview.channel === "INSTAGRAM" ? <InstagramBadge /> : <WhatsAppBadge />}
+                {channel === "INSTAGRAM" ? <InstagramBadge /> : <WhatsAppBadge />}
               </div>
 
-              <div className="rounded-xl border border-[#E5E0D4] bg-[#F4F2ED] p-4">
-                <p className="text-xs font-semibold uppercase tracking-wider text-[#0C1B33]/40 mb-2">
-                  Message Preview
+              {/* Message selector */}
+              {noOptions ? (
+                <p className="text-sm text-[#0C1B33]/50">
+                  {channel === "INSTAGRAM"
+                    ? "No saved replies configured. Add one in Settings to send a message."
+                    : "No approved WhatsApp templates. Approve a template to send a message."}
                 </p>
-                <p className="text-sm text-[#0C1B33] whitespace-pre-wrap leading-relaxed">
-                  {preview.messagePreview}
-                </p>
-              </div>
+              ) : (
+                <div>
+                  <label className="block text-xs font-medium text-[#0C1B33]/60 mb-1.5">
+                    {channel === "INSTAGRAM" ? "Saved Reply" : "Template"}
+                  </label>
+                  <select
+                    value={selectedId}
+                    onChange={(e) => setSelectedId(e.target.value)}
+                    disabled={submitting}
+                    className={selectClass}
+                  >
+                    {options.map((o) => (
+                      <option key={o.id} value={o.id}>
+                        {o.name}
+                        {o.language ? ` (${o.language})` : ""}
+                        {o.category ? ` — ${o.category}` : ""}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              )}
+
+              {/* Preview pane */}
+              {selectedId && (
+                <div className="rounded-xl border border-[#E5E0D4] bg-[#F4F2ED] p-4 relative">
+                  <p className="text-xs font-semibold uppercase tracking-wider text-[#0C1B33]/40 mb-2">
+                    Message Preview
+                  </p>
+                  {loadingPrev ? (
+                    <div className="h-4 w-3/4 animate-pulse rounded bg-[#E5E0D4]" />
+                  ) : (
+                    <p className="text-sm text-[#0C1B33] whitespace-pre-wrap leading-relaxed">
+                      {preview}
+                    </p>
+                  )}
+                </div>
+              )}
             </>
           )}
         </div>
@@ -117,19 +221,20 @@ export default function ConfirmBookingModal({ bookingId, onDone, onClose }: Prop
         <div className="px-6 pb-6 pt-2 flex flex-col gap-2">
           <button
             onClick={() => submit(true)}
-            disabled={loading || submitting || !!previewErr}
+            disabled={sendDisabled || noOptions}
             className="w-full rounded-lg bg-emerald-500 py-2 text-sm font-medium text-white hover:bg-emerald-600 transition disabled:opacity-50"
           >
             {submitting ? "Confirming…" : "Confirm & Send Message"}
           </button>
           <button
             onClick={() => submit(false)}
-            disabled={loading || submitting}
+            disabled={submitting || loadingOptions}
             className="w-full rounded-lg border border-[#E5E0D4] py-2 text-sm font-medium text-[#0C1B33]/70 hover:bg-[#F4F2ED] transition disabled:opacity-50"
           >
             Confirm Only
           </button>
         </div>
+
       </div>
     </div>
   );
