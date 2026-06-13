@@ -6,6 +6,7 @@ import { apiFetch } from "@/lib/api";
 import { useMounted } from "@/lib/useMounted";
 import { useToastStore } from "@/store/toastStore";
 import { formatCurrency, formatDate } from "@/lib/locale";
+import ConfirmBookingModal from "@/components/ConfirmBookingModal";
 
 const inputClass =
   "w-full rounded-lg border border-[#E5E0D4] px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#1B52A8]/25 focus:border-[#1B52A8]";
@@ -21,6 +22,7 @@ export default function BookingDetailPage() {
   const [error,     setError]     = useState("");
   const [actioning, setActioning] = useState(false);
   const [roomTypes, setRoomTypes] = useState<any[]>([]);
+  const [confirmModalOpen, setConfirmModalOpen] = useState(false);
 
   // Edit modal state
   const [editing,     setEditing]     = useState(false);
@@ -348,7 +350,7 @@ export default function BookingDetailPage() {
                 <>
                   <ActionButton
                     label="Confirm"
-                    onClick={() => changeStatus("CONFIRMED")}
+                    onClick={() => setConfirmModalOpen(true)}
                     disabled={actioning}
                     className="bg-emerald-500 text-white hover:bg-emerald-600"
                   />
@@ -370,7 +372,7 @@ export default function BookingDetailPage() {
                 <>
                   <ActionButton
                     label="Confirm"
-                    onClick={() => changeStatus("CONFIRMED")}
+                    onClick={() => setConfirmModalOpen(true)}
                     disabled={actioning}
                     className="bg-emerald-500 text-white hover:bg-emerald-600"
                   />
@@ -420,6 +422,18 @@ export default function BookingDetailPage() {
           </div>
         </div>
       </div>
+
+      {/* Confirm booking modal */}
+      {confirmModalOpen && booking && (
+        <ConfirmBookingModal
+          bookingId={booking.id}
+          onDone={() => {
+            setConfirmModalOpen(false);
+            setBooking((prev: any) => ({ ...prev, status: "CONFIRMED" }));
+          }}
+          onClose={() => setConfirmModalOpen(false)}
+        />
+      )}
 
       {/* Edit modal */}
       {editing && (

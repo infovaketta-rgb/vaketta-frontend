@@ -8,6 +8,7 @@ import { useMounted } from "@/lib/useMounted";
 import { useSocket } from "@/context/SocketContext";
 import { SkeletonTableRow } from "@/components/Skeleton";
 import { useToastStore } from "@/store/toastStore";
+import ConfirmBookingModal from "@/components/ConfirmBookingModal";
 
 const BookingCalendar = dynamic(() => import("@/components/BookingCalendar"), {
   ssr: false,
@@ -41,6 +42,7 @@ export default function BookingsPage() {
   const [pages, setPages] = useState(1);
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [bulkStatus, setBulkStatus]   = useState("CONFIRMED");
+  const [confirmingId, setConfirmingId] = useState<string | null>(null);
   const menuRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -282,7 +284,7 @@ async function updateStatus(id: string, status: string) {
                         <div ref={menuRef} data-no-nav className="absolute right-0 top-8 z-50 w-36 bg-white border border-[#E5E0D4] rounded-xl shadow-lg py-1 overflow-hidden">
                           <button data-no-nav onClick={() => openEdit(b)} className="w-full text-left px-4 py-2 text-sm text-[#0C1B33] hover:bg-[#F4F2ED] transition">Edit</button>
                           {b.status === "PENDING" && (
-                            <button data-no-nav onClick={() => updateStatus(b.id, "CONFIRMED")} className="w-full text-left px-4 py-2 text-sm text-emerald-600 hover:bg-emerald-50 transition">Confirm</button>
+                            <button data-no-nav onClick={() => { setConfirmingId(b.id); setOpenMenuId(null); }} className="w-full text-left px-4 py-2 text-sm text-emerald-600 hover:bg-emerald-50 transition">Confirm</button>
                           )}
                           <button data-no-nav onClick={() => updateStatus(b.id, "CANCELLED")} className="w-full text-left px-4 py-2 text-sm text-red-500 hover:bg-red-50 transition">Cancel</button>
                         </div>
@@ -400,7 +402,7 @@ async function updateStatus(id: string, status: string) {
                             {b.status === "PENDING" && (
                               <button
                                 data-no-nav
-                                onClick={() => updateStatus(b.id, "CONFIRMED")}
+                                onClick={() => { setConfirmingId(b.id); setOpenMenuId(null); }}
                                 className="w-full text-left px-4 py-2 text-sm text-emerald-600 hover:bg-emerald-50 transition"
                               >
                                 Confirm
@@ -448,6 +450,18 @@ async function updateStatus(id: string, status: string) {
             </div>
           )}
         </div>
+      )}
+
+      {/* Confirm booking modal */}
+      {confirmingId && (
+        <ConfirmBookingModal
+          bookingId={confirmingId}
+          onDone={() => {
+            setBookings((prev) => prev.map((b) => b.id === confirmingId ? { ...b, status: "CONFIRMED" } : b));
+            setConfirmingId(null);
+          }}
+          onClose={() => setConfirmingId(null)}
+        />
       )}
 
       {/* Edit Modal */}
