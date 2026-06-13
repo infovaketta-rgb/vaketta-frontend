@@ -15,6 +15,7 @@ interface MessageOption {
 interface OptionsResponse {
   channel: string;
   options: MessageOption[];
+  defaultId?: string | null;
 }
 
 interface Props {
@@ -84,11 +85,13 @@ export default function ConfirmBookingModal({ bookingId, onDone, onClose }: Prop
         setChannel(data.channel);
         setOptions(data.options);
         if (data.options.length > 0) {
-          const first = data.options[0]!;
-          // Use bodyPreview from the options response directly — no second fetch needed
-          setSelectedId(first.id);
-          setPreview(first.bodyPreview);
-          loadedPreviewFor.current = first.id;
+          // Prefer the hotel's saved default; fall back to first option
+          const preferred = data.defaultId
+            ? (data.options.find((o) => o.id === data.defaultId) ?? data.options[0]!)
+            : data.options[0]!;
+          setSelectedId(preferred.id);
+          setPreview(preferred.bodyPreview);
+          loadedPreviewFor.current = preferred.id;
         }
       })
       .catch((e: any) => setOptionsErr(e.message || "Failed to load message options"))

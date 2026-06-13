@@ -30,6 +30,18 @@ type RoomType = {
   description: string | null;
 };
 
+type WaTemplate = {
+  id: string;
+  name: string;
+  language: string;
+};
+
+type SavedReply = {
+  id: string;
+  name: string;
+  category: string | null;
+};
+
 type Config = {
   autoReplyEnabled: boolean;
   bookingEnabled: boolean;
@@ -486,6 +498,10 @@ export default function BotPage() {
   const [savingTitle, setSavingTitle] = useState(false);
   const [savedTitle, setSavedTitle]   = useState(false);
 
+  // confirm defaults
+  const [waTemplates,   setWaTemplates]   = useState<WaTemplate[]>([]);
+  const [savedReplies,  setSavedReplies]  = useState<SavedReply[]>([]);
+
   // flows tab
   const [flowsList,     setFlowsList]     = useState<FlowSummary[]>([]);
   const [flowsLoaded,   setFlowsLoaded]   = useState(false);
@@ -508,11 +524,20 @@ export default function BotPage() {
       apiFetch("/hotel-settings"),
       apiFetch("/room-types"),
       apiFetch("/hotel-settings/flows"),
-    ]).then(([s, r, fl]: [Settings, RoomType[], FlowSummary[]]) => {
+      apiFetch("/hotel-templates?status=APPROVED&limit=100").catch(() => ({ data: [] })),
+      apiFetch("/saved-replies").catch(() => []),
+    ]).then(([s, r, fl, tmpl, sr]: [Settings, RoomType[], FlowSummary[], any, any]) => {
         setSettings(s);
         setRooms(r);
         setFlowsList(fl);
         setFlowsLoaded(true);
+        const tmplList: WaTemplate[] = (Array.isArray(tmpl) ? tmpl : (tmpl?.data ?? [])).map((t: any) => ({
+          id: t.id, name: t.name, language: t.language,
+        }));
+        setWaTemplates(tmplList);
+        setSavedReplies((Array.isArray(sr) ? sr : (sr?.data ?? [])).map((r: any) => ({
+          id: r.id, name: r.name, category: r.category ?? null,
+        })));
         const cfg = s.config ?? {
           autoReplyEnabled: true, bookingEnabled: true, bookingFlowId: null, menuFlowId: null, aiEnabled: false,
           aiInstructions: null,
@@ -1468,6 +1493,70 @@ export default function BotPage() {
                         Only applies to the default menu — not active when a Main Menu Flow is selected above.
                       </p>
                     </div>
+                  </div>
+                )}
+              </div>
+            </div>
+
+            {/* Default WhatsApp Confirmation Template */}
+            <div className="rounded-2xl border border-gray-100 bg-white shadow-sm">
+              <div className="flex items-center justify-between border-b border-gray-50 px-6 py-4">
+                <div>
+                  <h2 className="text-sm font-semibold text-gray-900">Default WhatsApp Confirmation Template</h2>
+                  <p className="mt-0.5 text-xs text-gray-400">
+                    Pre-select a WhatsApp template when staff confirm a booking — they can still change it before sending.
+                  </p>
+                </div>
+                <SaveBtn saving={savingMsgs} saved={savedMsgs} onSave={saveBotMessages} />
+              </div>
+              <div className="px-6 py-5">
+                {waTemplates.length === 0 ? (
+                  <p className="text-sm text-gray-400">No approved WhatsApp templates found. Approve a template in the WhatsApp configuration to enable this.</p>
+                ) : (
+                  <div>
+                    <label className="block text-xs font-medium text-gray-700 mb-1.5">Template</label>
+                    <select
+                      value={botMsgs.defaultConfirmTemplateId ?? ""}
+                      onChange={(e) => setBotMsgs((m) => ({ ...m, defaultConfirmTemplateId: e.target.value }))}
+                      className={inp}
+                    >
+                      <option value="">— No default (staff selects each time) —</option>
+                      {waTemplates.map((t) => (
+                        <option key={t.id} value={t.id}>{t.name} ({t.language})</option>
+                      ))}
+                    </select>
+                  </div>
+                )}
+              </div>
+            </div>
+
+            {/* Default Instagram Confirmation Reply */}
+            <div className="rounded-2xl border border-gray-100 bg-white shadow-sm">
+              <div className="flex items-center justify-between border-b border-gray-50 px-6 py-4">
+                <div>
+                  <h2 className="text-sm font-semibold text-gray-900">Default Instagram Confirmation Reply</h2>
+                  <p className="mt-0.5 text-xs text-gray-400">
+                    Pre-select a saved reply when staff confirm a booking from an Instagram guest — they can still change it before sending.
+                  </p>
+                </div>
+                <SaveBtn saving={savingMsgs} saved={savedMsgs} onSave={saveBotMessages} />
+              </div>
+              <div className="px-6 py-5">
+                {savedReplies.length === 0 ? (
+                  <p className="text-sm text-gray-400">No saved replies found. Add one in Settings to enable this.</p>
+                ) : (
+                  <div>
+                    <label className="block text-xs font-medium text-gray-700 mb-1.5">Saved Reply</label>
+                    <select
+                      value={botMsgs.defaultConfirmSavedReplyId ?? ""}
+                      onChange={(e) => setBotMsgs((m) => ({ ...m, defaultConfirmSavedReplyId: e.target.value }))}
+                      className={inp}
+                    >
+                      <option value="">— No default (staff selects each time) —</option>
+                      {savedReplies.map((r) => (
+                        <option key={r.id} value={r.id}>{r.name}{r.category ? ` — ${r.category}` : ""}</option>
+                      ))}
+                    </select>
                   </div>
                 )}
               </div>
