@@ -4,12 +4,18 @@ import { useEffect, useRef, useState } from "react";
 import { apiFetch } from "@/lib/api";
 import { useToastStore } from "@/store/toastStore";
 
+interface TemplateVariable {
+  name: string;
+  defaultValue: string;
+}
+
 interface MessageOption {
   id: string;
   name: string;
   language?: string;
   category?: string | null;
   bodyPreview: string;
+  variables?: TemplateVariable[];
 }
 
 interface OptionsResponse {
@@ -49,8 +55,19 @@ function InstagramBadge() {
   );
 }
 
-const selectClass =
+const inputClass =
   "w-full rounded-lg border border-[#E5E0D4] px-3 py-2 text-sm text-[#0C1B33] bg-white focus:outline-none focus:ring-2 focus:ring-[#1B52A8]/25 focus:border-[#1B52A8]";
+
+const selectClass = inputClass;
+
+// Derive a readable label from a variable name like "guestName" → "Guest Name"
+function varLabel(name: string): string {
+  return name
+    .replace(/([A-Z])/g, " $1")
+    .replace(/[_-]/g, " ")
+    .replace(/^\w/, (c) => c.toUpperCase())
+    .trim();
+}
 
 export default function ConfirmBookingModal({ bookingId, onDone, onClose }: Props) {
   const { addToast } = useToastStore();
@@ -60,18 +77,19 @@ export default function ConfirmBookingModal({ bookingId, onDone, onClose }: Prop
   const [channel,        setChannel]        = useState<string>("");
   const [options,        setOptions]        = useState<MessageOption[]>([]);
 
-  // selectedId tracks the currently chosen option; preview is its interpolated body
-  const [selectedId,  setSelectedId]  = useState<string>("");
-  const [preview,     setPreview]     = useState<string>("");
-  const [loadingPrev, setLoadingPrev] = useState(false);
+  const [selectedId,   setSelectedId]   = useState<string>("");
+  const [preview,      setPreview]       = useState<string>("");
+  const [loadingPrev,  setLoadingPrev]   = useState(false);
+
+  // variables[varName] = current value (editable by staff)
+  const [variables, setVariables] = useState<Record<string, string>>({});
 
   const [submitting, setSubmitting] = useState(false);
 
-  // Track the id that was loaded into `preview` so we only re-fetch on real changes
   const loadedPreviewFor = useRef<string>("");
   const previewAbort     = useRef<AbortController | null>(null);
 
-  // Guard: don't fetch if bookingId is falsy (defensive, callers should gate this)
+  // Load options on mount
   useEffect(() => {
     if (!bookingId) {
       console.warn("[ConfirmBookingModal] bookingId is falsy — skipping fetch");
@@ -85,22 +103,39 @@ export default function ConfirmBookingModal({ bookingId, onDone, onClose }: Prop
         setChannel(data.channel);
         setOptions(data.options);
         if (data.options.length > 0) {
-          // Prefer the hotel's saved default; fall back to first option
           const preferred = data.defaultId
             ? (data.options.find((o) => o.id === data.defaultId) ?? data.options[0]!)
             : data.options[0]!;
           setSelectedId(preferred.id);
           setPreview(preferred.bodyPreview);
           loadedPreviewFor.current = preferred.id;
+          // Seed variables from the preferred option's defaults
+          if (preferred.variables?.length) {
+            const initial: Record<string, string> = {};
+            for (const v of preferred.variables) initial[v.name] = v.defaultValue;
+            setVariables(initial);
+          }
         }
       })
       .catch((e: any) => setOptionsErr(e.message || "Failed to load message options"))
       .finally(() => setLoadingOptions(false));
   }, [bookingId]);
 
-  // Fetch a fresh preview when the selection changes to an id we haven't loaded yet
+  // When template selection changes, update variable defaults from the new option
+  function handleSelectChange(newId: string) {
+    setSelectedId(newId);
+    const opt = options.find((o) => o.id === newId);
+    if (opt?.variables?.length) {
+      const newVars: Record<string, string> = {};
+      for (const v of opt.variables) newVars[v.name] = v.defaultValue;
+      setVariables(newVars);
+    } else {
+      setVariables({});
+    }
+  }
+
+  // Fetch preview when selection changes (only for items not yet loaded)
   useEffect(() => {
-    // Skip: no id, no channel yet, or already loaded for this id
     if (!selectedId || !channel || !bookingId || loadedPreviewFor.current === selectedId) return;
 
     previewAbort.current?.abort();
@@ -124,13 +159,20 @@ export default function ConfirmBookingModal({ bookingId, onDone, onClose }: Prop
     return () => ctrl.abort();
   }, [selectedId, channel, bookingId]);
 
+  const selectedOption = options.find((o) => o.id === selectedId);
+  const templateVars   = (channel === "WHATSAPP" && selectedOption?.variables) ? selectedOption.variables : [];
+
   async function submit(sendMessage: boolean) {
     setSubmitting(true);
     try {
       const body: Record<string, unknown> = { sendMessage };
       if (sendMessage && selectedId) {
-        if (channel === "INSTAGRAM") body.savedReplyId = selectedId;
-        else body.templateId = selectedId;
+        if (channel === "INSTAGRAM") {
+          body.savedReplyId = selectedId;
+        } else {
+          body.templateId = selectedId;
+          if (templateVars.length > 0) body.variables = variables;
+        }
       }
       await apiFetch(`/bookings/${bookingId}/confirm`, {
         method: "POST",
@@ -144,15 +186,16 @@ export default function ConfirmBookingModal({ bookingId, onDone, onClose }: Prop
     }
   }
 
-  const noOptions   = !loadingOptions && !optionsErr && options.length === 0;
-  const sendDisabled = submitting || loadingOptions || !!optionsErr || noOptions || !selectedId;
+  const noOptions    = !loadingOptions && !optionsErr && options.length === 0;
+  const varsHaveEmpty = templateVars.some((v) => !(variables[v.name] ?? "").trim());
+  const sendDisabled  = submitting || loadingOptions || !!optionsErr || noOptions || !selectedId || varsHaveEmpty;
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
-      <div className="bg-white rounded-2xl shadow-xl w-full max-w-md flex flex-col">
+      <div className="bg-white rounded-2xl shadow-xl w-full max-w-md flex flex-col max-h-[90vh]">
 
         {/* Header */}
-        <div className="flex items-center justify-between px-6 pt-5 pb-4 border-b border-[#E5E0D4]">
+        <div className="flex items-center justify-between px-6 pt-5 pb-4 border-b border-[#E5E0D4] shrink-0">
           <h2 className="text-base font-semibold text-[#0C1B33]">Confirm Booking</h2>
           <button
             onClick={onClose}
@@ -163,8 +206,8 @@ export default function ConfirmBookingModal({ bookingId, onDone, onClose }: Prop
           </button>
         </div>
 
-        {/* Body */}
-        <div className="px-6 py-5 flex flex-col gap-4">
+        {/* Body — scrollable */}
+        <div className="px-6 py-5 flex flex-col gap-4 overflow-y-auto">
 
           {loadingOptions && (
             <div className="flex items-center justify-center py-6">
@@ -197,7 +240,7 @@ export default function ConfirmBookingModal({ bookingId, onDone, onClose }: Prop
                     </label>
                     <select
                       value={selectedId}
-                      onChange={(e) => setSelectedId(e.target.value)}
+                      onChange={(e) => handleSelectChange(e.target.value)}
                       disabled={submitting}
                       className={selectClass}
                     >
@@ -238,7 +281,33 @@ export default function ConfirmBookingModal({ bookingId, onDone, onClose }: Prop
                 )
               )}
 
-              {/* Preview pane — shown whenever a selection exists */}
+              {/* ── WhatsApp template variable fields ── */}
+              {channel === "WHATSAPP" && templateVars.length > 0 && (
+                <div className="rounded-xl border border-[#E5E0D4] p-4 flex flex-col gap-3">
+                  <p className="text-xs font-semibold uppercase tracking-wider text-[#0C1B33]/40">
+                    Message Variables
+                  </p>
+                  {templateVars.map((v) => (
+                    <div key={v.name}>
+                      <label className="block text-xs font-medium text-[#0C1B33]/70 mb-1">
+                        {varLabel(v.name)}
+                      </label>
+                      <input
+                        type="text"
+                        value={variables[v.name] ?? ""}
+                        onChange={(e) =>
+                          setVariables((prev) => ({ ...prev, [v.name]: e.target.value }))
+                        }
+                        disabled={submitting}
+                        placeholder={v.defaultValue || v.name}
+                        className={inputClass}
+                      />
+                    </div>
+                  ))}
+                </div>
+              )}
+
+              {/* Preview pane */}
               {selectedId && (
                 <div className="rounded-xl border border-[#E5E0D4] bg-[#F4F2ED] p-4">
                   <p className="text-xs font-semibold uppercase tracking-wider text-[#0C1B33]/40 mb-2">
@@ -261,7 +330,7 @@ export default function ConfirmBookingModal({ bookingId, onDone, onClose }: Prop
         </div>
 
         {/* Footer */}
-        <div className="px-6 pb-6 pt-2 flex flex-col gap-2">
+        <div className="px-6 pb-6 pt-2 flex flex-col gap-2 shrink-0 border-t border-[#E5E0D4]">
           <button
             onClick={() => submit(true)}
             disabled={sendDisabled}
