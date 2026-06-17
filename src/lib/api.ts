@@ -45,7 +45,8 @@ export async function apiFetch(
       errDetails = b.details;
     } catch { /* ignore */ }
     if (!errMsg) { try { errMsg = await res.text(); } catch { /* ignore */ } }
-    throw Object.assign(new Error(errMsg || "API request failed"), { details: errDetails });
+    // Attach the HTTP status so callers can branch on it (e.g. 409 conflict).
+    throw Object.assign(new Error(errMsg || "API request failed"), { status: res.status, details: errDetails });
   }
 
   return res.json();

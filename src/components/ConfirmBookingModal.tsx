@@ -3,31 +3,37 @@
 import { useEffect, useRef, useState } from "react";
 import { apiFetch } from "@/lib/api";
 import { useToastStore } from "@/store/toastStore";
+import { useSocket } from "@/context/SocketContext";
 
-interface TemplateVariable {
-  name: string;
-  defaultValue: string;
+type RefType = "TEMPLATE" | "SAVED_REPLY";
+type StepStatus = "idle" | "sending" | "sent" | "failed" | "skipped";
+
+interface PreviewStep {
+  stepId:  string;
+  refType: RefType;
+  refId:   string;
+  title:   string;
+  body:    string;
 }
 
-interface MessageOption {
-  id: string;
-  name: string;
-  language?: string;
-  category?: string | null;
-  bodyPreview: string;
-  variables?: TemplateVariable[];
-}
-
-interface OptionsResponse {
+interface PreviewResponse {
   channel: string;
-  options: MessageOption[];
-  defaultId?: string | null;
+  source:  "sequence" | "legacy";
+  sequenceId?: string;
+  steps:   PreviewStep[];
 }
 
 interface Props {
   bookingId: string;
   onDone: () => void;
   onClose: () => void;
+}
+
+// Per-step UI state: whether staff included it + its live send status.
+interface StepState extends PreviewStep {
+  checked: boolean;
+  status:  StepStatus;
+  error?:  string;
 }
 
 function WhatsAppBadge() {
@@ -55,140 +61,167 @@ function InstagramBadge() {
   );
 }
 
-const inputClass =
-  "w-full rounded-lg border border-[#E5E0D4] px-3 py-2 text-sm text-[#0C1B33] bg-white focus:outline-none focus:ring-2 focus:ring-[#1B52A8]/25 focus:border-[#1B52A8]";
+function TypeBadge({ refType }: { refType: RefType }) {
+  return refType === "TEMPLATE" ? (
+    <span className="text-[10px] font-semibold px-1.5 py-0.5 rounded bg-sky-100 text-sky-700">Template</span>
+  ) : (
+    <span className="text-[10px] font-semibold px-1.5 py-0.5 rounded bg-purple-100 text-purple-700">Saved Reply</span>
+  );
+}
 
-const selectClass = inputClass;
-
-// Derive a readable label from a variable name like "guestName" → "Guest Name"
-function varLabel(name: string): string {
-  return name
-    .replace(/([A-Z])/g, " $1")
-    .replace(/[_-]/g, " ")
-    .replace(/^\w/, (c) => c.toUpperCase())
-    .trim();
+function StatusPill({ status, error }: { status: StepStatus; error?: string }) {
+  switch (status) {
+    case "sending":
+      return <span className="text-[11px] text-amber-600 inline-flex items-center gap-1">
+        <span className="h-2.5 w-2.5 animate-spin rounded-full border-2 border-amber-300 border-t-amber-600" /> Sending…
+      </span>;
+    case "sent":
+      return <span className="text-[11px] font-medium text-emerald-600">✓ Sent</span>;
+    case "skipped":
+      return <span className="text-[11px] text-slate-400">Skipped</span>;
+    case "failed":
+      return <span className="text-[11px] font-medium text-red-500" title={error}>✕ Failed</span>;
+    default:
+      return null;
+  }
 }
 
 export default function ConfirmBookingModal({ bookingId, onDone, onClose }: Props) {
   const { addToast } = useToastStore();
+  const socket = useSocket();
 
-  const [loadingOptions, setLoadingOptions] = useState(true);
-  const [optionsErr,     setOptionsErr]     = useState("");
-  const [channel,        setChannel]        = useState<string>("");
-  const [options,        setOptions]        = useState<MessageOption[]>([]);
+  const [loading,    setLoading]    = useState(true);
+  const [loadErr,    setLoadErr]    = useState("");
+  const [channel,    setChannel]    = useState<string>("");
+  const [steps,      setSteps]      = useState<StepState[]>([]);
 
-  const [selectedId,   setSelectedId]   = useState<string>("");
-  const [preview,      setPreview]       = useState<string>("");
-  const [loadingPrev,  setLoadingPrev]   = useState(false);
+  const [sending,    setSending]    = useState(false);
+  const [sentOnce,   setSentOnce]   = useState(false);  // a send has been started
+  const [allDone,    setAllDone]    = useState(false);
 
-  // variables[varName] = current value (editable by staff)
-  const [variables, setVariables] = useState<Record<string, string>>({});
+  // Reconcile local checklist with the server's authoritative job status. Called on
+  // mount (recover an in-flight/finished send if the modal was reopened) and on every
+  // socket reconnect (catch up on step events missed while disconnected).
+  async function reconcileStatus() {
+    try {
+      const st = await apiFetch(`/bookings/${bookingId}/confirmation-status`);
+      if (st?.state === "not_found" || !Array.isArray(st.steps) || st.steps.length === 0) return;
 
-  const [submitting, setSubmitting] = useState(false);
+      // A job exists for this booking — a send already happened. Reflect its per-step
+      // status and lock the form (no re-submit into an unsent state).
+      setSentOnce(true);
+      const byId: Record<string, { status: string; error?: string }> = {};
+      for (const s of st.steps) byId[s.stepId] = { status: s.status, error: s.error };
 
-  const loadedPreviewFor = useRef<string>("");
-  const previewAbort     = useRef<AbortController | null>(null);
+      setSteps((prev) => prev.map((s) => {
+        const r = byId[s.stepId];
+        if (!r) return s;
+        // "pending" maps to our "idle" placeholder; everything else maps 1:1.
+        const status = (r.status === "pending" ? "sending" : r.status) as StepStatus;
+        return { ...s, checked: r.status !== "skipped", status, error: r.error };
+      }));
 
-  // Load options on mount
+      if (st.state === "completed" || st.state === "failed") {
+        setAllDone(true);
+        setSending(false);
+      } else if (st.inFlight) {
+        setSending(true);
+      }
+    } catch {
+      /* status is best-effort recovery — ignore failures, live events still apply */
+    }
+  }
+
+  // Load the confirmation preview (sequence or legacy single-message fallback), then
+  // reconcile against any existing job for this booking.
   useEffect(() => {
     if (!bookingId) {
-      console.warn("[ConfirmBookingModal] bookingId is falsy — skipping fetch");
-      setLoadingOptions(false);
-      setOptionsErr("No booking selected.");
+      setLoading(false);
+      setLoadErr("No booking selected.");
       return;
     }
-
-    apiFetch(`/bookings/${bookingId}/confirm-options`)
-      .then((data: OptionsResponse) => {
+    apiFetch(`/bookings/${bookingId}/confirmation-preview`)
+      .then(async (data: PreviewResponse) => {
         setChannel(data.channel);
-        setOptions(data.options);
-        if (data.options.length > 0) {
-          const preferred = data.defaultId
-            ? (data.options.find((o) => o.id === data.defaultId) ?? data.options[0]!)
-            : data.options[0]!;
-          setSelectedId(preferred.id);
-          setPreview(preferred.bodyPreview);
-          loadedPreviewFor.current = preferred.id;
-          // Seed variables from the preferred option's defaults
-          if (preferred.variables?.length) {
-            const initial: Record<string, string> = {};
-            for (const v of preferred.variables) initial[v.name] = v.defaultValue;
-            setVariables(initial);
-          }
-        }
+        setSteps(data.steps.map((s) => ({ ...s, checked: true, status: "idle" })));
+        await reconcileStatus();
       })
-      .catch((e: any) => setOptionsErr(e.message || "Failed to load message options"))
-      .finally(() => setLoadingOptions(false));
+      .catch((e: any) => setLoadErr(e?.message || "Failed to load confirmation preview"))
+      .finally(() => setLoading(false));
   }, [bookingId]);
 
-  // When template selection changes, update variable defaults from the new option
-  function handleSelectChange(newId: string) {
-    setSelectedId(newId);
-    const opt = options.find((o) => o.id === newId);
-    if (opt?.variables?.length) {
-      const newVars: Record<string, string> = {};
-      for (const v of opt.variables) newVars[v.name] = v.defaultValue;
-      setVariables(newVars);
-    } else {
-      setVariables({});
-    }
-  }
-
-  // Fetch preview when selection changes (only for items not yet loaded)
+  // Live per-step status via the hotel-scoped Socket.IO room, plus a re-sync on
+  // reconnect so events emitted during a disconnect aren't lost.
   useEffect(() => {
-    if (!selectedId || !channel || !bookingId || loadedPreviewFor.current === selectedId) return;
+    if (!socket) return;
 
-    previewAbort.current?.abort();
-    const ctrl = new AbortController();
-    previewAbort.current = ctrl;
+    function onStep(payload: any) {
+      if (payload?.bookingId !== bookingId) return;
+      setSteps((prev) => prev.map((s) =>
+        s.stepId === payload.stepId
+          ? { ...s, status: payload.status as StepStatus, error: payload.error }
+          : s
+      ));
+    }
+    function onDoneEvt(payload: any) {
+      if (payload?.bookingId !== bookingId) return;
+      setAllDone(true);
+      setSending(false);
+    }
+    // Socket.IO client fires "reconnect" on the manager after a successful reconnect.
+    function onReconnect() { reconcileStatus(); }
 
-    const param = channel === "INSTAGRAM"
-      ? `savedReplyId=${encodeURIComponent(selectedId)}`
-      : `templateId=${encodeURIComponent(selectedId)}`;
+    socket.on("confirmation:step", onStep);
+    socket.on("confirmation:done", onDoneEvt);
+    socket.io.on("reconnect", onReconnect);
+    return () => {
+      socket.off("confirmation:step", onStep);
+      socket.off("confirmation:done", onDoneEvt);
+      socket.io.off("reconnect", onReconnect);
+    };
+  }, [socket, bookingId]);
 
-    setLoadingPrev(true);
-    apiFetch(`/bookings/${bookingId}/confirm-preview?${param}`)
-      .then((d: { messagePreview: string | null }) => {
-        if (ctrl.signal.aborted) return;
-        setPreview(d.messagePreview ?? "");
-        loadedPreviewFor.current = selectedId;
-      })
-      .catch(() => { /* keep previous preview on error */ })
-      .finally(() => { if (!ctrl.signal.aborted) setLoadingPrev(false); });
+  function toggle(stepId: string) {
+    setSteps((prev) => prev.map((s) => s.stepId === stepId ? { ...s, checked: !s.checked } : s));
+  }
 
-    return () => ctrl.abort();
-  }, [selectedId, channel, bookingId]);
-
-  const selectedOption = options.find((o) => o.id === selectedId);
-  const templateVars   = (channel === "WHATSAPP" && selectedOption?.variables) ? selectedOption.variables : [];
-
-  async function submit(sendMessage: boolean) {
-    setSubmitting(true);
+  async function handleSend() {
+    setSending(true);
+    setSentOnce(true);
     try {
-      const body: Record<string, unknown> = { sendMessage };
-      if (sendMessage && selectedId) {
-        if (channel === "INSTAGRAM") {
-          body.savedReplyId = selectedId;
-        } else {
-          body.templateId = selectedId;
-          if (templateVars.length > 0) body.variables = variables;
-        }
-      }
-      await apiFetch(`/bookings/${bookingId}/confirm`, {
+      await apiFetch(`/bookings/${bookingId}/send-confirmation`, {
         method: "POST",
-        body: JSON.stringify(body),
+        body: JSON.stringify({
+          steps: steps.map((s) => ({
+            stepId:  s.stepId,
+            refType: s.refType,
+            refId:   s.refId,
+            skip:    !s.checked,
+          })),
+        }),
       });
-      addToast(sendMessage ? "Booking confirmed and message sent" : "Booking confirmed", "success");
-      onDone();
+      // Mark unchecked steps as skipped immediately; checked ones await socket events.
+      setSteps((prev) => prev.map((s) => s.checked ? { ...s, status: "sending" } : { ...s, status: "skipped" }));
+      addToast("Booking confirmed — sending messages…", "success");
+      onDone();  // refresh the bookings list (status is now CONFIRMED)
     } catch (e: any) {
-      addToast(e.message || "Failed to confirm booking", "error");
-      setSubmitting(false);
+      // 409 → a send is already in flight for this booking (double-submit guard).
+      if (e?.status === 409) {
+        addToast("A confirmation is already being sent for this booking.", "warning");
+        setSentOnce(true);          // keep the form locked
+        await reconcileStatus();    // show the existing job's live progress
+        return;
+      }
+      addToast(e?.message || "Failed to start confirmation send", "error");
+      setSending(false);
+      setSentOnce(false);
     }
   }
 
-  const noOptions    = !loadingOptions && !optionsErr && options.length === 0;
-  const varsHaveEmpty = templateVars.some((v) => !(variables[v.name] ?? "").trim());
-  const sendDisabled  = submitting || loadingOptions || !!optionsErr || noOptions || !selectedId || varsHaveEmpty;
+  const noSteps      = !loading && !loadErr && steps.length === 0;
+  const checkedCount = steps.filter((s) => s.checked).length;
+  const failedCount  = steps.filter((s) => s.status === "failed").length;
+  const sendDisabled = sending || loading || !!loadErr || noSteps || checkedCount === 0 || sentOnce;
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
@@ -197,133 +230,77 @@ export default function ConfirmBookingModal({ bookingId, onDone, onClose }: Prop
         {/* Header */}
         <div className="flex items-center justify-between px-6 pt-5 pb-4 border-b border-[#E5E0D4] shrink-0">
           <h2 className="text-base font-semibold text-[#0C1B33]">Confirm Booking</h2>
-          <button
-            onClick={onClose}
-            disabled={submitting}
-            className="text-slate-400 hover:text-slate-600 transition text-xl leading-none"
-          >
-            ×
-          </button>
+          <button onClick={onClose} className="text-slate-400 hover:text-slate-600 transition text-xl leading-none">×</button>
         </div>
 
-        {/* Body — scrollable */}
+        {/* Body */}
         <div className="px-6 py-5 flex flex-col gap-4 overflow-y-auto">
-
-          {loadingOptions && (
+          {loading && (
             <div className="flex items-center justify-center py-6">
               <div className="h-6 w-6 animate-spin rounded-full border-4 border-gray-200 border-t-[#1B52A8]" />
             </div>
           )}
 
-          {optionsErr && (
-            <p className="text-sm text-red-500">{optionsErr}</p>
+          {loadErr && <p className="text-sm text-red-500">{loadErr}</p>}
+
+          {noSteps && (
+            <p className="text-sm text-[#0C1B33]/50">
+              No confirmation message is configured for this {channel === "INSTAGRAM" ? "Instagram" : "WhatsApp"} booking.
+              You can still confirm the booking without sending a message.
+            </p>
           )}
 
-          {!loadingOptions && !optionsErr && (
+          {!loading && !loadErr && steps.length > 0 && (
             <>
-              {/* Channel badge */}
               <div className="flex items-center gap-2">
                 <span className="text-xs text-[#0C1B33]/50">Channel:</span>
                 {channel === "INSTAGRAM" ? <InstagramBadge /> : <WhatsAppBadge />}
               </div>
 
-              {/* ── WhatsApp template selector ── */}
-              {channel === "WHATSAPP" && (
-                noOptions ? (
-                  <p className="text-sm text-[#0C1B33]/50">
-                    No approved WhatsApp templates found. Approve a template to send a message.
-                  </p>
-                ) : (
-                  <div>
-                    <label className="block text-xs font-medium text-[#0C1B33]/60 mb-1.5">
-                      WhatsApp Template
-                    </label>
-                    <select
-                      value={selectedId}
-                      onChange={(e) => handleSelectChange(e.target.value)}
-                      disabled={submitting}
-                      className={selectClass}
-                    >
-                      {options.map((o) => (
-                        <option key={o.id} value={o.id}>
-                          {o.name}{o.language ? ` (${o.language})` : ""}
-                        </option>
-                      ))}
-                    </select>
-                  </div>
-                )
-              )}
+              <p className="text-xs font-semibold uppercase tracking-wider text-[#0C1B33]/40">
+                Messages to send ({checkedCount} of {steps.length})
+              </p>
 
-              {/* ── Instagram saved reply selector ── */}
-              {channel === "INSTAGRAM" && (
-                noOptions ? (
-                  <p className="text-sm text-[#0C1B33]/50">
-                    No saved replies configured. Add one in Settings to send a message.
-                  </p>
-                ) : (
-                  <div>
-                    <label className="block text-xs font-medium text-[#0C1B33]/60 mb-1.5">
-                      Saved Reply
-                    </label>
-                    <select
-                      value={selectedId}
-                      onChange={(e) => setSelectedId(e.target.value)}
-                      disabled={submitting}
-                      className={selectClass}
-                    >
-                      {options.map((o) => (
-                        <option key={o.id} value={o.id}>
-                          {o.name}{o.category ? ` — ${o.category}` : ""}
-                        </option>
-                      ))}
-                    </select>
-                  </div>
-                )
-              )}
-
-              {/* ── WhatsApp template variable fields ── */}
-              {channel === "WHATSAPP" && templateVars.length > 0 && (
-                <div className="rounded-xl border border-[#E5E0D4] p-4 flex flex-col gap-3">
-                  <p className="text-xs font-semibold uppercase tracking-wider text-[#0C1B33]/40">
-                    Message Variables
-                  </p>
-                  {templateVars.map((v) => (
-                    <div key={v.name}>
-                      <label className="block text-xs font-medium text-[#0C1B33]/70 mb-1">
-                        {varLabel(v.name)}
-                      </label>
+              <ul className="flex flex-col gap-2">
+                {steps.map((s, i) => (
+                  <li key={s.stepId}
+                      className={`rounded-xl border p-3 transition ${
+                        s.status === "failed" ? "border-red-200 bg-red-50/50" : "border-[#E5E0D4] bg-white"
+                      }`}>
+                    <div className="flex items-start gap-3">
                       <input
-                        type="text"
-                        value={variables[v.name] ?? ""}
-                        onChange={(e) =>
-                          setVariables((prev) => ({ ...prev, [v.name]: e.target.value }))
-                        }
-                        disabled={submitting}
-                        placeholder={v.defaultValue || v.name}
-                        className={inputClass}
+                        type="checkbox"
+                        checked={s.checked}
+                        disabled={sentOnce}
+                        onChange={() => toggle(s.stepId)}
+                        className="mt-0.5 h-4 w-4 rounded accent-emerald-500 disabled:opacity-50"
                       />
+                      <div className="min-w-0 flex-1">
+                        <div className="flex items-center gap-2 flex-wrap">
+                          <span className="text-[11px] text-slate-300">{i + 1}.</span>
+                          <TypeBadge refType={s.refType} />
+                          <span className="text-[13px] font-medium text-[#0C1B33] truncate">{s.title}</span>
+                          <span className="ml-auto"><StatusPill status={s.status} error={s.error} /></span>
+                        </div>
+                        {s.body && (
+                          <p className="mt-1 text-[12px] text-[#0C1B33]/60 whitespace-pre-wrap line-clamp-3">{s.body}</p>
+                        )}
+                        {s.status === "failed" && (
+                          <p className="mt-1 text-[11px] text-red-500">{s.error || "Send failed."} The other steps were not affected.</p>
+                        )}
+                      </div>
                     </div>
-                  ))}
-                </div>
-              )}
+                  </li>
+                ))}
+              </ul>
 
-              {/* Preview pane */}
-              {selectedId && (
-                <div className="rounded-xl border border-[#E5E0D4] bg-[#F4F2ED] p-4">
-                  <p className="text-xs font-semibold uppercase tracking-wider text-[#0C1B33]/40 mb-2">
-                    Message Preview
-                  </p>
-                  {loadingPrev ? (
-                    <div className="space-y-2">
-                      <div className="h-3 w-full animate-pulse rounded bg-[#E5E0D4]" />
-                      <div className="h-3 w-4/5 animate-pulse rounded bg-[#E5E0D4]" />
-                    </div>
-                  ) : (
-                    <p className="text-sm text-[#0C1B33] whitespace-pre-wrap leading-relaxed">
-                      {preview}
-                    </p>
-                  )}
-                </div>
+              {allDone && failedCount > 0 && (
+                <p className="text-[12px] text-amber-600">
+                  Finished with {failedCount} failed step{failedCount > 1 ? "s" : ""}. The booking is confirmed.
+                </p>
+              )}
+              {allDone && failedCount === 0 && (
+                <p className="text-[12px] text-emerald-600">All messages sent. The booking is confirmed.</p>
               )}
             </>
           )}
@@ -331,20 +308,32 @@ export default function ConfirmBookingModal({ bookingId, onDone, onClose }: Prop
 
         {/* Footer */}
         <div className="px-6 pb-6 pt-2 flex flex-col gap-2 shrink-0 border-t border-[#E5E0D4]">
-          <button
-            onClick={() => submit(true)}
-            disabled={sendDisabled}
-            className="w-full rounded-lg bg-emerald-500 py-2 text-sm font-medium text-white hover:bg-emerald-600 transition disabled:opacity-50"
-          >
-            {submitting ? "Confirming…" : "Confirm & Send Message"}
-          </button>
-          <button
-            onClick={() => submit(false)}
-            disabled={submitting || loadingOptions}
-            className="w-full rounded-lg border border-[#E5E0D4] py-2 text-sm font-medium text-[#0C1B33]/70 hover:bg-[#F4F2ED] transition disabled:opacity-50"
-          >
-            Confirm Only
-          </button>
+          {!sentOnce ? (
+            <button
+              onClick={handleSend}
+              disabled={sendDisabled}
+              className="w-full rounded-lg bg-emerald-500 py-2 text-sm font-medium text-white hover:bg-emerald-600 transition disabled:opacity-50"
+            >
+              {sending ? "Sending…" : noSteps ? "No messages to send" : `Confirm & Send ${checkedCount} message${checkedCount === 1 ? "" : "s"}`}
+            </button>
+          ) : (
+            <button
+              onClick={onClose}
+              disabled={sending && !allDone}
+              className="w-full rounded-lg bg-[#1B52A8] py-2 text-sm font-medium text-white hover:bg-[#164088] transition disabled:opacity-50"
+            >
+              {allDone ? "Done" : "Sending… (you can close)"}
+            </button>
+          )}
+          {!sentOnce && (
+            <button
+              onClick={onClose}
+              disabled={sending}
+              className="w-full rounded-lg border border-[#E5E0D4] py-2 text-sm font-medium text-[#0C1B33]/70 hover:bg-[#F4F2ED] transition disabled:opacity-50"
+            >
+              Cancel
+            </button>
+          )}
         </div>
 
       </div>

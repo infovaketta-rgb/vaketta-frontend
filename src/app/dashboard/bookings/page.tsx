@@ -456,9 +456,10 @@ async function updateStatus(id: string, status: string) {
       {confirmingId && (
         <ConfirmBookingModal
           bookingId={confirmingId}
+          // onDone fires when the booking is confirmed + send started — patch the row
+          // but keep the modal open so staff can watch live per-step send status.
           onDone={() => {
             setBookings((prev) => prev.map((b) => b.id === confirmingId ? { ...b, status: "CONFIRMED" } : b));
-            setConfirmingId(null);
           }}
           onClose={() => setConfirmingId(null)}
         />

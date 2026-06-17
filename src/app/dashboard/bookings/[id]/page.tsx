@@ -427,8 +427,9 @@ export default function BookingDetailPage() {
       {confirmModalOpen && booking && (
         <ConfirmBookingModal
           bookingId={booking.id}
+          // Keep the modal open after send so staff can watch live per-step status;
+          // just patch the booking status. Modal closes via onClose.
           onDone={() => {
-            setConfirmModalOpen(false);
             setBooking((prev: any) => ({ ...prev, status: "CONFIRMED" }));
           }}
           onClose={() => setConfirmModalOpen(false)}

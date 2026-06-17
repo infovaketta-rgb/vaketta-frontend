@@ -4,6 +4,9 @@ import { useEffect, useState } from "react";
 import { apiFetch } from "@/lib/api";
 import { useMounted } from "@/lib/useMounted";
 import { useToastStore } from "@/store/toastStore";
+import ConfirmationSequencesTab from "./ConfirmationSequencesTab";
+
+type Tab = "replies" | "sequences";
 
 type SavedReply = {
   id:        string;
@@ -33,6 +36,7 @@ export default function SavedRepliesPage() {
   const mounted    = useMounted();
   const { addToast } = useToastStore();
 
+  const [tab,        setTab]        = useState<Tab>("replies");
   const [replies,    setReplies]    = useState<SavedReply[]>([]);
   const [loading,    setLoading]    = useState(true);
   const [search,     setSearch]     = useState("");
@@ -133,24 +137,55 @@ export default function SavedRepliesPage() {
   return (
     <div className="flex flex-col h-full bg-[#F4F2ED]">
       {/* Page header */}
-      <div className="bg-white border-b border-[#E5E0D4] px-6 py-4 flex items-center justify-between gap-4 shrink-0">
-        <div>
-          <h1 className="text-lg font-semibold text-[#0C1B33]">Saved Replies</h1>
-          <p className="text-[13px] text-slate-500 mt-0.5">
-            Internal message templates with <code className="text-purple-600">{"{{variable}}"}</code> support. Not sent via WhatsApp API — used by staff and automation flows.
-          </p>
+      <div className="bg-white border-b border-[#E5E0D4] px-6 pt-4 shrink-0">
+        <div className="flex items-start justify-between gap-4">
+          <div>
+            <h1 className="text-lg font-semibold text-[#0C1B33]">Saved Replies</h1>
+            <p className="text-[13px] text-slate-500 mt-0.5">
+              Internal message templates with <code className="text-purple-600">{"{{variable}}"}</code> support. Not sent via WhatsApp API — used by staff and automation flows.
+            </p>
+          </div>
+          {tab === "replies" && (
+            <button
+              onClick={openCreate}
+              className="shrink-0 flex items-center gap-2 px-4 py-2 rounded-lg bg-[#1B52A8] text-white text-[13px] font-medium hover:bg-[#164088] transition"
+            >
+              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+              </svg>
+              New Reply
+            </button>
+          )}
         </div>
-        <button
-          onClick={openCreate}
-          className="shrink-0 flex items-center gap-2 px-4 py-2 rounded-lg bg-[#1B52A8] text-white text-[13px] font-medium hover:bg-[#164088] transition"
-        >
-          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
-          </svg>
-          New Reply
-        </button>
+
+        {/* Tab bar */}
+        <div className="flex gap-6 mt-3 -mb-px">
+          {([
+            { id: "replies"   as Tab, label: "Saved Replies" },
+            { id: "sequences" as Tab, label: "Confirmation Sequences" },
+          ]).map((t) => (
+            <button
+              key={t.id}
+              onClick={() => setTab(t.id)}
+              className={`pb-2.5 text-[13px] font-medium border-b-2 transition ${
+                tab === t.id
+                  ? "border-[#7A3F91] text-[#7A3F91]"
+                  : "border-transparent text-slate-500 hover:text-slate-700"
+              }`}
+            >
+              {t.label}
+            </button>
+          ))}
+        </div>
       </div>
 
+      {tab === "sequences" && (
+        <div className="flex-1 overflow-y-auto p-6">
+          <ConfirmationSequencesTab />
+        </div>
+      )}
+
+      {tab === "replies" && (
       <div className="flex-1 overflow-y-auto p-6 space-y-4">
         {/* Search + filter bar */}
         <div className="flex items-center gap-3 flex-wrap">
@@ -266,6 +301,7 @@ export default function SavedRepliesPage() {
           </div>
         )}
       </div>
+      )}
 
       {/* Create / Edit Modal */}
       {modalOpen && (
