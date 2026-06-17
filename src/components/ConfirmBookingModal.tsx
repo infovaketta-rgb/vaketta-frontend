@@ -8,12 +8,18 @@ import { useSocket } from "@/context/SocketContext";
 type RefType = "TEMPLATE" | "SAVED_REPLY";
 type StepStatus = "idle" | "sending" | "sent" | "failed" | "skipped";
 
+interface TemplateVariable {
+  name:         string;
+  defaultValue: string;   // auto-derived from the booking; "" → staff must fill
+}
+
 interface PreviewStep {
   stepId:  string;
   refType: RefType;
   refId:   string;
   title:   string;
   body:    string;
+  variables?: TemplateVariable[];   // TEMPLATE steps only
 }
 
 interface PreviewResponse {
@@ -29,11 +35,28 @@ interface Props {
   onClose: () => void;
 }
 
-// Per-step UI state: whether staff included it + its live send status.
+// Per-step UI state: whether staff included it, live send status, and the current
+// (auto-derived + staff-edited) values for any template variables.
 interface StepState extends PreviewStep {
-  checked: boolean;
-  status:  StepStatus;
-  error?:  string;
+  checked:   boolean;
+  status:    StepStatus;
+  error?:    string;
+  varValues: Record<string, string>;
+}
+
+// "guestName" → "Guest Name" for friendlier field labels.
+function varLabel(name: string): string {
+  return name
+    .replace(/([A-Z])/g, " $1")
+    .replace(/[_-]/g, " ")
+    .replace(/^\w/, (c) => c.toUpperCase())
+    .trim();
+}
+
+// Variables a TEMPLATE step needs that staff must fill (no auto-derived default).
+function missingVars(s: StepState): string[] {
+  if (s.refType !== "TEMPLATE" || !s.variables) return [];
+  return s.variables.filter((v) => !(s.varValues[v.name] ?? "").trim()).map((v) => v.name);
 }
 
 function WhatsAppBadge() {
@@ -143,7 +166,13 @@ export default function ConfirmBookingModal({ bookingId, onDone, onClose }: Prop
     apiFetch(`/bookings/${bookingId}/confirmation-preview`)
       .then(async (data: PreviewResponse) => {
         setChannel(data.channel);
-        setSteps(data.steps.map((s) => ({ ...s, checked: true, status: "idle" })));
+        setSteps(data.steps.map((s) => ({
+          ...s,
+          checked: true,
+          status:  "idle" as StepStatus,
+          // Seed each template variable with its auto-derived default.
+          varValues: Object.fromEntries((s.variables ?? []).map((v) => [v.name, v.defaultValue])),
+        })));
         await reconcileStatus();
       })
       .catch((e: any) => setLoadErr(e?.message || "Failed to load confirmation preview"))
@@ -185,6 +214,12 @@ export default function ConfirmBookingModal({ bookingId, onDone, onClose }: Prop
     setSteps((prev) => prev.map((s) => s.stepId === stepId ? { ...s, checked: !s.checked } : s));
   }
 
+  function setVarValue(stepId: string, name: string, value: string) {
+    setSteps((prev) => prev.map((s) =>
+      s.stepId === stepId ? { ...s, varValues: { ...s.varValues, [name]: value } } : s
+    ));
+  }
+
   async function handleSend() {
     setSending(true);
     setSentOnce(true);
@@ -197,6 +232,8 @@ export default function ConfirmBookingModal({ bookingId, onDone, onClose }: Prop
             refType: s.refType,
             refId:   s.refId,
             skip:    !s.checked,
+            // Send the full (auto-derived + edited) variable map for TEMPLATE steps.
+            ...(s.refType === "TEMPLATE" && s.variables?.length ? { variables: s.varValues } : {}),
           })),
         }),
       });
@@ -221,7 +258,9 @@ export default function ConfirmBookingModal({ bookingId, onDone, onClose }: Prop
   const noSteps      = !loading && !loadErr && steps.length === 0;
   const checkedCount = steps.filter((s) => s.checked).length;
   const failedCount  = steps.filter((s) => s.status === "failed").length;
-  const sendDisabled = sending || loading || !!loadErr || noSteps || checkedCount === 0 || sentOnce;
+  // A checked template step with an unfilled required variable blocks the whole send.
+  const hasMissingVars = steps.some((s) => s.checked && missingVars(s).length > 0);
+  const sendDisabled = sending || loading || !!loadErr || noSteps || checkedCount === 0 || sentOnce || hasMissingVars;
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
@@ -285,6 +324,38 @@ export default function ConfirmBookingModal({ bookingId, onDone, onClose }: Prop
                         {s.body && (
                           <p className="mt-1 text-[12px] text-[#0C1B33]/60 whitespace-pre-wrap line-clamp-3">{s.body}</p>
                         )}
+
+                        {/* Template variable inputs — only those NOT auto-derived from
+                            the booking (empty default). Hidden once a send has started. */}
+                        {s.checked && !sentOnce && s.refType === "TEMPLATE" &&
+                          (s.variables ?? []).filter((v) => !v.defaultValue).length > 0 && (
+                          <div className="mt-2 flex flex-col gap-2 rounded-lg border border-[#E5E0D4] bg-[#F4F2ED] p-2.5">
+                            <p className="text-[10px] font-semibold uppercase tracking-wider text-[#0C1B33]/40">
+                              Fill in template variables
+                            </p>
+                            {(s.variables ?? []).filter((v) => !v.defaultValue).map((v) => {
+                              const val   = s.varValues[v.name] ?? "";
+                              const empty = !val.trim();
+                              return (
+                                <div key={v.name}>
+                                  <label className="block text-[11px] font-medium text-[#0C1B33]/70 mb-0.5">
+                                    {varLabel(v.name)} <span className="text-red-400">*</span>
+                                  </label>
+                                  <input
+                                    type="text"
+                                    value={val}
+                                    onChange={(e) => setVarValue(s.stepId, v.name, e.target.value)}
+                                    placeholder={v.name}
+                                    className={`w-full rounded-md border px-2 py-1 text-[12px] text-[#0C1B33] bg-white focus:outline-none focus:ring-2 focus:ring-[#1B52A8]/25 ${
+                                      empty ? "border-red-300" : "border-[#E5E0D4] focus:border-[#1B52A8]"
+                                    }`}
+                                  />
+                                </div>
+                              );
+                            })}
+                          </div>
+                        )}
+
                         {s.status === "failed" && (
                           <p className="mt-1 text-[11px] text-red-500">{s.error || "Send failed."} The other steps were not affected.</p>
                         )}
@@ -314,7 +385,10 @@ export default function ConfirmBookingModal({ bookingId, onDone, onClose }: Prop
               disabled={sendDisabled}
               className="w-full rounded-lg bg-emerald-500 py-2 text-sm font-medium text-white hover:bg-emerald-600 transition disabled:opacity-50"
             >
-              {sending ? "Sending…" : noSteps ? "No messages to send" : `Confirm & Send ${checkedCount} message${checkedCount === 1 ? "" : "s"}`}
+              {sending ? "Sending…"
+                : noSteps ? "No messages to send"
+                : hasMissingVars ? "Fill required template fields"
+                : `Confirm & Send ${checkedCount} message${checkedCount === 1 ? "" : "s"}`}
             </button>
           ) : (
             <button
