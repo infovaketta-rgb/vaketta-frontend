@@ -4,11 +4,13 @@ import { useEffect, useState, useRef } from "react";
 import { apiFetch } from "@/lib/api";
 import { useToastStore } from "@/store/toastStore";
 import { useMounted } from "@/lib/useMounted";
+import VariableMappingTab from "./VariableMappingTab";
 
 // ── Types ──────────────────────────────────────────────────────────────────────
 
 type TemplateCategory = "MARKETING" | "UTILITY" | "AUTHENTICATION";
 type TemplateStatus   = "PENDING" | "APPROVED" | "REJECTED" | "PAUSED" | "DISABLED";
+type Tab = "templates" | "mapping";
 
 interface ButtonDef {
   type:    "QUICK_REPLY" | "URL" | "PHONE_NUMBER" | "COPY_CODE";
@@ -103,6 +105,7 @@ export default function TemplatesPage() {
   const mounted = useMounted();
   const { addToast } = useToastStore();
 
+  const [tab, setTab]                   = useState<Tab>("templates");
   const [templates, setTemplates]       = useState<Template[]>([]);
   const [loading, setLoading]           = useState(true);
   const [search, setSearch]             = useState("");
@@ -302,8 +305,38 @@ export default function TemplatesPage() {
         </div>
       </div>
 
+      {/* Tab bar */}
+      <div className="px-6 border-b border-[#E5E0D4]">
+        <div className="flex gap-6">
+          {([
+            { id: "templates" as Tab, label: "Templates" },
+            { id: "mapping"   as Tab, label: "Variable Mapping" },
+          ]).map((t) => (
+            <button
+              key={t.id}
+              onClick={() => setTab(t.id)}
+              className={`pb-2.5 text-[13px] font-medium border-b-2 transition ${
+                tab === t.id
+                  ? "border-[#7A3F91] text-[#7A3F91]"
+                  : "border-transparent text-slate-500 hover:text-slate-700"
+              }`}
+            >
+              {t.label}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      {tab === "mapping" && (
+        <div className="flex-1 overflow-y-auto px-6 py-5">
+          <VariableMappingTab />
+        </div>
+      )}
+
+      {tab === "templates" && (
+      <>
       {/* Filters */}
-      <div className="px-6 pb-4 flex flex-wrap gap-3 items-center">
+      <div className="px-6 pt-4 pb-4 flex flex-wrap gap-3 items-center">
         <div className="relative">
           <svg className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
@@ -388,6 +421,8 @@ export default function TemplatesPage() {
           </div>
         )}
       </div>
+      </>
+      )}
 
       {/* Delete confirmation dialog */}
       {deleting && (
