@@ -45,6 +45,7 @@ type SavedReply = {
 type Config = {
   autoReplyEnabled: boolean;
   bookingEnabled: boolean;
+  maxStayNights: number;
   bookingFlowId: string | null;
   menuFlowId: string | null;
   aiEnabled: boolean;
@@ -539,7 +540,7 @@ export default function BotPage() {
           id: r.id, name: r.name, category: r.category ?? null,
         })));
         const cfg = s.config ?? {
-          autoReplyEnabled: true, bookingEnabled: true, bookingFlowId: null, menuFlowId: null, aiEnabled: false,
+          autoReplyEnabled: true, bookingEnabled: true, maxStayNights: 60, bookingFlowId: null, menuFlowId: null, aiEnabled: false,
           aiInstructions: null,
           businessStartHour: 9, businessEndHour: 21, allDay: false,
           timezone: "UTC", defaultLanguage: "en",
@@ -1363,6 +1364,33 @@ export default function BotPage() {
                         + Create default booking flow
                       </button>
                     )}
+                  </div>
+                )}
+
+                {/* Maximum stay length */}
+                {config.bookingEnabled && (
+                  <div className="rounded-xl border border-purple-100 bg-purple-50 p-4 space-y-2">
+                    <div>
+                      <p className="text-sm font-medium text-gray-700">Maximum stay length (nights)</p>
+                      <p className="text-xs text-gray-400 mt-0.5">
+                        Reject bookings longer than this. Default 60. Most hotels stay well under 365 — raise it
+                        for long-stay apartments or extended-residency. Max 3650 (10 years).
+                      </p>
+                    </div>
+                    <input
+                      type="number"
+                      min={1}
+                      max={3650}
+                      className={`${inp} max-w-[8rem]`}
+                      value={config.maxStayNights ?? 60}
+                      onChange={(e) =>
+                        setConfig((c) => c && ({ ...c, maxStayNights: e.target.value === "" ? 60 : Number(e.target.value) }))
+                      }
+                      onBlur={(e) => {
+                        const n = Math.min(3650, Math.max(1, Math.round(Number(e.target.value) || 60)));
+                        setConfig((c) => c && ({ ...c, maxStayNights: n }));
+                      }}
+                    />
                   </div>
                 )}
 
