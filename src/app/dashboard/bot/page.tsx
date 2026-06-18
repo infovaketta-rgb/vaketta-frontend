@@ -566,7 +566,10 @@ export default function BotPage() {
     if (!config) return;
     setSavingConfig(true); setSavedConfig(false);
     try {
-      await apiFetch("/hotel-settings", { method: "PATCH", body: JSON.stringify(config) });
+      // maxStayNights is superadmin-controlled — never written from the hotel
+      // panel (backend ignores it too; stripped here to keep the payload honest).
+      const { maxStayNights: _ro, ...payload } = config;
+      await apiFetch("/hotel-settings", { method: "PATCH", body: JSON.stringify(payload) });
       setSavedConfig(true); setTimeout(() => setSavedConfig(false), 3000);
     } finally { setSavingConfig(false); }
   }
@@ -1367,30 +1370,23 @@ export default function BotPage() {
                   </div>
                 )}
 
-                {/* Maximum stay length */}
+                {/* Maximum stay length — read-only; superadmin-controlled */}
                 {config.bookingEnabled && (
                   <div className="rounded-xl border border-purple-100 bg-purple-50 p-4 space-y-2">
                     <div>
                       <p className="text-sm font-medium text-gray-700">Maximum stay length (nights)</p>
                       <p className="text-xs text-gray-400 mt-0.5">
-                        Reject bookings longer than this. Default 60. Most hotels stay well under 365 — raise it
-                        for long-stay apartments or extended-residency. Max 3650 (10 years).
+                        Reject bookings longer than this many nights.
                       </p>
                     </div>
                     <input
                       type="number"
-                      min={1}
-                      max={3650}
-                      className={`${inp} max-w-[8rem]`}
+                      readOnly
+                      disabled
+                      className={`${inp} max-w-[8rem] bg-gray-100 text-gray-500 cursor-not-allowed`}
                       value={config.maxStayNights ?? 60}
-                      onChange={(e) =>
-                        setConfig((c) => c && ({ ...c, maxStayNights: e.target.value === "" ? 60 : Number(e.target.value) }))
-                      }
-                      onBlur={(e) => {
-                        const n = Math.min(3650, Math.max(1, Math.round(Number(e.target.value) || 60)));
-                        setConfig((c) => c && ({ ...c, maxStayNights: n }));
-                      }}
                     />
+                    <p className="text-xs text-gray-400">Contact Vaketta to change this setting.</p>
                   </div>
                 )}
 

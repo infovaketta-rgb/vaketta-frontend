@@ -59,6 +59,11 @@ export default function SettingsPage() {
   const [waSuccess, setWaSuccess] = useState("");
   const [waError, setWaError] = useState("");
 
+  const [maxStayCeiling, setMaxStayCeiling] = useState("3650");
+  const [ceilingSaving, setCeilingSaving] = useState(false);
+  const [ceilingSuccess, setCeilingSuccess] = useState("");
+  const [ceilingError, setCeilingError] = useState("");
+
   useEffect(() => {
     if (!mounted) return;
     let cancelled = false;
@@ -81,6 +86,7 @@ export default function SettingsPage() {
         if (!cancelled) {
           setIgEmbedUrl(res.instagramEmbedUrl      ?? "");
           setWaEmbedUrl(res.whatsappEmbedSignupUrl ?? "");
+          if (res.maxStayNightsCeiling != null) setMaxStayCeiling(String(res.maxStayNightsCeiling));
         }
       })
       .catch(() => {});
@@ -148,6 +154,28 @@ export default function SettingsPage() {
       setWaError(e.message);
     } finally {
       setWaSaving(false);
+    }
+  }
+
+  async function handleCeilingSave(e: React.FormEvent) {
+    e.preventDefault();
+    setCeilingError(""); setCeilingSuccess("");
+    const n = Math.round(Number(maxStayCeiling));
+    if (!Number.isFinite(n) || n < 1) { setCeilingError("Enter a whole number of nights (1 or more)."); return; }
+    setCeilingSaving(true);
+    try {
+      const res = await adminApiFetch("/admin/platform-settings", {
+        method: "PATCH",
+        body: JSON.stringify({ maxStayNightsCeiling: n }),
+      });
+      logAdminAction("admin.platform.maxStayNightsCeiling", { value: n });
+      if (res.maxStayNightsCeiling != null) setMaxStayCeiling(String(res.maxStayNightsCeiling));
+      setCeilingSuccess("Maximum stay ceiling saved.");
+      setTimeout(() => setCeilingSuccess(""), 3000);
+    } catch (e: any) {
+      setCeilingError(e.message);
+    } finally {
+      setCeilingSaving(false);
     }
   }
 
@@ -304,6 +332,53 @@ export default function SettingsPage() {
             >
               {waSaving && <span className="h-3.5 w-3.5 animate-spin rounded-full border-2 border-white border-t-transparent" />}
               {waSaving ? "Saving…" : "Save URL"}
+            </button>
+          </form>
+        </div>
+      </div>
+
+      {/* Maximum stay ceiling */}
+      <div className="rounded-2xl border border-[#E5E0D4] bg-white shadow-sm overflow-hidden">
+        <div className="border-b border-[#E5E0D4] bg-[#F4F2ED] px-6 py-4">
+          <h2 className="text-sm font-semibold text-[#0C1B33]">Maximum Stay Ceiling (nights)</h2>
+          <p className="mt-0.5 text-xs text-[#0C1B33]/45">
+            Platform-wide hard cap on booking length. No hotel's maximum stay can exceed this — it directly
+            controls the server's crash-prevention limit. Default 3650 (10 years).
+          </p>
+        </div>
+        <div className="px-6 py-5 space-y-4">
+          {ceilingSuccess && (
+            <div className="rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-700">{ceilingSuccess}</div>
+          )}
+          {ceilingError && (
+            <div className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">{ceilingError}</div>
+          )}
+          <form onSubmit={handleCeilingSave} className="space-y-4">
+            <div>
+              <label className="mb-1.5 block text-xs font-semibold uppercase tracking-wide text-[#0C1B33]/60">
+                Ceiling (nights)
+              </label>
+              <input
+                type="number"
+                min={1}
+                value={maxStayCeiling}
+                onChange={(e) => setMaxStayCeiling(e.target.value)}
+                className={`${inputCls} max-w-40`}
+                placeholder="3650"
+              />
+              {Number(maxStayCeiling) > 3650 && (
+                <p className="mt-1.5 text-[11px] text-amber-600">
+                  ⚠️ Values above 3650 are not recommended — this directly controls the server's crash-prevention cap.
+                </p>
+              )}
+            </div>
+            <button
+              type="submit"
+              disabled={ceilingSaving}
+              className="flex items-center gap-2 rounded-xl bg-[#1B52A8] px-5 py-2.5 text-sm font-semibold text-white shadow-sm transition hover:bg-[#163F82] disabled:opacity-60"
+            >
+              {ceilingSaving && <span className="h-3.5 w-3.5 animate-spin rounded-full border-2 border-white border-t-transparent" />}
+              {ceilingSaving ? "Saving…" : "Save Ceiling"}
             </button>
           </form>
         </div>

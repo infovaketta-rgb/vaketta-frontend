@@ -131,6 +131,12 @@ export default function HotelDetailPage() {
   const [localeError,      setLocaleError]      = useState("");
   const [localeSaved,      setLocaleSaved]      = useState(false);
 
+  const [maxStay,        setMaxStay]        = useState("60");
+  const [platformCeiling, setPlatformCeiling] = useState<number | null>(null);
+  const [savingMaxStay,  setSavingMaxStay]  = useState(false);
+  const [maxStayError,   setMaxStayError]   = useState("");
+  const [maxStaySaved,   setMaxStaySaved]   = useState(false);
+
   const [plans, setPlans] = useState<Plan[]>([]);
   const [showTrial, setShowTrial] = useState(false);
   const [trialDays, setTrialDays] = useState("14");
@@ -147,8 +153,9 @@ export default function HotelDetailPage() {
     Promise.all([
       adminApiFetch(`/admin/hotels/${id}`),
       adminApiFetch("/admin/plans"),
+      adminApiFetch("/admin/platform-settings").catch(() => null),
     ])
-      .then(([data, planList]: [HotelDetail, Plan[]]) => {
+      .then(([data, planList, platform]: [HotelDetail, Plan[], any]) => {
         if (cancelled) return;
         setHotel(data);
         setEditName(data.name);
@@ -156,6 +163,8 @@ export default function HotelDetailPage() {
         if (data.config?.country)    setLocaleCountry(data.config.country);
         if (data.config?.currency)   setLocaleCurrency(data.config.currency);
         if (data.config?.dateFormat) setLocaleDateFormat(data.config.dateFormat);
+        if (data.config?.maxStayNights != null) setMaxStay(String(data.config.maxStayNights));
+        if (platform?.maxStayNightsCeiling != null) setPlatformCeiling(Number(platform.maxStayNightsCeiling));
       })
       .catch((e: any) => { if (cancelled || e.message === "Unauthorized") return; setError(e.message); })
       .finally(() => { if (!cancelled) setLoading(false); });
@@ -242,6 +251,29 @@ export default function HotelDetailPage() {
       setLocaleError(e.message);
     } finally {
       setSavingLocale(false);
+    }
+  }
+
+  async function saveMaxStay() {
+    setMaxStayError("");
+    const n = Math.round(Number(maxStay));
+    if (!Number.isFinite(n) || n < 1) { setMaxStayError("Enter a whole number of nights (1 or more)."); return; }
+    setSavingMaxStay(true);
+    try {
+      const res = await adminApiFetch(`/admin/hotels/${id}/max-stay`, {
+        method: "PATCH",
+        body: JSON.stringify({ maxStayNights: n }),
+      });
+      logAdminAction("hotel.maxStay.update", { id, maxStayNights: res.maxStayNights });
+      // Backend clamps to the platform ceiling — reflect the stored value.
+      setMaxStay(String(res.maxStayNights));
+      setHotel((h) => h ? { ...h, config: { ...(h.config ?? {}), maxStayNights: res.maxStayNights } } : h);
+      setMaxStaySaved(true);
+      setTimeout(() => setMaxStaySaved(false), 2500);
+    } catch (e: any) {
+      setMaxStayError(e.message);
+    } finally {
+      setSavingMaxStay(false);
     }
   }
 
@@ -675,6 +707,56 @@ export default function HotelDetailPage() {
               {savingLocale ? "Saving…" : "Save Locale Settings"}
             </button>
             {localeSaved && (
+              <span className="flex items-center gap-1 text-xs font-medium text-emerald-600">
+                <svg className="h-3.5 w-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M5 13l4 4L19 7" />
+                </svg>
+                Saved
+              </span>
+            )}
+          </div>
+        </div>
+      </div>
+
+      {/* Booking — Maximum Stay (superadmin-controlled) */}
+      <div className="rounded-2xl border border-[#E5E0D4] bg-white shadow-sm overflow-hidden">
+        <div className="border-b border-[#E5E0D4] bg-[#F4F2ED] px-6 py-4">
+          <h2 className="text-sm font-semibold text-[#0C1B33]">Maximum Stay Length</h2>
+          <p className="mt-0.5 text-xs text-[#0C1B33]/45">
+            Reject bookings longer than this many nights for this hotel. Only Vaketta superadmins can change it.
+            {platformCeiling != null && <> Capped at the platform ceiling of <span className="font-semibold">{platformCeiling.toLocaleString()}</span> nights.</>}
+          </p>
+        </div>
+        <div className="px-6 py-5 space-y-4">
+          {maxStayError && (
+            <div className="rounded-xl border border-red-200 bg-red-50 px-3 py-2 text-xs text-red-700">{maxStayError}</div>
+          )}
+          <div>
+            <label className="mb-1.5 block text-xs font-semibold uppercase tracking-wide text-[#0C1B33]/60">Maximum stay (nights)</label>
+            <input
+              type="number"
+              min={1}
+              max={platformCeiling ?? undefined}
+              value={maxStay}
+              onChange={(e) => setMaxStay(e.target.value)}
+              className={`${inputCls} max-w-40`}
+            />
+            {platformCeiling != null && Number(maxStay) > platformCeiling && (
+              <p className="mt-1.5 text-[11px] text-amber-600">
+                ⚠️ Above the platform ceiling — this will be clamped to {platformCeiling.toLocaleString()} on save.
+              </p>
+            )}
+          </div>
+          <div className="flex items-center gap-3">
+            <button
+              onClick={saveMaxStay}
+              disabled={savingMaxStay}
+              className="flex items-center gap-2 rounded-xl bg-[#1B52A8] px-5 py-2.5 text-sm font-semibold text-white shadow-sm transition hover:bg-[#163F82] disabled:opacity-60"
+            >
+              {savingMaxStay && <span className="h-3.5 w-3.5 animate-spin rounded-full border-2 border-white border-t-transparent" />}
+              {savingMaxStay ? "Saving…" : "Save Maximum Stay"}
+            </button>
+            {maxStaySaved && (
               <span className="flex items-center gap-1 text-xs font-medium text-emerald-600">
                 <svg className="h-3.5 w-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M5 13l4 4L19 7" />
