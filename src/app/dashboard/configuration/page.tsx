@@ -26,6 +26,8 @@ type WhatsAppConfig = {
   metaVerifyToken:   string;
   connected:         boolean;
   embedUrl:          string;
+  configId:          string;
+  metaApiVersion:    string;
 };
 
 type InstagramConfig = {
@@ -113,6 +115,8 @@ export default function ConfigurationPage() {
     metaWabaId:        "",
     metaVerifyToken:   "",
     connected:         false,
+    configId:          "",
+    metaApiVersion:    "v25.0",
     embedUrl:          "",
   });
   const [waSaving, setWaSaving]     = useState(false);
@@ -202,6 +206,8 @@ export default function ConfigurationPage() {
         metaVerifyToken:   data.metaVerifyToken   ?? "",
         connected:         data.connected         ?? false,
         embedUrl:          data.embedUrl          ?? "",
+        configId:          data.configId          ?? "",
+        metaApiVersion:    data.metaApiVersion     ?? "v25.0",
       }))
       .catch(() => {});
 
@@ -319,6 +325,8 @@ export default function ConfigurationPage() {
         metaVerifyToken:   updated.metaVerifyToken   ?? "",
         connected:         updated.connected         ?? false,
         embedUrl:          updated.embedUrl          ?? "",
+        configId:          updated.configId          ?? "",
+        metaApiVersion:    updated.metaApiVersion     ?? "v25.0",
       });
       setWaSaved(true);
       setTimeout(() => setWaSaved(false), 3000);
@@ -432,12 +440,18 @@ export default function ConfigurationPage() {
     }
     setFbConnecting(true);
 
-    let configId = "1594195311668034";
-    if (wa.embedUrl) {
+    // Priority: explicit configId field → extracted from embedUrl → env var fallback
+    let configId = wa.configId || process.env.NEXT_PUBLIC_META_WA_CONFIG_ID || "";
+    if (!configId && wa.embedUrl) {
       try {
         const parsed = new URL(wa.embedUrl);
-        configId = parsed.searchParams.get("config_id") ?? configId;
+        configId = parsed.searchParams.get("config_id") ?? "";
       } catch {}
+    }
+    if (!configId) {
+      setFbError("WhatsApp config ID is not configured. Ask your Vaketta admin to set it in Platform Settings.");
+      setFbConnecting(false);
+      return;
     }
 
     FB.login(

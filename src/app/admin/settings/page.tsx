@@ -50,14 +50,21 @@ export default function SettingsPage() {
   const [passwordError, setPasswordError] = useState("");
 
   const [igEmbedUrl, setIgEmbedUrl] = useState("");
+  const [igAppId, setIgAppId] = useState("");
   const [igSaving, setIgSaving] = useState(false);
   const [igSuccess, setIgSuccess] = useState("");
   const [igError, setIgError] = useState("");
 
   const [waEmbedUrl, setWaEmbedUrl] = useState("");
+  const [waConfigId, setWaConfigId] = useState("");
   const [waSaving, setWaSaving] = useState(false);
   const [waSuccess, setWaSuccess] = useState("");
   const [waError, setWaError] = useState("");
+
+  const [metaApiVersion, setMetaApiVersion] = useState("v25.0");
+  const [versionSaving, setVersionSaving] = useState(false);
+  const [versionSuccess, setVersionSuccess] = useState("");
+  const [versionError, setVersionError] = useState("");
 
   const [maxStayCeiling, setMaxStayCeiling] = useState("3650");
   const [ceilingSaving, setCeilingSaving] = useState(false);
@@ -85,7 +92,10 @@ export default function SettingsPage() {
       .then((res: any) => {
         if (!cancelled) {
           setIgEmbedUrl(res.instagramEmbedUrl      ?? "");
+          setIgAppId(res.instagramAppId            ?? "");
           setWaEmbedUrl(res.whatsappEmbedSignupUrl ?? "");
+          setWaConfigId(res.whatsappConfigId       ?? "");
+          setMetaApiVersion(res.metaApiVersion     ?? "v25.0");
           if (res.maxStayNightsCeiling != null) setMaxStayCeiling(String(res.maxStayNightsCeiling));
         }
       })
@@ -145,15 +155,38 @@ export default function SettingsPage() {
     try {
       await adminApiFetch("/admin/platform-settings", {
         method: "PATCH",
-        body: JSON.stringify({ whatsappEmbedSignupUrl: waEmbedUrl.trim() }),
+        body: JSON.stringify({
+          whatsappEmbedSignupUrl: waEmbedUrl.trim(),
+          whatsappConfigId:       waConfigId.trim(),
+        }),
       });
       logAdminAction("admin.platform.whatsappEmbedSignupUrl");
-      setWaSuccess("WhatsApp embed signup URL saved.");
+      setWaSuccess("WhatsApp settings saved.");
       setTimeout(() => setWaSuccess(""), 3000);
     } catch (e: any) {
       setWaError(e.message);
     } finally {
       setWaSaving(false);
+    }
+  }
+
+  async function handleVersionSave(e: React.FormEvent) {
+    e.preventDefault();
+    const v = metaApiVersion.trim();
+    if (!/^v\d+\.\d+$/.test(v)) { setVersionError("Must be in format v25.0"); return; }
+    setVersionError(""); setVersionSuccess(""); setVersionSaving(true);
+    try {
+      await adminApiFetch("/admin/platform-settings", {
+        method: "PATCH",
+        body: JSON.stringify({ metaApiVersion: v }),
+      });
+      logAdminAction("admin.platform.metaApiVersion");
+      setVersionSuccess("Meta API version saved.");
+      setTimeout(() => setVersionSuccess(""), 3000);
+    } catch (e: any) {
+      setVersionError(e.message);
+    } finally {
+      setVersionSaving(false);
     }
   }
 
@@ -185,10 +218,13 @@ export default function SettingsPage() {
     try {
       await adminApiFetch("/admin/platform-settings", {
         method: "PATCH",
-        body: JSON.stringify({ instagramEmbedUrl: igEmbedUrl.trim() }),
+        body: JSON.stringify({
+          instagramEmbedUrl: igEmbedUrl.trim(),
+          instagramAppId:    igAppId.trim(),
+        }),
       });
       logAdminAction("admin.platform.instagramEmbedUrl");
-      setIgSuccess("Instagram embed URL saved.");
+      setIgSuccess("Instagram settings saved.");
       setTimeout(() => setIgSuccess(""), 3000);
     } catch (e: any) {
       setIgError(e.message);
@@ -295,12 +331,13 @@ export default function SettingsPage() {
           </form>
         </div>
       </div>
-      {/* WhatsApp Embedded Signup URL */}
+      {/* WhatsApp Embedded Signup */}
       <div className="rounded-2xl border border-[#E5E0D4] bg-white shadow-sm overflow-hidden">
         <div className="border-b border-[#E5E0D4] bg-[#F4F2ED] px-6 py-4">
-          <h2 className="text-sm font-semibold text-[#0C1B33]">WhatsApp Embedded Signup URL</h2>
+          <h2 className="text-sm font-semibold text-[#0C1B33]">WhatsApp Embedded Signup</h2>
           <p className="mt-0.5 text-xs text-[#0C1B33]/45">
-            The full Meta embedded signup URL used when hotel users click "Connect via Facebook". The <code className="font-mono">config_id</code> query parameter is extracted automatically.
+            Signup URL and <code className="font-mono">config_id</code> used when hotel users click "Connect via Facebook".
+            The config ID is extracted from the URL automatically but can be overridden here.
           </p>
         </div>
         <div className="px-6 py-5 space-y-4">
@@ -325,13 +362,71 @@ export default function SettingsPage() {
                 Paste the full URL from the Meta App Dashboard including all query parameters.
               </p>
             </div>
+            <div>
+              <label className="mb-1.5 block text-xs font-semibold uppercase tracking-wide text-[#0C1B33]/60">
+                Config ID <span className="normal-case font-normal text-[#0C1B33]/40">(override)</span>
+              </label>
+              <input
+                value={waConfigId}
+                onChange={(e) => setWaConfigId(e.target.value)}
+                className={inputCls}
+                placeholder="e.g. 1594195311668034"
+              />
+              <p className="mt-1 text-[11px] text-[#0C1B33]/40">
+                The <code className="font-mono">config_id</code> from your Meta App's WhatsApp configuration.
+                If set, takes precedence over the value extracted from the signup URL above.
+              </p>
+            </div>
             <button
               type="submit"
               disabled={waSaving}
               className="flex items-center gap-2 rounded-xl bg-[#1877F2] px-5 py-2.5 text-sm font-semibold text-white shadow-sm transition hover:bg-[#1464d8] disabled:opacity-60"
             >
               {waSaving && <span className="h-3.5 w-3.5 animate-spin rounded-full border-2 border-white border-t-transparent" />}
-              {waSaving ? "Saving…" : "Save URL"}
+              {waSaving ? "Saving…" : "Save WhatsApp Settings"}
+            </button>
+          </form>
+        </div>
+      </div>
+
+      {/* Meta API Version */}
+      <div className="rounded-2xl border border-[#E5E0D4] bg-white shadow-sm overflow-hidden">
+        <div className="border-b border-[#E5E0D4] bg-[#F4F2ED] px-6 py-4">
+          <h2 className="text-sm font-semibold text-[#0C1B33]">Meta Graph API Version</h2>
+          <p className="mt-0.5 text-xs text-[#0C1B33]/45">
+            The Graph API version used for all WhatsApp and Instagram API calls (e.g. <code className="font-mono">v25.0</code>).
+            Update here when Meta releases a new version — no code deploy needed.
+          </p>
+        </div>
+        <div className="px-6 py-5 space-y-4">
+          {versionSuccess && (
+            <div className="rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-700">{versionSuccess}</div>
+          )}
+          {versionError && (
+            <div className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">{versionError}</div>
+          )}
+          <form onSubmit={handleVersionSave} className="space-y-4">
+            <div>
+              <label className="mb-1.5 block text-xs font-semibold uppercase tracking-wide text-[#0C1B33]/60">
+                API Version
+              </label>
+              <input
+                value={metaApiVersion}
+                onChange={(e) => setMetaApiVersion(e.target.value)}
+                className={`${inputCls} max-w-40`}
+                placeholder="v25.0"
+              />
+              <p className="mt-1 text-[11px] text-[#0C1B33]/40">
+                Must be in the format <code className="font-mono">vNN.N</code> (e.g. <code className="font-mono">v25.0</code>).
+              </p>
+            </div>
+            <button
+              type="submit"
+              disabled={versionSaving}
+              className="flex items-center gap-2 rounded-xl bg-[#1B52A8] px-5 py-2.5 text-sm font-semibold text-white shadow-sm transition hover:bg-[#163F82] disabled:opacity-60"
+            >
+              {versionSaving && <span className="h-3.5 w-3.5 animate-spin rounded-full border-2 border-white border-t-transparent" />}
+              {versionSaving ? "Saving…" : "Save Version"}
             </button>
           </form>
         </div>
@@ -384,12 +479,12 @@ export default function SettingsPage() {
         </div>
       </div>
 
-      {/* Instagram Embed URL */}
+      {/* Instagram OAuth */}
       <div className="rounded-2xl border border-[#E5E0D4] bg-white shadow-sm overflow-hidden">
         <div className="border-b border-[#E5E0D4] bg-[#F4F2ED] px-6 py-4">
-          <h2 className="text-sm font-semibold text-[#0C1B33]">Instagram OAuth URL</h2>
+          <h2 className="text-sm font-semibold text-[#0C1B33]">Instagram OAuth</h2>
           <p className="mt-0.5 text-xs text-[#0C1B33]/45">
-            The Instagram OAuth authorize URL shown to hotel users when they click "Connect via Instagram".
+            The Facebook/Instagram App ID and OAuth URL used when hotel users connect Instagram via Facebook login.
           </p>
         </div>
         <div className="px-6 py-5 space-y-4">
@@ -402,7 +497,21 @@ export default function SettingsPage() {
           <form onSubmit={handleIgEmbedSave} className="space-y-4">
             <div>
               <label className="mb-1.5 block text-xs font-semibold uppercase tracking-wide text-[#0C1B33]/60">
-                OAuth Authorize URL
+                Facebook / Instagram App ID
+              </label>
+              <input
+                value={igAppId}
+                onChange={(e) => setIgAppId(e.target.value)}
+                className={inputCls}
+                placeholder="e.g. 1268699038798227"
+              />
+              <p className="mt-1 text-[11px] text-[#0C1B33]/40">
+                The numeric App ID from your Meta App Dashboard. Used as <code className="font-mono">client_id</code> in the FB.login() call for Instagram.
+              </p>
+            </div>
+            <div>
+              <label className="mb-1.5 block text-xs font-semibold uppercase tracking-wide text-[#0C1B33]/60">
+                OAuth Authorize URL <span className="normal-case font-normal text-[#0C1B33]/40">(optional)</span>
               </label>
               <input
                 value={igEmbedUrl}
@@ -411,7 +520,7 @@ export default function SettingsPage() {
                 placeholder="https://www.instagram.com/oauth/authorize?client_id=…"
               />
               <p className="mt-1 text-[11px] text-[#0C1B33]/40">
-                Paste the full Instagram OAuth URL including all query parameters (client_id, redirect_uri, scope, etc.).
+                Full Instagram OAuth URL for fallback redirect flow. Include all query parameters.
               </p>
             </div>
             <button
@@ -421,7 +530,7 @@ export default function SettingsPage() {
               style={{ background: "linear-gradient(135deg, #d6249f, #fd5949)" }}
             >
               {igSaving && <span className="h-3.5 w-3.5 animate-spin rounded-full border-2 border-white border-t-transparent" />}
-              {igSaving ? "Saving…" : "Save URL"}
+              {igSaving ? "Saving…" : "Save Instagram Settings"}
             </button>
           </form>
         </div>
