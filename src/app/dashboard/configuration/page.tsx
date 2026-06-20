@@ -594,8 +594,13 @@ export default function ConfigurationPage() {
         completeIgExchange(code, redirectUri);
       },
       {
-        config_id:     configId,
-        response_type: "code",
+        config_id:                      configId,
+        response_type:                  "code",
+        // REQUIRED for the Business-Login (BISU) authorization-code grant — without it
+        // the SDK falls back to its default response type and the returned "code" is
+        // not a valid auth code, which Meta then rejects on exchange with the misleading
+        // "redirect_uri is identical…" error. Mirrors WhatsApp's working call.
+        override_default_response_type: true,
       }
     );
   }

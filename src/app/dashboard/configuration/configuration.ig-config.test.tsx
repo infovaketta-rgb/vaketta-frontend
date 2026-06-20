@@ -78,7 +78,13 @@ describe("Instagram connect — empty configId guard", () => {
 
     await waitFor(() => expect((window as any).FB.login).toHaveBeenCalledTimes(1));
     const opts = (window as any).FB.login.mock.calls[0][1];
-    expect(opts).toMatchObject({ config_id: "1594195311668034", response_type: "code" });
+    // override_default_response_type is required for the BISU code grant — without it
+    // Meta rejects the exchange with the misleading "redirect_uri is identical" error.
+    expect(opts).toMatchObject({
+      config_id:                      "1594195311668034",
+      response_type:                  "code",
+      override_default_response_type: true,
+    });
     // no error shown
     expect(screen.queryByText(/instagram onboarding is not configured/i)).not.toBeInTheDocument();
   });
