@@ -593,11 +593,10 @@ export default function ConfigurationPage() {
           return;
         }
 
-        // Do NOT forward response.authResponse.redirect_uri — for the JS-SDK popup
-        // code flow there is no real redirect_uri, and sending the SDK's internal one
-        // makes Meta reject the exchange ("redirect_uri is identical…"). Send empty;
-        // the backend omits redirect_uri entirely when it's empty.
-        const redirectUri = "";
+        // Forward the SDK's redirect_uri verbatim (mirrors WhatsApp). For the popup
+        // flow this is empty, and the backend sends redirect_uri:"" — a present-but-
+        // empty value matches the code; OMITTING it triggers Meta's 36008 rejection.
+        const redirectUri = response?.authResponse?.redirect_uri ?? "";
         igPendingCodeRef.current = { code, redirectUri };
         completeIgExchange(code, redirectUri);
       },
