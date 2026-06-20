@@ -572,8 +572,7 @@ export default function ConfigurationPage() {
 
     FB.login(
       function (response: any) {
-        const code        = response?.authResponse?.code;
-        const redirectUri = response?.authResponse?.redirect_uri ?? "";
+        const code = response?.authResponse?.code;
 
         if (!code) {
           setIgConnecting(false);
@@ -586,6 +585,11 @@ export default function ConfigurationPage() {
           return;
         }
 
+        // Do NOT forward response.authResponse.redirect_uri — for the JS-SDK popup
+        // code flow there is no real redirect_uri, and sending the SDK's internal one
+        // makes Meta reject the exchange ("redirect_uri is identical…"). Send empty;
+        // the backend omits redirect_uri entirely when it's empty.
+        const redirectUri = "";
         igPendingCodeRef.current = { code, redirectUri };
         completeIgExchange(code, redirectUri);
       },
