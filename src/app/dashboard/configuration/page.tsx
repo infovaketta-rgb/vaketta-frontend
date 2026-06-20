@@ -570,8 +570,16 @@ export default function ConfigurationPage() {
     setIgConnecting(true);
     igPendingCodeRef.current = null;
 
+    // TEMP DIAGNOSTIC (remove after debugging): confirm the exact config_id sent + the
+    // FB SDK App ID it runs against. A config_id from a different app, or a non-Business
+    // -Login config, mints a code this app can't exchange → OAuthException 36008.
+    console.log("[ig-connect] config_id:", JSON.stringify(configId),
+      "| SDK appId:", (window as any).FB?._appId ?? (window as any).FB?.getLoginStatus ? "(init'd)" : "(unknown)");
+
     FB.login(
       function (response: any) {
+        // TEMP DIAGNOSTIC: full SDK response — shows code + any redirect_uri the SDK used.
+        console.log("[ig-connect] FB.login response:", JSON.stringify(response));
         const code = response?.authResponse?.code;
 
         if (!code) {
