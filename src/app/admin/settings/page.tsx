@@ -50,7 +50,7 @@ export default function SettingsPage() {
   const [passwordError, setPasswordError] = useState("");
 
   const [igEmbedUrl, setIgEmbedUrl] = useState("");
-  const [igAppId, setIgAppId] = useState("");
+  const [igConfigId, setIgConfigId] = useState("");
   const [igSaving, setIgSaving] = useState(false);
   const [igSuccess, setIgSuccess] = useState("");
   const [igError, setIgError] = useState("");
@@ -92,7 +92,7 @@ export default function SettingsPage() {
       .then((res: any) => {
         if (!cancelled) {
           setIgEmbedUrl(res.instagramEmbedUrl      ?? "");
-          setIgAppId(res.instagramAppId            ?? "");
+          setIgConfigId(res.instagramConfigId      ?? "");
           setWaEmbedUrl(res.whatsappEmbedSignupUrl ?? "");
           setWaConfigId(res.whatsappConfigId       ?? "");
           setMetaApiVersion(res.metaApiVersion     ?? "v25.0");
@@ -220,7 +220,7 @@ export default function SettingsPage() {
         method: "PATCH",
         body: JSON.stringify({
           instagramEmbedUrl: igEmbedUrl.trim(),
-          instagramAppId:    igAppId.trim(),
+          instagramConfigId: igConfigId.trim(),
         }),
       });
       logAdminAction("admin.platform.instagramEmbedUrl");
@@ -484,7 +484,7 @@ export default function SettingsPage() {
         <div className="border-b border-[#E5E0D4] bg-[#F4F2ED] px-6 py-4">
           <h2 className="text-sm font-semibold text-[#0C1B33]">Instagram OAuth</h2>
           <p className="mt-0.5 text-xs text-[#0C1B33]/45">
-            The Facebook/Instagram App ID and OAuth URL used when hotel users connect Instagram via Facebook login.
+            The Instagram onboarding Config ID (and optional OAuth URL) used when hotel users connect Instagram via Facebook login.
           </p>
         </div>
         <div className="px-6 py-5 space-y-4">
@@ -497,16 +497,18 @@ export default function SettingsPage() {
           <form onSubmit={handleIgEmbedSave} className="space-y-4">
             <div>
               <label className="mb-1.5 block text-xs font-semibold uppercase tracking-wide text-[#0C1B33]/60">
-                Facebook / Instagram App ID
+                Instagram Config ID
               </label>
               <input
-                value={igAppId}
-                onChange={(e) => setIgAppId(e.target.value)}
+                value={igConfigId}
+                onChange={(e) => setIgConfigId(e.target.value)}
                 className={inputCls}
-                placeholder="e.g. 1268699038798227"
+                placeholder="e.g. 1594195311668034"
               />
               <p className="mt-1 text-[11px] text-[#0C1B33]/40">
-                The numeric App ID from your Meta App Dashboard. Used as <code className="font-mono">client_id</code> in the FB.login() call for Instagram.
+                The Configuration ID from the <strong>Instagram onboarding</strong> entry in Meta App Dashboard →
+                Facebook Login for Business → Configurations. Used as <code className="font-mono">config_id</code> in
+                the FB.login() popup. Without it, hotel users cannot connect Instagram.
               </p>
             </div>
             <div>

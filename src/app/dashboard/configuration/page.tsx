@@ -34,6 +34,7 @@ type InstagramConfig = {
   accessToken: string;
   igAccountId: string;
   connected:   boolean;
+  configId:    string;
 };
 
 type FacebookPage = {
@@ -141,7 +142,10 @@ export default function ConfigurationPage() {
   const pendingCodeRef = useRef<{ code: string; redirectUri: string } | null>(null);
 
   // Instagram integration state
-  const [ig, setIg]               = useState<InstagramConfig>({ accessToken: "", igAccountId: "", connected: false });
+  const [ig, setIg]               = useState<InstagramConfig>({ accessToken: "", igAccountId: "", connected: false, configId: "" });
+  // Pending IG auth code awaiting completion (mirrors WhatsApp's pendingCodeRef
+  // split so the FB.login callback stays synchronous).
+  const igPendingCodeRef = useRef<{ code: string; redirectUri: string } | null>(null);
   const [igConnecting,  setIgConnecting]  = useState(false);
   const [igOAuthError,  setIgOAuthError]  = useState("");
   const [igPages,         setIgPages]         = useState<FacebookPage[]>([]);
@@ -218,6 +222,7 @@ export default function ConfigurationPage() {
           accessToken: data.accessToken ?? "",
           igAccountId: data.igAccountId ?? "",
           connected,
+          configId:    data.configId ?? "",
         });
         if (connected) {
           apiFetch("/hotel-settings/instagram/subscribe/status")
@@ -543,6 +548,8 @@ export default function ConfigurationPage() {
     }
   }
 
+  // Sync FB.login callback wrapper — kept synchronous (mirrors WhatsApp's
+  // launchWhatsAppSignup fix); the async work is delegated to completeIgExchange.
   function handleIgFBConnect() {
     setIgOAuthError("");
 
@@ -552,56 +559,86 @@ export default function ConfigurationPage() {
       return;
     }
 
+    // config_id is required for the Facebook-Login-for-Business flow. No fallback —
+    // surface a clear error rather than calling FB.login() with an undefined config_id.
+    const configId = ig.configId?.trim();
+    if (!configId) {
+      setIgOAuthError("Instagram onboarding is not configured — contact support.");
+      return;
+    }
+
     setIgConnecting(true);
+    igPendingCodeRef.current = null;
 
     FB.login(
       function (response: any) {
-        const token = response?.authResponse?.accessToken;
+        const code        = response?.authResponse?.code;
+        const redirectUri = response?.authResponse?.redirect_uri ?? "";
 
-        if (!token) {
+        if (!code) {
           setIgConnecting(false);
-          if (response?.status !== "unknown") {
+          igPendingCodeRef.current = null;
+          if (response?.status === "not_authorized") {
+            setIgOAuthError("App not authorized. Make sure the Instagram config is correct.");
+          } else if (response?.status !== "unknown") {
             setIgOAuthError("Facebook authorisation was cancelled. Please try again.");
           }
           return;
         }
 
-        apiFetch(`/api/instagram/pages?token=${encodeURIComponent(token)}`)
-          .then((data: any) => {
-            const pages: FacebookPage[] = data.pages ?? [];
-            if (pages.length === 0) {
-              setIgOAuthError("No Instagram Business accounts found linked to your Facebook pages.");
-              setIgConnecting(false);
-              return;
-            }
-            if (pages.length === 1) {
-              connectPage(pages[0].id, token);
-              return;
-            }
-            setIgPages(pages);
-            setIgShortToken(token);
-            setIgPageSelecting(true);
-            setIgConnecting(false);
-          })
-          .catch((e: any) => {
-            setIgOAuthError(e.message ?? "Failed to fetch pages.");
-            setIgConnecting(false);
-          });
+        igPendingCodeRef.current = { code, redirectUri };
+        completeIgExchange(code, redirectUri);
       },
       {
-        scope:         "instagram_manage_messages,instagram_basic,pages_show_list,pages_read_engagement",
-        return_scopes: true,
+        config_id:     configId,
+        response_type: "code",
       }
     );
   }
 
-  async function connectPage(pageId: string, shortToken: string) {
+  // Async handler: exchange the code server-side, then connect (single page) or
+  // prompt page selection (multiple).
+  async function completeIgExchange(code: string, redirectUri: string) {
+    try {
+      const data = await apiFetch("/api/instagram/exchange-code", {
+        method: "POST",
+        body:   JSON.stringify({ code, redirectUri }),
+      });
+      igPendingCodeRef.current = null;
+
+      if ((data as any).needsSelection) {
+        const pages: FacebookPage[] = (data as any).pages ?? [];
+        setIgPages(pages);
+        // igShortToken holds the long-lived token returned by /exchange-code; the
+        // auth code is single-use and already spent, so /connect reuses this token.
+        setIgShortToken((data as any).longLivedToken ?? "");
+        setIgPageSelecting(true);
+        setIgConnecting(false);
+        return;
+      }
+
+      setIg((prev) => ({
+        ...prev,
+        igAccountId: (data as any).instagramBusinessAccountId ?? prev.igAccountId,
+        connected:   true,
+      }));
+      setIgAdvancedOpen(true);
+    } catch (e: any) {
+      setIgOAuthError(e.message ?? "Failed to connect Instagram account.");
+    } finally {
+      setIgConnecting(false);
+    }
+  }
+
+  // Page selection (multi-page case): connect the chosen page with the long-lived
+  // token from /exchange-code — no second code exchange.
+  async function connectPage(pageId: string, longLivedToken: string) {
     setIgConnecting(true);
     setIgOAuthError("");
     try {
       const data = await apiFetch("/api/instagram/connect", {
         method: "POST",
-        body:   JSON.stringify({ pageId, shortLivedToken: shortToken }),
+        body:   JSON.stringify({ pageId, longLivedToken }),
       });
       setIg((prev) => ({
         ...prev,
