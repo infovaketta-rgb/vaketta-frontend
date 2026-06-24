@@ -621,6 +621,10 @@ export default function ConfigurationPage() {
       "pages_show_list",
       "pages_read_engagement",
       "pages_messaging",
+      // Platform-level requirement for IG_API_ONBOARDING (not in Meta's docs as of
+      // May 2025, but the dialog rejects the request with
+      // "Missing openid in scope parameter" without it).
+      "openid",
     ].join(",");
     const extras = encodeURIComponent(JSON.stringify({ setup: { channel: "IG_API_ONBOARDING" } }));
 
