@@ -34,7 +34,6 @@ type InstagramConfig = {
   accessToken: string;
   igAccountId: string;
   connected:   boolean;
-  configId:    string;
 };
 
 type FacebookPage = {
@@ -146,7 +145,7 @@ export default function ConfigurationPage() {
   const pendingCodeRef = useRef<{ code: string; redirectUri: string } | null>(null);
 
   // Instagram integration state
-  const [ig, setIg]               = useState<InstagramConfig>({ accessToken: "", igAccountId: "", connected: false, configId: "" });
+  const [ig, setIg]               = useState<InstagramConfig>({ accessToken: "", igAccountId: "", connected: false });
   const [igConnecting,  setIgConnecting]  = useState(false);
   const [igOAuthError,  setIgOAuthError]  = useState("");
   const [igPages,         setIgPages]         = useState<FacebookPage[]>([]);
@@ -223,7 +222,6 @@ export default function ConfigurationPage() {
           accessToken: data.accessToken ?? "",
           igAccountId: data.igAccountId ?? "",
           connected,
-          configId:    data.configId ?? "",
         });
         if (connected) {
           apiFetch("/hotel-settings/instagram/subscribe/status")
@@ -587,21 +585,15 @@ export default function ConfigurationPage() {
     }
   }
 
-  // Instagram "Facebook Login for Business / IG_API_ONBOARDING" flow.
-  // Meta documents this as a MANUAL redirect dialog (not FB.login / not config_id):
-  // navigate to facebook.com/<v>/dialog/oauth with response_type=token + the
-  // IG_API_ONBOARDING extras; on return the access token arrives in the URL fragment
-  // (#access_token=…&long_lived_token=…). We parse it on mount (see the redirect-return
-  // effect) and POST it to /api/instagram/connect-with-token. There is no code exchange.
+  // Instagram connect — manual OAuth redirect (token flow, no code exchange).
+  // Confirmed working URL shape (manually tested end-to-end):
+  //   facebook.com/<v>/dialog/oauth?client_id=…&redirect_uri=…&response_type=token
+  //   &scope=instagram_basic,pages_show_list,instagram_manage_messages
+  // No extras, no display param, no config_id — the simpler "Get Started" flow.
+  // The IG_API_ONBOARDING extras approach (Meta's "Business Login for Instagram" guide)
+  // triggered an internal Meta bridge that had its own scope bugs; removed.
   function handleIgFBConnect() {
     setIgOAuthError("");
-
-    // The admin "Instagram Config ID" presence still gates whether onboarding is set up.
-    const configId = ig.configId?.trim();
-    if (!configId) {
-      setIgOAuthError("Instagram onboarding is not configured — contact support.");
-      return;
-    }
 
     const appId = process.env.NEXT_PUBLIC_META_APP_ID ?? "";
     if (!appId) {
@@ -612,33 +604,16 @@ export default function ConfigurationPage() {
     setIgConnecting(true);
 
     // redirect_uri must exactly match a Valid OAuth Redirect URI in the app settings.
-    // Use this page's canonical URL (no hash/query) — the same origin+path already
-    // whitelisted for the WhatsApp flow.
     const redirectUri = `${window.location.origin}${window.location.pathname}`;
-    const scope = [
-      "instagram_basic",
-      "instagram_manage_messages",
-      "pages_show_list",
-      "pages_read_engagement",
-      "pages_messaging",
-      // Platform-level requirement for IG_API_ONBOARDING (not in Meta's docs as of
-      // May 2025, but the dialog rejects the request with
-      // "Missing openid in scope parameter" without it).
-      "openid",
-    ].join(",");
-    const extras = encodeURIComponent(JSON.stringify({ setup: { channel: "IG_API_ONBOARDING" } }));
+    const scope = "instagram_basic,pages_show_list,instagram_manage_messages";
 
     const dialog =
       `https://www.facebook.com/${META_DIALOG_VERSION}/dialog/oauth` +
       `?client_id=${encodeURIComponent(appId)}` +
-      `&display=page` +
-      `&response_type=token` +
       `&redirect_uri=${encodeURIComponent(redirectUri)}` +
-      `&scope=${encodeURIComponent(scope)}` +
-      `&extras=${extras}`;
+      `&response_type=token` +
+      `&scope=${encodeURIComponent(scope)}`;
 
-    // Mark that we initiated IG onboarding so the redirect-return handler knows the
-    // fragment token belongs to Instagram (not some other FB flow).
     try { sessionStorage.setItem("ig_onboarding_pending", "1"); } catch {}
 
     console.log("[ig-connect] redirecting to dialog — redirect_uri:", redirectUri);

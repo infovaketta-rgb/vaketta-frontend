@@ -49,11 +49,6 @@ export default function SettingsPage() {
   const [passwordSuccess, setPasswordSuccess] = useState("");
   const [passwordError, setPasswordError] = useState("");
 
-  const [igEmbedUrl, setIgEmbedUrl] = useState("");
-  const [igConfigId, setIgConfigId] = useState("");
-  const [igSaving, setIgSaving] = useState(false);
-  const [igSuccess, setIgSuccess] = useState("");
-  const [igError, setIgError] = useState("");
 
   const [waEmbedUrl, setWaEmbedUrl] = useState("");
   const [waConfigId, setWaConfigId] = useState("");
@@ -91,8 +86,6 @@ export default function SettingsPage() {
     adminApiFetch("/admin/platform-settings")
       .then((res: any) => {
         if (!cancelled) {
-          setIgEmbedUrl(res.instagramEmbedUrl      ?? "");
-          setIgConfigId(res.instagramConfigId      ?? "");
           setWaEmbedUrl(res.whatsappEmbedSignupUrl ?? "");
           setWaConfigId(res.whatsappConfigId       ?? "");
           setMetaApiVersion(res.metaApiVersion     ?? "v25.0");
@@ -209,27 +202,6 @@ export default function SettingsPage() {
       setCeilingError(e.message);
     } finally {
       setCeilingSaving(false);
-    }
-  }
-
-  async function handleIgEmbedSave(e: React.FormEvent) {
-    e.preventDefault();
-    setIgError(""); setIgSuccess(""); setIgSaving(true);
-    try {
-      await adminApiFetch("/admin/platform-settings", {
-        method: "PATCH",
-        body: JSON.stringify({
-          instagramEmbedUrl: igEmbedUrl.trim(),
-          instagramConfigId: igConfigId.trim(),
-        }),
-      });
-      logAdminAction("admin.platform.instagramEmbedUrl");
-      setIgSuccess("Instagram settings saved.");
-      setTimeout(() => setIgSuccess(""), 3000);
-    } catch (e: any) {
-      setIgError(e.message);
-    } finally {
-      setIgSaving(false);
     }
   }
 
@@ -474,65 +446,6 @@ export default function SettingsPage() {
             >
               {ceilingSaving && <span className="h-3.5 w-3.5 animate-spin rounded-full border-2 border-white border-t-transparent" />}
               {ceilingSaving ? "Saving…" : "Save Ceiling"}
-            </button>
-          </form>
-        </div>
-      </div>
-
-      {/* Instagram OAuth */}
-      <div className="rounded-2xl border border-[#E5E0D4] bg-white shadow-sm overflow-hidden">
-        <div className="border-b border-[#E5E0D4] bg-[#F4F2ED] px-6 py-4">
-          <h2 className="text-sm font-semibold text-[#0C1B33]">Instagram OAuth</h2>
-          <p className="mt-0.5 text-xs text-[#0C1B33]/45">
-            The Instagram onboarding Config ID (and optional OAuth URL) used when hotel users connect Instagram via Facebook login.
-          </p>
-        </div>
-        <div className="px-6 py-5 space-y-4">
-          {igSuccess && (
-            <div className="rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-700">{igSuccess}</div>
-          )}
-          {igError && (
-            <div className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">{igError}</div>
-          )}
-          <form onSubmit={handleIgEmbedSave} className="space-y-4">
-            <div>
-              <label className="mb-1.5 block text-xs font-semibold uppercase tracking-wide text-[#0C1B33]/60">
-                Instagram Config ID
-              </label>
-              <input
-                value={igConfigId}
-                onChange={(e) => setIgConfigId(e.target.value)}
-                className={inputCls}
-                placeholder="e.g. 1594195311668034"
-              />
-              <p className="mt-1 text-[11px] text-[#0C1B33]/40">
-                The Configuration ID from the <strong>Instagram onboarding</strong> entry in Meta App Dashboard →
-                Facebook Login for Business → Configurations. Used as <code className="font-mono">config_id</code> in
-                the FB.login() popup. Without it, hotel users cannot connect Instagram.
-              </p>
-            </div>
-            <div>
-              <label className="mb-1.5 block text-xs font-semibold uppercase tracking-wide text-[#0C1B33]/60">
-                OAuth Authorize URL <span className="normal-case font-normal text-[#0C1B33]/40">(optional)</span>
-              </label>
-              <input
-                value={igEmbedUrl}
-                onChange={(e) => setIgEmbedUrl(e.target.value)}
-                className={inputCls}
-                placeholder="https://www.instagram.com/oauth/authorize?client_id=…"
-              />
-              <p className="mt-1 text-[11px] text-[#0C1B33]/40">
-                Full Instagram OAuth URL for fallback redirect flow. Include all query parameters.
-              </p>
-            </div>
-            <button
-              type="submit"
-              disabled={igSaving}
-              className="flex items-center gap-2 rounded-xl px-5 py-2.5 text-sm font-semibold text-white shadow-sm transition disabled:opacity-60"
-              style={{ background: "linear-gradient(135deg, #d6249f, #fd5949)" }}
-            >
-              {igSaving && <span className="h-3.5 w-3.5 animate-spin rounded-full border-2 border-white border-t-transparent" />}
-              {igSaving ? "Saving…" : "Save Instagram Settings"}
             </button>
           </form>
         </div>
