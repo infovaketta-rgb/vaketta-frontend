@@ -1,10 +1,12 @@
 /**
- * Instagram connect — empty-config_id UI error path.
+ * Instagram connect — IG_API_ONBOARDING manual-redirect flow.
  *
- * The config_id-based FB.login() flow requires PlatformSettings.instagramConfigId,
- * surfaced to the dashboard via GET /hotel-settings/instagram as `configId`. When it
- * is empty, clicking "Connect via Facebook" must show a clear error and must NOT call
- * FB.login() with an undefined config_id.
+ * Meta's "Facebook Login for Business / IG_API_ONBOARDING" channel is a manual redirect
+ * (NOT FB.login): the client navigates to facebook.com/<v>/dialog/oauth with
+ * response_type=token + extras {"setup":{"channel":"IG_API_ONBOARDING"}}; the token comes
+ * back in the URL fragment. These tests cover:
+ *   - empty configId → clear error, NO redirect.
+ *   - present configId → redirects to the dialog URL with the correct params.
  */
 
 import { describe, it, expect, vi, beforeEach } from "vitest";
@@ -44,48 +46,63 @@ function igConnectButton() {
   return within(section as HTMLElement).getByRole("button", { name: /connect via facebook/i });
 }
 
+let assignSpy: ReturnType<typeof vi.fn>;
+
 beforeEach(() => {
   vi.clearAllMocks();
-  // FB SDK present so the guard (not the "SDK not loaded" branch) is what fires.
-  (window as any).FB = { login: vi.fn() };
+  // Stub navigation so the redirect doesn't actually happen in jsdom.
+  assignSpy = vi.fn();
+  Object.defineProperty(window, "location", {
+    configurable: true,
+    value: {
+      origin: "https://vaketta.com",
+      pathname: "/dashboard/configuration",
+      search: "",
+      hash: "",
+      href: "https://vaketta.com/dashboard/configuration",
+      assign: assignSpy,
+    },
+  });
 });
 
 describe("Instagram connect — empty configId guard", () => {
-  it("shows a clear error and does NOT call FB.login() when configId is empty", async () => {
+  it("shows a clear error and does NOT redirect when configId is empty", async () => {
     wireApi({ accessToken: "", igAccountId: "", connected: false, configId: "" });
     const user = userEvent.setup();
     render(<ConfigurationPage />);
 
-    // Wait for the IG section to render (mount-time fetch resolved).
     await screen.findByRole("heading", { name: /instagram integration/i });
-
     await user.click(igConnectButton());
 
     expect(
       await screen.findByText(/instagram onboarding is not configured/i)
     ).toBeInTheDocument();
-    expect((window as any).FB.login).not.toHaveBeenCalled();
+    expect(assignSpy).not.toHaveBeenCalled();
   });
+});
 
-  it("calls FB.login() with config_id when configId is present", async () => {
-    wireApi({ accessToken: "", igAccountId: "", connected: false, configId: "1594195311668034" });
+describe("Instagram connect — IG_API_ONBOARDING redirect", () => {
+  it("redirects to the dialog with response_type=token + IG_API_ONBOARDING extras when configId is present", async () => {
+    process.env.NEXT_PUBLIC_META_APP_ID = "1268699038798227";
+    wireApi({ accessToken: "", igAccountId: "", connected: false, configId: "1866014670744123" });
     const user = userEvent.setup();
     render(<ConfigurationPage />);
 
     await screen.findByRole("heading", { name: /instagram integration/i });
-
     await user.click(igConnectButton());
 
-    await waitFor(() => expect((window as any).FB.login).toHaveBeenCalledTimes(1));
-    const opts = (window as any).FB.login.mock.calls[0][1];
-    // override_default_response_type is required for the BISU code grant — without it
-    // Meta rejects the exchange with the misleading "redirect_uri is identical" error.
-    expect(opts).toMatchObject({
-      config_id:                      "1594195311668034",
-      response_type:                  "code",
-      override_default_response_type: true,
-    });
-    // no error shown
+    await waitFor(() => expect(assignSpy).toHaveBeenCalledTimes(1));
+    const url = assignSpy.mock.calls[0][0] as string;
+    expect(url).toContain("https://www.facebook.com/");
+    expect(url).toContain("/dialog/oauth");
+    expect(url).toContain("client_id=1268699038798227");
+    expect(url).toContain("response_type=token");
+    // extras = URL-encoded {"setup":{"channel":"IG_API_ONBOARDING"}}
+    expect(url).toContain(encodeURIComponent(JSON.stringify({ setup: { channel: "IG_API_ONBOARDING" } })));
+    // redirect_uri = this page's canonical URL
+    expect(url).toContain(encodeURIComponent("https://vaketta.com/dashboard/configuration"));
+    // must NOT use the code grant
+    expect(url).not.toContain("response_type=code");
     expect(screen.queryByText(/instagram onboarding is not configured/i)).not.toBeInTheDocument();
   });
 });

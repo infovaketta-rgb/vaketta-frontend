@@ -99,6 +99,10 @@ const WEBHOOK_URL =
 const INSTAGRAM_WEBHOOK_URL =
   (process.env.NEXT_PUBLIC_API_BASE ?? "") + "/webhook/instagram";
 
+// Graph API version used to build the manual IG_API_ONBOARDING dialog URL. Matches
+// the FB JS SDK init version in app/layout.tsx.
+const META_DIALOG_VERSION = "v25.0";
+
 export default function ConfigurationPage() {
   const mounted = useMounted();
 
@@ -143,9 +147,6 @@ export default function ConfigurationPage() {
 
   // Instagram integration state
   const [ig, setIg]               = useState<InstagramConfig>({ accessToken: "", igAccountId: "", connected: false, configId: "" });
-  // Pending IG auth code awaiting completion (mirrors WhatsApp's pendingCodeRef
-  // split so the FB.login callback stays synchronous).
-  const igPendingCodeRef = useRef<{ code: string; redirectUri: string } | null>(null);
   const [igConnecting,  setIgConnecting]  = useState(false);
   const [igOAuthError,  setIgOAuthError]  = useState("");
   const [igPages,         setIgPages]         = useState<FacebookPage[]>([]);
@@ -231,6 +232,44 @@ export default function ConfigurationPage() {
         }
       })
       .catch(() => {});
+  }, [mounted]);
+
+  // Instagram onboarding redirect-return handler. The IG_API_ONBOARDING dialog returns
+  // the access token in the URL fragment (#access_token=…&long_lived_token=…). Parse it
+  // once on mount, prefer the long-lived token, hand it to the backend, then strip the
+  // fragment from the URL so the token never lingers in the address bar / history.
+  useEffect(() => {
+    if (!mounted) return;
+    if (typeof window === "undefined" || !window.location.hash) return;
+
+    let pending = false;
+    try { pending = sessionStorage.getItem("ig_onboarding_pending") === "1"; } catch {}
+    if (!pending) return;
+
+    const params      = new URLSearchParams(window.location.hash.replace(/^#/, ""));
+    const longLived   = params.get("long_lived_token") ?? "";
+    const shortLived  = params.get("access_token") ?? "";
+    const token       = longLived || shortLived;
+    const fbError     = params.get("error_message") ?? params.get("error") ?? "";
+
+    // Clear the marker + scrub the fragment regardless of outcome.
+    try { sessionStorage.removeItem("ig_onboarding_pending"); } catch {}
+    window.history.replaceState(null, "", `${window.location.pathname}${window.location.search}`);
+
+    // length only — never log the raw token
+    console.log("[ig-connect] redirect return — token present:", !!token,
+      "| token len:", token.length, "| long_lived:", !!longLived, "| error:", fbError || "(none)");
+
+    if (fbError) {
+      setIgOAuthError(decodeURIComponent(fbError));
+      return;
+    }
+    if (token) {
+      completeIgConnect(token);
+    } else {
+      setIgOAuthError("Instagram authorisation did not return an access token. Please try again.");
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [mounted]);
 
   function set(field: keyof Profile, value: string) {
@@ -548,86 +587,77 @@ export default function ConfigurationPage() {
     }
   }
 
-  // Sync FB.login callback wrapper — kept synchronous (mirrors WhatsApp's
-  // launchWhatsAppSignup fix); the async work is delegated to completeIgExchange.
+  // Instagram "Facebook Login for Business / IG_API_ONBOARDING" flow.
+  // Meta documents this as a MANUAL redirect dialog (not FB.login / not config_id):
+  // navigate to facebook.com/<v>/dialog/oauth with response_type=token + the
+  // IG_API_ONBOARDING extras; on return the access token arrives in the URL fragment
+  // (#access_token=…&long_lived_token=…). We parse it on mount (see the redirect-return
+  // effect) and POST it to /api/instagram/connect-with-token. There is no code exchange.
   function handleIgFBConnect() {
     setIgOAuthError("");
 
-    const FB = (window as any).FB;
-    if (!FB) {
-      setIgOAuthError("Facebook SDK not loaded. Please refresh the page and try again.");
-      return;
-    }
-
-    // config_id is required for the Facebook-Login-for-Business flow. No fallback —
-    // surface a clear error rather than calling FB.login() with an undefined config_id.
+    // The admin "Instagram Config ID" presence still gates whether onboarding is set up.
     const configId = ig.configId?.trim();
     if (!configId) {
       setIgOAuthError("Instagram onboarding is not configured — contact support.");
       return;
     }
 
+    const appId = process.env.NEXT_PUBLIC_META_APP_ID ?? "";
+    if (!appId) {
+      setIgOAuthError("Facebook App ID is not configured. Contact support.");
+      return;
+    }
+
     setIgConnecting(true);
-    igPendingCodeRef.current = null;
 
-    // TEMP DIAGNOSTIC (remove after debugging): confirm the exact config_id sent + the
-    // FB SDK App ID it runs against. A config_id from a different app, or a non-Business
-    // -Login config, mints a code this app can't exchange → OAuthException 36008.
-    console.log("[ig-connect] config_id:", JSON.stringify(configId),
-      "| SDK appId:", (window as any).FB?._appId ?? (window as any).FB?.getLoginStatus ? "(init'd)" : "(unknown)");
+    // redirect_uri must exactly match a Valid OAuth Redirect URI in the app settings.
+    // Use this page's canonical URL (no hash/query) — the same origin+path already
+    // whitelisted for the WhatsApp flow.
+    const redirectUri = `${window.location.origin}${window.location.pathname}`;
+    const scope = [
+      "instagram_basic",
+      "instagram_manage_messages",
+      "pages_show_list",
+      "pages_read_engagement",
+      "pages_messaging",
+    ].join(",");
+    const extras = encodeURIComponent(JSON.stringify({ setup: { channel: "IG_API_ONBOARDING" } }));
 
-    FB.login(
-      function (response: any) {
-        // TEMP DIAGNOSTIC: full SDK response — shows code + any redirect_uri the SDK used.
-        console.log("[ig-connect] FB.login response:", JSON.stringify(response));
-        const code = response?.authResponse?.code;
+    const dialog =
+      `https://www.facebook.com/${META_DIALOG_VERSION}/dialog/oauth` +
+      `?client_id=${encodeURIComponent(appId)}` +
+      `&display=page` +
+      `&response_type=token` +
+      `&redirect_uri=${encodeURIComponent(redirectUri)}` +
+      `&scope=${encodeURIComponent(scope)}` +
+      `&extras=${extras}`;
 
-        if (!code) {
-          setIgConnecting(false);
-          igPendingCodeRef.current = null;
-          if (response?.status === "not_authorized") {
-            setIgOAuthError("App not authorized. Make sure the Instagram config is correct.");
-          } else if (response?.status !== "unknown") {
-            setIgOAuthError("Facebook authorisation was cancelled. Please try again.");
-          }
-          return;
-        }
+    // Mark that we initiated IG onboarding so the redirect-return handler knows the
+    // fragment token belongs to Instagram (not some other FB flow).
+    try { sessionStorage.setItem("ig_onboarding_pending", "1"); } catch {}
 
-        // Forward the SDK's redirect_uri verbatim (mirrors WhatsApp). For the popup
-        // flow this is empty, and the backend sends redirect_uri:"" — a present-but-
-        // empty value matches the code; OMITTING it triggers Meta's 36008 rejection.
-        const redirectUri = response?.authResponse?.redirect_uri ?? "";
-        igPendingCodeRef.current = { code, redirectUri };
-        completeIgExchange(code, redirectUri);
-      },
-      {
-        config_id:                      configId,
-        response_type:                  "code",
-        // REQUIRED for the Business-Login (BISU) authorization-code grant — without it
-        // the SDK falls back to its default response type and the returned "code" is
-        // not a valid auth code, which Meta then rejects on exchange with the misleading
-        // "redirect_uri is identical…" error. Mirrors WhatsApp's working call.
-        override_default_response_type: true,
-      }
-    );
+    console.log("[ig-connect] redirecting to dialog — redirect_uri:", redirectUri);
+    window.location.assign(dialog);
   }
 
-  // Async handler: exchange the code server-side, then connect (single page) or
-  // prompt page selection (multiple).
-  async function completeIgExchange(code: string, redirectUri: string) {
+  // Async handler: send the access token from the redirect fragment to the backend,
+  // then connect (single page) or prompt page selection (multiple).
+  async function completeIgConnect(accessToken: string) {
+    setIgConnecting(true);
+    setIgOAuthError("");
     try {
-      const data = await apiFetch("/api/instagram/exchange-code", {
+      const data = await apiFetch("/api/instagram/connect-with-token", {
         method: "POST",
-        body:   JSON.stringify({ code, redirectUri }),
+        body:   JSON.stringify({ accessToken }),
       });
-      igPendingCodeRef.current = null;
 
       if ((data as any).needsSelection) {
         const pages: FacebookPage[] = (data as any).pages ?? [];
         setIgPages(pages);
-        // igShortToken holds the long-lived token returned by /exchange-code; the
-        // auth code is single-use and already spent, so /connect reuses this token.
-        setIgShortToken((data as any).longLivedToken ?? "");
+        // igShortToken holds the user access token returned by connect-with-token;
+        // the multi-page /connect step reuses it with the chosen pageId.
+        setIgShortToken((data as any).accessToken ?? "");
         setIgPageSelecting(true);
         setIgConnecting(false);
         return;
@@ -646,15 +676,14 @@ export default function ConfigurationPage() {
     }
   }
 
-  // Page selection (multi-page case): connect the chosen page with the long-lived
-  // token from /exchange-code — no second code exchange.
-  async function connectPage(pageId: string, longLivedToken: string) {
+  // Page selection (multi-page case): connect the chosen page with the access token.
+  async function connectPage(pageId: string, accessToken: string) {
     setIgConnecting(true);
     setIgOAuthError("");
     try {
       const data = await apiFetch("/api/instagram/connect", {
         method: "POST",
-        body:   JSON.stringify({ pageId, longLivedToken }),
+        body:   JSON.stringify({ pageId, accessToken }),
       });
       setIg((prev) => ({
         ...prev,
