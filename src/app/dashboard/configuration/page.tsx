@@ -36,12 +36,6 @@ type InstagramConfig = {
   connected:   boolean;
 };
 
-type FacebookPage = {
-  id:        string;
-  name:      string;
-  igAccount: { id: string; name: string } | null;
-};
-
 // ── helpers ────────────────────────────────────────────────────────────────────
 
 const inputClass =
@@ -98,10 +92,6 @@ const WEBHOOK_URL =
 const INSTAGRAM_WEBHOOK_URL =
   (process.env.NEXT_PUBLIC_API_BASE ?? "") + "/webhook/instagram";
 
-// Graph API version used to build the manual IG_API_ONBOARDING dialog URL. Matches
-// the FB JS SDK init version in app/layout.tsx.
-const META_DIALOG_VERSION = "v25.0";
-
 export default function ConfigurationPage() {
   const mounted = useMounted();
 
@@ -148,9 +138,6 @@ export default function ConfigurationPage() {
   const [ig, setIg]               = useState<InstagramConfig>({ accessToken: "", igAccountId: "", connected: false });
   const [igConnecting,  setIgConnecting]  = useState(false);
   const [igOAuthError,  setIgOAuthError]  = useState("");
-  const [igPages,         setIgPages]         = useState<FacebookPage[]>([]);
-  const [igPageSelecting, setIgPageSelecting] = useState(false);
-  const [igShortToken,    setIgShortToken]    = useState("");
   const [igSaving,  setIgSaving]  = useState(false);
   const [igSaved,   setIgSaved]   = useState(false);
   const [igError,   setIgError]   = useState("");
@@ -223,40 +210,37 @@ export default function ConfigurationPage() {
       .catch(() => {});
   }, [mounted]);
 
-  // Instagram onboarding redirect-return handler. The IG_API_ONBOARDING dialog returns
-  // the access token in the URL fragment (#access_token=…&long_lived_token=…). Parse it
-  // once on mount, prefer the long-lived token, hand it to the backend, then strip the
-  // fragment from the URL so the token never lingers in the address bar / history.
+  // Business Login for Instagram redirect-return handler.
+  // instagram.com/oauth/authorize returns ?code= in the query string (not a fragment).
+  // Parse it once on mount, POST to the backend, then strip ?code from the URL.
   useEffect(() => {
     if (!mounted) return;
-    if (typeof window === "undefined" || !window.location.hash) return;
+    if (typeof window === "undefined") return;
 
+    const params  = new URLSearchParams(window.location.search);
+    const code    = params.get("code")  ?? "";
+    const igError = params.get("error") ?? "";
+
+    // Only act if this looks like an IG redirect (code or error present + our marker set)
     let pending = false;
     try { pending = sessionStorage.getItem("ig_onboarding_pending") === "1"; } catch {}
-    if (!pending) return;
+    if (!pending || (!code && !igError)) return;
 
-    const params      = new URLSearchParams(window.location.hash.replace(/^#/, ""));
-    const longLived   = params.get("long_lived_token") ?? "";
-    const shortLived  = params.get("access_token") ?? "";
-    const token       = longLived || shortLived;
-    const fbError     = params.get("error_message") ?? params.get("error") ?? "";
-
-    // Clear the marker + scrub the fragment regardless of outcome.
+    // Clear the marker + scrub ?code= from the URL immediately (code is single-use)
     try { sessionStorage.removeItem("ig_onboarding_pending"); } catch {}
-    window.history.replaceState(null, "", `${window.location.pathname}${window.location.search}`);
+    const cleanUrl = window.location.pathname;
+    window.history.replaceState(null, "", cleanUrl);
 
-    // length only — never log the raw token
-    console.log("[ig-connect] redirect return — token present:", !!token,
-      "| token len:", token.length, "| long_lived:", !!longLived, "| error:", fbError || "(none)");
+    console.log("[ig-connect] redirect return — code present:", !!code, "| error:", igError || "(none)");
 
-    if (fbError) {
-      setIgOAuthError(decodeURIComponent(fbError));
+    if (igError) {
+      setIgOAuthError(decodeURIComponent(igError));
       return;
     }
-    if (token) {
-      completeIgConnect(token);
+    if (code) {
+      exchangeIgCode(code);
     } else {
-      setIgOAuthError("Instagram authorisation did not return an access token. Please try again.");
+      setIgOAuthError("Instagram authorisation did not return a code. Please try again.");
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [mounted]);
@@ -576,93 +560,50 @@ export default function ConfigurationPage() {
     }
   }
 
-  // Instagram connect — manual OAuth redirect (token flow, no code exchange).
-  // Confirmed working URL shape (manually tested end-to-end):
-  //   facebook.com/<v>/dialog/oauth?client_id=…&redirect_uri=…&response_type=token
-  //   &scope=instagram_basic,pages_show_list,instagram_manage_messages
-  // No extras, no display param, no config_id — the simpler "Get Started" flow.
-  // The IG_API_ONBOARDING extras approach (Meta's "Business Login for Instagram" guide)
-  // triggered an internal Meta bridge that had its own scope bugs; removed.
-  function handleIgFBConnect() {
+  // Business Login for Instagram — full-page redirect to instagram.com/oauth/authorize.
+  // Returns ?code= in the query string; the mount effect above picks it up and calls
+  // exchangeIgCode(). No Facebook Page required.
+  function handleIgConnect() {
     setIgOAuthError("");
 
-    const appId = process.env.NEXT_PUBLIC_META_APP_ID ?? "";
+    const appId = process.env.NEXT_PUBLIC_INSTAGRAM_APP_ID ?? "";
     if (!appId) {
-      setIgOAuthError("Facebook App ID is not configured. Contact support.");
+      setIgOAuthError("Instagram App ID is not configured. Contact support.");
       return;
     }
 
-    setIgConnecting(true);
-
-    // redirect_uri must exactly match a Valid OAuth Redirect URI in the app settings.
+    // redirect_uri must exactly match a Valid OAuth Redirect URI in the Instagram app settings.
     const redirectUri = `${window.location.origin}${window.location.pathname}`;
-    const scope = "instagram_basic,pages_show_list,instagram_manage_messages";
+    const scope       = "instagram_business_basic,instagram_business_manage_messages";
 
     const dialog =
-      `https://www.facebook.com/${META_DIALOG_VERSION}/dialog/oauth` +
+      `https://www.instagram.com/oauth/authorize` +
       `?client_id=${encodeURIComponent(appId)}` +
       `&redirect_uri=${encodeURIComponent(redirectUri)}` +
-      `&response_type=token` +
-      `&scope=${encodeURIComponent(scope)}`;
+      `&scope=${encodeURIComponent(scope)}` +
+      `&response_type=code`;
 
     try { sessionStorage.setItem("ig_onboarding_pending", "1"); } catch {}
 
-    console.log("[ig-connect] redirecting to dialog — redirect_uri:", redirectUri);
+    console.log("[ig-connect] redirecting — redirect_uri:", redirectUri);
     window.location.assign(dialog);
   }
 
-  // Async handler: send the access token from the redirect fragment to the backend,
-  // then connect (single page) or prompt page selection (multiple).
-  async function completeIgConnect(accessToken: string) {
+  // Called from the mount effect once ?code= is found in the URL.
+  async function exchangeIgCode(code: string) {
     setIgConnecting(true);
     setIgOAuthError("");
+    const redirectUri = `${window.location.origin}${window.location.pathname}`;
     try {
-      const data = await apiFetch("/api/instagram/connect-with-token", {
+      const data = await apiFetch("/api/instagram/exchange-code", {
         method: "POST",
-        body:   JSON.stringify({ accessToken }),
-      });
-
-      if ((data as any).needsSelection) {
-        const pages: FacebookPage[] = (data as any).pages ?? [];
-        setIgPages(pages);
-        // igShortToken holds the user access token returned by connect-with-token;
-        // the multi-page /connect step reuses it with the chosen pageId.
-        setIgShortToken((data as any).accessToken ?? "");
-        setIgPageSelecting(true);
-        setIgConnecting(false);
-        return;
-      }
-
-      setIg((prev) => ({
-        ...prev,
-        igAccountId: (data as any).instagramBusinessAccountId ?? prev.igAccountId,
-        connected:   true,
-      }));
-      setIgAdvancedOpen(true);
-    } catch (e: any) {
-      setIgOAuthError(e.message ?? "Failed to connect Instagram account.");
-    } finally {
-      setIgConnecting(false);
-    }
-  }
-
-  // Page selection (multi-page case): connect the chosen page with the access token.
-  async function connectPage(pageId: string, accessToken: string) {
-    setIgConnecting(true);
-    setIgOAuthError("");
-    try {
-      const data = await apiFetch("/api/instagram/connect", {
-        method: "POST",
-        body:   JSON.stringify({ pageId, accessToken }),
+        body:   JSON.stringify({ code, redirectUri }),
       });
       setIg((prev) => ({
         ...prev,
         igAccountId: (data as any).instagramBusinessAccountId ?? prev.igAccountId,
         connected:   true,
       }));
-      setIgPageSelecting(false);
-      setIgPages([]);
-      setIgShortToken("");
       setIgAdvancedOpen(true);
     } catch (e: any) {
       setIgOAuthError(e.message ?? "Failed to connect Instagram account.");
@@ -1238,31 +1179,32 @@ export default function ConfigurationPage() {
 
             <div className="px-6 py-5 space-y-4">
 
-              {/* ── Connect via Facebook ── */}
+              {/* ── Connect via Instagram OAuth ── */}
               <div className="flex flex-col gap-2">
-                <div className="flex items-center justify-between rounded-xl border border-[#1877F2]/20 bg-[#1877F2]/5 px-4 py-3">
+                <div className="flex items-center justify-between rounded-xl border border-pink-100 bg-pink-50/40 px-4 py-3">
                   <div>
                     <p className="text-sm font-medium text-gray-800">
                       Connect Instagram <span className="text-xs font-normal text-green-600">(Recommended)</span>
                     </p>
                     <p className="text-xs text-gray-400 mt-0.5">
-                      Use Facebook login to connect your Instagram Business account automatically.
+                      Log in with Instagram to connect your Business account directly — no Facebook Page required.
                     </p>
                   </div>
                   <button
                     type="button"
-                    onClick={handleIgFBConnect}
+                    onClick={handleIgConnect}
                     disabled={igConnecting}
-                    className="flex items-center gap-2 rounded-lg bg-[#1877F2] px-4 py-2 text-sm font-semibold text-white hover:bg-[#1464d8] disabled:opacity-60 disabled:cursor-not-allowed shrink-0 ml-4 transition"
+                    className="flex items-center gap-2 rounded-lg px-4 py-2 text-sm font-semibold text-white disabled:opacity-60 disabled:cursor-not-allowed shrink-0 ml-4 transition"
+                    style={{ background: "radial-gradient(circle at 30% 107%, #fdf497 0%, #fdf497 5%, #fd5949 45%, #d6249f 60%, #285AEB 90%)" }}
                   >
                     {igConnecting ? (
                       <span className="h-4 w-4 animate-spin rounded-full border-2 border-white border-t-transparent" />
                     ) : (
                       <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 24 24">
-                        <path d="M24 12.073C24 5.446 18.627 0 12 0S0 5.446 0 12.073C0 18.1 4.388 23.094 10.125 24v-8.437H7.078v-3.49h3.047V9.41c0-3.025 1.791-4.697 4.533-4.697 1.312 0 2.686.236 2.686.236v2.97h-1.513c-1.491 0-1.956.93-1.956 1.887v2.268h3.328l-.532 3.49h-2.796V24C19.612 23.094 24 18.1 24 12.073z"/>
+                        <path d="M12 2.163c3.204 0 3.584.012 4.85.07 3.252.148 4.771 1.691 4.919 4.919.058 1.265.069 1.645.069 4.849 0 3.205-.012 3.584-.069 4.849-.149 3.225-1.664 4.771-4.919 4.919-1.266.058-1.644.07-4.85.07-3.204 0-3.584-.012-4.849-.07-3.26-.149-4.771-1.699-4.919-4.92-.058-1.265-.07-1.644-.07-4.849 0-3.204.013-3.583.07-4.849.149-3.227 1.664-4.771 4.919-4.919 1.266-.057 1.645-.069 4.849-.069zM12 0C8.741 0 8.333.014 7.053.072 2.695.272.273 2.69.073 7.052.014 8.333 0 8.741 0 12c0 3.259.014 3.668.072 4.948.2 4.358 2.618 6.78 6.98 6.98C8.333 23.986 8.741 24 12 24c3.259 0 3.668-.014 4.948-.072 4.354-.2 6.782-2.618 6.979-6.98.059-1.28.073-1.689.073-4.948 0-3.259-.014-3.667-.072-4.947-.196-4.354-2.617-6.78-6.979-6.98C15.668.014 15.259 0 12 0zm0 5.838a6.162 6.162 0 1 0 0 12.324 6.162 6.162 0 0 0 0-12.324zM12 16a4 4 0 1 1 0-8 4 4 0 0 1 0 8zm6.406-11.845a1.44 1.44 0 1 0 0 2.881 1.44 1.44 0 0 0 0-2.881z"/>
                       </svg>
                     )}
-                    {igConnecting ? "Connecting…" : "Connect via Facebook"}
+                    {igConnecting ? "Connecting…" : "Connect Instagram"}
                   </button>
                 </div>
                 {igOAuthError && (
@@ -1270,51 +1212,7 @@ export default function ConfigurationPage() {
                 )}
               </div>
 
-              {/* ── Page selector modal ── */}
-              {igPageSelecting && (
-                <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
-                  <div className="w-full max-w-md rounded-2xl bg-white shadow-xl overflow-hidden">
-                    <div className="border-b border-gray-100 px-6 py-4">
-                      <h3 className="text-sm font-semibold text-[#2B0D3E]">Select a Facebook Page</h3>
-                      <p className="mt-0.5 text-xs text-gray-400">
-                        Choose the page linked to the Instagram account you want to connect.
-                      </p>
-                    </div>
-                    <div className="divide-y divide-gray-100 max-h-72 overflow-y-auto">
-                      {igPages.map((page) => (
-                        <button
-                          key={page.id}
-                          type="button"
-                          onClick={() => connectPage(page.id, igShortToken)}
-                          disabled={igConnecting}
-                          className="w-full flex items-center justify-between px-6 py-4 text-left hover:bg-gray-50 disabled:opacity-50 transition"
-                        >
-                          <div>
-                            <p className="text-sm font-medium text-gray-800">{page.name}</p>
-                            <p className="text-xs text-gray-400 mt-0.5">
-                              Instagram: {page.igAccount?.name || page.igAccount?.id}
-                            </p>
-                          </div>
-                          <span className="text-xs font-semibold text-[#1877F2] shrink-0 ml-4">Select</span>
-                        </button>
-                      ))}
-                    </div>
-                    <div className="border-t border-gray-100 px-6 py-3 flex justify-end">
-                      <button
-                        type="button"
-                        onClick={() => { setIgPageSelecting(false); setIgPages([]); setIgShortToken(""); }}
-                        className="text-xs font-medium text-gray-500 hover:text-gray-700 transition"
-                      >
-                        Cancel
-                      </button>
-                    </div>
-                  </div>
-                </div>
-              )}
 
-              {/* Webhook subscription happens automatically at connect time (see
-                  finishConnect → subscribePageToWebhook in the backend), matching the
-                  WhatsApp UX — no manual subscribe step. */}
 
               {/* Collapsible credentials panel */}
               <div className="rounded-xl border border-gray-200 overflow-hidden">
