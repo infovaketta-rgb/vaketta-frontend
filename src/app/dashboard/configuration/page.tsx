@@ -143,6 +143,7 @@ export default function ConfigurationPage() {
   const [igError,   setIgError]   = useState("");
   const [showIgToken, setShowIgToken] = useState(false);
   const [igAdvancedOpen, setIgAdvancedOpen] = useState(false);
+  const [igEmbedUrl, setIgEmbedUrl] = useState("");
 
   // Message delay state
   const [delayEnabled, setDelayEnabled]   = useState(false);
@@ -206,6 +207,7 @@ export default function ConfigurationPage() {
           igAccountId: data.igAccountId ?? "",
           connected:   data.connected ?? false,
         });
+        if (data.instagramEmbedUrl) setIgEmbedUrl(data.instagramEmbedUrl);
       })
       .catch(() => {});
   }, [mounted]);
@@ -566,26 +568,42 @@ export default function ConfigurationPage() {
   function handleIgConnect() {
     setIgOAuthError("");
 
-    const appId = process.env.NEXT_PUBLIC_INSTAGRAM_APP_ID ?? "";
-    if (!appId) {
-      setIgOAuthError("Instagram App ID is not configured. Contact support.");
-      return;
+    // Use the server-supplied URL (saved override or server-computed default).
+    // Fall back to local construction if empty or pointing at the wrong host —
+    // protects against a bad admin edit breaking the connect button entirely.
+    let dialog = igEmbedUrl.trim();
+    const isValidSaved = (() => {
+      try {
+        const u = new URL(dialog);
+        return u.hostname === "www.instagram.com" &&
+               u.pathname === "/oauth/authorize" &&
+               !!u.searchParams.get("client_id") &&
+               u.searchParams.get("response_type") === "code";
+      } catch { return false; }
+    })();
+
+    if (!isValidSaved) {
+      const appId = process.env.NEXT_PUBLIC_INSTAGRAM_APP_ID ?? "";
+      if (!appId) {
+        setIgOAuthError("Instagram App ID is not configured. Contact support.");
+        return;
+      }
+      if (dialog) {
+        console.warn("[ig-connect] saved instagramEmbedUrl is invalid — falling back to computed URL");
+      }
+      const redirectUri = `${window.location.origin}${window.location.pathname}`;
+      const scope       = "instagram_business_basic,instagram_business_manage_messages";
+      dialog =
+        `https://www.instagram.com/oauth/authorize` +
+        `?client_id=${encodeURIComponent(appId)}` +
+        `&redirect_uri=${encodeURIComponent(redirectUri)}` +
+        `&scope=${encodeURIComponent(scope)}` +
+        `&response_type=code`;
     }
-
-    // redirect_uri must exactly match a Valid OAuth Redirect URI in the Instagram app settings.
-    const redirectUri = `${window.location.origin}${window.location.pathname}`;
-    const scope       = "instagram_business_basic,instagram_business_manage_messages";
-
-    const dialog =
-      `https://www.instagram.com/oauth/authorize` +
-      `?client_id=${encodeURIComponent(appId)}` +
-      `&redirect_uri=${encodeURIComponent(redirectUri)}` +
-      `&scope=${encodeURIComponent(scope)}` +
-      `&response_type=code`;
 
     try { sessionStorage.setItem("ig_onboarding_pending", "1"); } catch {}
 
-    console.log("[ig-connect] redirecting — redirect_uri:", redirectUri);
+    console.log("[ig-connect] redirecting — using", isValidSaved ? "saved URL" : "computed URL");
     window.location.assign(dialog);
   }
 

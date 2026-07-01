@@ -56,6 +56,11 @@ export default function SettingsPage() {
   const [waSuccess, setWaSuccess] = useState("");
   const [waError, setWaError] = useState("");
 
+  const [igEmbedUrl, setIgEmbedUrl] = useState("");
+  const [igEmbedSaving, setIgEmbedSaving] = useState(false);
+  const [igEmbedSuccess, setIgEmbedSuccess] = useState("");
+  const [igEmbedError, setIgEmbedError] = useState("");
+
   const [metaApiVersion, setMetaApiVersion] = useState("v25.0");
   const [versionSaving, setVersionSaving] = useState(false);
   const [versionSuccess, setVersionSuccess] = useState("");
@@ -90,6 +95,7 @@ export default function SettingsPage() {
           setWaConfigId(res.whatsappConfigId       ?? "");
           setMetaApiVersion(res.metaApiVersion     ?? "v25.0");
           if (res.maxStayNightsCeiling != null) setMaxStayCeiling(String(res.maxStayNightsCeiling));
+          setIgEmbedUrl(res.instagramEmbedUrl      ?? "");
         }
       })
       .catch(() => {});
@@ -160,6 +166,24 @@ export default function SettingsPage() {
       setWaError(e.message);
     } finally {
       setWaSaving(false);
+    }
+  }
+
+  async function handleIgEmbedSave(e: React.FormEvent) {
+    e.preventDefault();
+    setIgEmbedError(""); setIgEmbedSuccess(""); setIgEmbedSaving(true);
+    try {
+      await adminApiFetch("/admin/platform-settings", {
+        method: "PATCH",
+        body: JSON.stringify({ instagramEmbedUrl: igEmbedUrl.trim() }),
+      });
+      logAdminAction("admin.platform.instagramEmbedUrl");
+      setIgEmbedSuccess("Instagram Embed URL saved.");
+      setTimeout(() => setIgEmbedSuccess(""), 3000);
+    } catch (e: any) {
+      setIgEmbedError(e.message);
+    } finally {
+      setIgEmbedSaving(false);
     }
   }
 
@@ -356,6 +380,52 @@ export default function SettingsPage() {
             >
               {waSaving && <span className="h-3.5 w-3.5 animate-spin rounded-full border-2 border-white border-t-transparent" />}
               {waSaving ? "Saving…" : "Save WhatsApp Settings"}
+            </button>
+          </form>
+        </div>
+      </div>
+
+      {/* Instagram Embed URL */}
+      <div className="rounded-2xl border border-[#E5E0D4] bg-white shadow-sm overflow-hidden">
+        <div className="border-b border-[#E5E0D4] bg-[#F4F2ED] px-6 py-4">
+          <h2 className="text-sm font-semibold text-[#0C1B33]">Instagram OAuth URL</h2>
+          <p className="mt-0.5 text-xs text-[#0C1B33]/45">
+            Defaults to the correct URL automatically. Only edit this if Meta changes their
+            authorization endpoint or you need to add optional parameters.
+          </p>
+        </div>
+        <div className="px-6 py-5 space-y-4">
+          {igEmbedSuccess && (
+            <div className="rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-700">{igEmbedSuccess}</div>
+          )}
+          {igEmbedError && (
+            <div className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">{igEmbedError}</div>
+          )}
+          <form onSubmit={handleIgEmbedSave} className="space-y-4">
+            <div>
+              <label className="mb-1.5 block text-xs font-semibold uppercase tracking-wide text-[#0C1B33]/60">
+                Authorize URL
+              </label>
+              <input
+                value={igEmbedUrl}
+                onChange={(e) => setIgEmbedUrl(e.target.value)}
+                className={inputCls}
+                placeholder="https://www.instagram.com/oauth/authorize?client_id=…"
+              />
+              <p className="mt-1 text-[11px] text-[#0C1B33]/40">
+                Leave blank to use the auto-computed default (built from <code className="font-mono">INSTAGRAM_APP_ID</code> + current scopes).
+                Must include <code className="font-mono">client_id</code>, <code className="font-mono">redirect_uri</code>,{" "}
+                <code className="font-mono">response_type=code</code>, and <code className="font-mono">scope</code>.
+              </p>
+            </div>
+            <button
+              type="submit"
+              disabled={igEmbedSaving}
+              className="flex items-center gap-2 rounded-xl px-5 py-2.5 text-sm font-semibold text-white shadow-sm transition disabled:opacity-60"
+              style={{ background: "radial-gradient(circle at 30% 107%, #fdf497 0%, #fdf497 5%, #fd5949 45%, #d6249f 60%, #285AEB 90%)" }}
+            >
+              {igEmbedSaving && <span className="h-3.5 w-3.5 animate-spin rounded-full border-2 border-white border-t-transparent" />}
+              {igEmbedSaving ? "Saving…" : "Save Instagram URL"}
             </button>
           </form>
         </div>
