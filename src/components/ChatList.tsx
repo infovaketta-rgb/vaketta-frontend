@@ -405,10 +405,10 @@ export default function ChatList() {
           >
             <div className={`w-5 h-5 rounded border-2 flex items-center justify-center shrink-0 transition-colors ${
               allSelected
-                ? "bg-[#1B52A8] border-[#1B52A8]"
+                ? "bg-[#7A3F91] border-[#7A3F91]"
                 : someSelected
-                ? "border-[#1B52A8] bg-white"
-                : "border-slate-300 bg-white group-hover:border-[#1B52A8]"
+                ? "border-[#7A3F91] bg-white"
+                : "border-slate-300 bg-white group-hover:border-[#7A3F91]"
             }`}>
               {allSelected && (
                 <svg className="w-3 h-3 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -416,7 +416,7 @@ export default function ChatList() {
                 </svg>
               )}
               {someSelected && (
-                <div className="w-2.5 h-0.5 rounded bg-[#1B52A8]" />
+                <div className="w-2.5 h-0.5 rounded bg-[#7A3F91]" />
               )}
             </div>
             <span className="text-sm font-semibold text-[#0C1B33]">
@@ -439,7 +439,7 @@ export default function ChatList() {
             placeholder="Search by phone..."
             value={search}
             onChange={(e) => setSearch(e.target.value)}
-            className="w-full pl-9 pr-3 py-2 text-sm rounded-lg bg-[#F4F2ED] border-none outline-none focus:ring-2 focus:ring-[#1B52A8]/20 text-[#0C1B33] placeholder-slate-400"
+            className="w-full pl-9 pr-3 py-2 text-sm rounded-lg bg-[#F4F2ED] border-none outline-none focus:ring-2 focus:ring-[#7A3F91]/20 text-[#0C1B33] placeholder-slate-400"
           />
         </div>
       </div>
@@ -470,9 +470,9 @@ export default function ChatList() {
               key={c.guestId}
               className={`relative flex items-center gap-3 px-4 py-3 cursor-pointer transition-colors border-b border-[#E5E0D4]/60 ${
                 isSelected
-                  ? "bg-blue-50/70 border-l-2 border-l-[#1B52A8]"
+                  ? "bg-[#F2EAF7]/70 border-l-2 border-l-[#7A3F91]"
                   : isActive
-                  ? "bg-blue-50 border-l-2 border-l-[#1B52A8]"
+                  ? "bg-[#F2EAF7] border-l-2 border-l-[#7A3F91]"
                   : "hover:bg-[#F4F2ED]"
               }`}
               onMouseEnter={() => setHoveredId(c.guestId)}
@@ -491,7 +491,7 @@ export default function ChatList() {
               {selectMode && (
                 <div
                   className={`shrink-0 w-5 h-5 rounded border-2 flex items-center justify-center transition-colors ${
-                    isSelected ? "bg-[#1B52A8] border-[#1B52A8]" : "border-slate-300 bg-white"
+                    isSelected ? "bg-[#7A3F91] border-[#7A3F91]" : "border-slate-300 bg-white"
                   }`}
                   onClick={(e) => { e.stopPropagation(); toggleSelect(c.guestId); }}
                 >
@@ -531,14 +531,14 @@ export default function ChatList() {
                   <span className="text-sm font-semibold text-[#0C1B33] truncate">
                     {c.name || (c.channel === "INSTAGRAM" ? "Instagram User" : formatPhone(c.phone))}
                   </span>
-                  <span className={`text-[11px] shrink-0 ${c.unreadCount > 0 ? "text-[#1B52A8] font-medium" : "text-slate-400"}`}>
+                  <span className={`text-[11px] shrink-0 ${c.unreadCount > 0 ? "text-[#7A3F91] font-medium" : "text-[#2B0D3E]/70"}`}>
                     {formatTime(c.lastTimestamp)}
                   </span>
                 </div>
                 <div className="flex items-center justify-between gap-2 mt-0.5">
-                  <span className={`text-xs truncate ${c.unreadCount > 0 ? "text-[#0C1B33] font-medium" : "text-slate-500"}`}>
+                  <span className={`text-xs truncate ${c.unreadCount > 0 ? "text-[#0C1B33] font-medium" : "text-[#2B0D3E]/70"}`}>
                     {c.lastDirection === "OUT" && (
-                      <span className="text-slate-400 mr-1">You:</span>
+                      <span className="text-[#2B0D3E]/60 mr-1">You:</span>
                     )}
                     {preview}
                   </span>
@@ -549,7 +549,7 @@ export default function ChatList() {
                       </span>
                     )}
                     {c.unreadCount > 0 && (
-                      <span className="min-w-4.5 h-4.5 rounded-full bg-[#1B52A8] text-white text-[10px] font-bold flex items-center justify-center px-1">
+                      <span className="min-w-4.5 h-4.5 rounded-full bg-[#7A3F91] text-white text-[10px] font-bold flex items-center justify-center px-1">
                         {c.unreadCount > 99 ? "99+" : c.unreadCount}
                       </span>
                     )}

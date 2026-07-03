@@ -29,7 +29,10 @@ table,
   font-variant-numeric: tabular-nums;
 }
 
-/* ── WhatsApp-style chat bubbles ───────────────────────────────────────────── */
+/* ── WhatsApp-style chat bubbles — Twilight Haze palette ─────────────────────
+   Out bubble #A7B7E7 carries DARK text (#2B0D3E, 8.59:1 AAA) — white text
+   fails WCAG AA at 1.99:1 on this hex. Secondary text is #2B0D3E at 70%
+   (60% measures 3.57:1 inside the out bubble — below AA). */
 
 .wa-bubble {
   position: relative;
@@ -38,11 +41,11 @@ table,
   word-wrap: break-word;
   font-size: 14.2px;
   line-height: 19px;
-  color: #111b21;
+  color: #2b0d3e;
 }
 
 .wa-bubble-out {
-  background-color: #d9fdd3;
+  background-color: #a7b7e7;
   border-top-right-radius: 0;
 }
 
@@ -53,7 +56,7 @@ table,
   right: -8px;
   width: 8px;
   height: 13px;
-  background-color: #d9fdd3;
+  background-color: #a7b7e7;
   clip-path: polygon(0 0, 0 100%, 100% 0);
 }
 
@@ -91,7 +94,7 @@ table,
   gap: 3px;
   font-size: 11px;
   line-height: 15px;
-  color: rgba(0, 0, 0, 0.45);
+  color: rgba(43, 13, 62, 0.7);
   user-select: none;
   pointer-events: none;
 }
@@ -101,8 +104,9 @@ table,
   height: 11px;
   flex-shrink: 0;
 }
-.wa-tick-read { color: #53bdeb; }
-.wa-tick-sent { color: rgba(0, 0, 0, 0.45); }
+/* Read tick: WhatsApp's #53bdeb is invisible on #A7B7E7 (1.07:1) — brand blue reads at 3.75:1 */
+.wa-tick-read { color: #1b52a8; }
+.wa-tick-sent { color: rgba(43, 13, 62, 0.7); }
 
 /* Template card variant — wider, hosts media + body + footer + buttons. */
 .wa-template-card {
@@ -127,7 +131,7 @@ table,
   font-weight: 600;
   font-size: 14.6px;
   padding: 6px 9px 0;
-  color: #111b21;
+  color: #2b0d3e;
 }
 
 .wa-template-body {
@@ -136,13 +140,13 @@ table,
   line-height: 19px;
   white-space: pre-wrap;
   word-wrap: break-word;
-  color: #111b21;
+  color: #2b0d3e;
 }
 
 .wa-template-footer {
   padding: 4px 9px 22px;
   font-size: 13px;
-  color: #667781;
+  color: rgba(43, 13, 62, 0.7);
 }
 
 .wa-template-buttons {

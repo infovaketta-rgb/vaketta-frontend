@@ -62,8 +62,8 @@ function AudioPlayer({ src, isOut }: { src: string; isOut: boolean }) {
     return `${m}:${sec.toString().padStart(2, "0")}`;
   }
 
-  const activeColor  = isOut ? "#075e54" : "#7c3aed";
-  const inactiveColor = isOut ? "#a7f3d0" : "#ddd6fe";
+  const activeColor  = isOut ? "#2B0D3E" : "#7c3aed";
+  const inactiveColor = isOut ? "#D8E2FF" : "#ddd6fe";
   const filledBars = Math.round((progress / 100) * WAVEFORM.length);
 
   if (loadError) {
@@ -145,7 +145,7 @@ function AudioPlayer({ src, isOut }: { src: string; isOut: boolean }) {
         </div>
 
         {/* Time */}
-        <span className="text-[10px]" style={{ color: isOut ? "#075e54" : "#6b7280" }}>
+        <span className="text-[10px]" style={{ color: isOut ? "rgba(43, 13, 62, 0.7)" : "#6b7280" }}>
           {playing || currentTime > 0 ? fmt(currentTime) : fmt(duration)}
         </span>
       </div>
@@ -223,11 +223,11 @@ function ListMessageBubble({ body }: { body: string }) {
   return (
     <div className="space-y-2 p-1">
       <p className="text-sm whitespace-pre-wrap leading-relaxed">{bodyText}</p>
-      <div className="flex items-center justify-center rounded-lg border border-gray-200 bg-white/60 px-3 py-1.5 gap-1.5 text-xs text-gray-500 font-medium select-none">
+      <div className="flex items-center justify-center rounded-lg border border-[#2B0D3E]/15 bg-white/60 px-3 py-1.5 gap-1.5 text-xs text-[#2B0D3E]/80 font-medium select-none">
         <span>{buttonLabel}</span>
         <span className="text-[10px]">▼</span>
       </div>
-      <p className="text-[10px] text-gray-400 text-center">List message</p>
+      <p className="text-[10px] text-[#2B0D3E]/70 text-center">List message</p>
     </div>
   );
 }
@@ -1107,7 +1107,7 @@ return () => {
 
   if (!guestId) {
     return (
-      <div className="flex flex-col flex-1 min-w-0 items-center justify-center h-full w-full bg-[#f0ebe3] relative overflow-hidden">
+      <div className="flex flex-col flex-1 min-w-0 items-center justify-center h-full w-full bg-[#D8E2FF] relative overflow-hidden">
         <div className="absolute w-80 h-80 rounded-full bg-purple-200 opacity-25 -top-16 -right-16 pointer-events-none" />
         <div className="absolute w-56 h-56 rounded-full bg-purple-300 opacity-15 bottom-24 -left-16 pointer-events-none" />
         <div className="absolute w-36 h-36 rounded-full bg-amber-200 opacity-25 bottom-12 right-24 pointer-events-none" />
@@ -1156,7 +1156,7 @@ return () => {
   const avatarColor = selectedGuestPhone ? getAvatarColor(selectedGuestPhone) : "#7c3aed";
 
   return (
-    <div className="flex flex-col h-full flex-1 min-w-0 bg-[#f0ebe3]">
+    <div className="flex flex-col h-full flex-1 min-w-0 bg-[#D8E2FF]">
 
       {/* Chat Header */}
       <div className="flex items-center gap-3 px-4 py-2.5 bg-white border-b border-gray-200 shadow-sm">
@@ -1273,7 +1273,7 @@ return () => {
 
         {loading && (
           <div className="flex justify-center py-10">
-            <div className="flex gap-2 items-center text-gray-400 text-sm">
+            <div className="flex gap-2 items-center text-[#2B0D3E]/70 text-sm">
               <svg className="w-4 h-4 animate-spin" fill="none" viewBox="0 0 24 24">
                 <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
                 <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8H4z" />
@@ -1284,7 +1284,7 @@ return () => {
         )}
 
         {!loading && messages.length === 0 && (
-          <div className="flex flex-col items-center justify-center h-40 gap-2 text-gray-400">
+          <div className="flex flex-col items-center justify-center h-40 gap-2 text-[#2B0D3E]/70">
             <p className="text-sm">No messages yet</p>
           </div>
         )}
@@ -1293,7 +1293,7 @@ return () => {
           <div key={gi}>
             {/* Date Divider */}
             <div className="flex items-center justify-center my-4">
-              <span className="text-[11px] text-gray-500 bg-white px-3 py-1 rounded-full shadow-sm border border-gray-100">
+              <span className="text-[11px] text-[#2B0D3E]/70 bg-white px-3 py-1 rounded-full shadow-sm border border-gray-100">
                 {formatDateDivider(group.date)}
               </span>
             </div>
@@ -1351,7 +1351,7 @@ return () => {
                         <div className="max-w-[85%] flex flex-col gap-1">
                           <RoomCarouselCards content={m.body ?? ""} />
                           <div className="flex justify-end items-center gap-1 px-1">
-                            <span className="text-xs text-gray-400">{formatMsgTime(m.timestamp)}</span>
+                            <span className="text-xs text-[#2B0D3E]/70">{formatMsgTime(m.timestamp)}</span>
                             {isOut && !m.deleted && <StatusTicks status={m.status} />}
                           </div>
                         </div>
@@ -1371,7 +1371,7 @@ return () => {
                       >
                         {m.deleted ? (
                           <div className="wa-bubble-text">
-                            <span className="flex items-center gap-1.5 italic text-gray-400 text-sm select-none">
+                            <span className="flex items-center gap-1.5 italic text-[#2B0D3E]/70 text-sm select-none">
                               <svg className="w-3.5 h-3.5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
                                   d="M18.364 18.364A9 9 0 005.636 5.636m12.728 12.728A9 9 0 015.636 5.636m12.728 12.728L5.636 5.636" />
