@@ -40,5 +40,5 @@ yarn-error.log*
 *.tsbuildinfo
 next-env.d.ts
 
-# Claude Code
-CLAUDE.md
+# Claude Code / docs — keep Markdown local, never commit
+*.md
