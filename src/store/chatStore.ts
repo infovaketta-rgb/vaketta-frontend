@@ -23,6 +23,21 @@ export type TemplateBubbleMeta = {
   }>;
 };
 
+// Persisted by the backend on Message.metadata for WhatsApp interactive
+// replies (list/button taps): the bubble shows body (= the human-readable
+// title the guest tapped); the payload id + type live here for the
+// "Message details" popup.
+export type InteractiveReplyMeta = {
+  type: "button_reply" | "list_reply" | "quick_reply" | string;
+  id: string;
+  title?: string | null;
+  description?: string | null;
+};
+
+export type MessageMetadata = {
+  interactiveReply?: InteractiveReplyMeta;
+};
+
 export type Message = {
   id:          string;
   direction:   "IN" | "OUT";
@@ -37,6 +52,7 @@ export type Message = {
   deleted:     boolean;
   deletedBy:   string | null;
   jobId:       string | null;
+  metadata?:   MessageMetadata | null;
   template?:   TemplateBubbleMeta | null;
 };
 

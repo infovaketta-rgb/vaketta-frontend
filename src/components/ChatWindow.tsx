@@ -3,7 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import { apiFetch } from "@/lib/api";
 import { useSocket } from "@/context/SocketContext";
-import { useChatStore, type TemplateBubbleMeta } from "@/store/chatStore";
+import { useChatStore, type TemplateBubbleMeta, type Message as ChatMessage } from "@/store/chatStore";
 import { useMounted } from "@/lib/useMounted";
 import BookingForm from "./BookingForm";
 import MediaPickerModal from "./MediaPickerModal";
@@ -537,15 +537,17 @@ function getAvatarColor(phone: string): string {
 
 // ── ChatWindow ────────────────────────────────────────────────────────────────
 
-// ── Delete popup ──────────────────────────────────────────────────────────────
-function DeletePopup({
-  messageId,
+// ── ⋮ message actions popup ───────────────────────────────────────────────────
+function MessageActionsPopup({
+  message,
   onClose,
   onDelete,
+  onDetails,
 }: {
-  messageId: string;
+  message: ChatMessage;
   onClose: () => void;
   onDelete: (id: string) => void;
+  onDetails: () => void;
 }) {
   return (
     <div
@@ -556,15 +558,23 @@ function DeletePopup({
         className="w-full sm:w-72 rounded-t-2xl sm:rounded-2xl bg-white shadow-2xl overflow-hidden"
         onClick={(e) => e.stopPropagation()}
       >
-        <div className="px-5 pt-5 pb-3 border-b border-gray-100 text-center">
-          <p className="text-sm font-semibold text-gray-800">Delete message?</p>
-          <p className="text-xs text-gray-400 mt-1">The message will be removed from the chat history.</p>
-        </div>
-
         <div className="py-1">
           <button
-            onClick={() => { onDelete(messageId); onClose(); }}
-            className="w-full flex items-center gap-3 px-5 py-3.5 text-left hover:bg-red-50 transition-colors group"
+            onClick={onDetails}
+            className="w-full flex items-center gap-3 px-5 py-3.5 text-left hover:bg-gray-50 transition-colors group"
+          >
+            <div className="w-8 h-8 rounded-full bg-blue-100 group-hover:bg-blue-200 flex items-center justify-center shrink-0 transition-colors">
+              <svg className="w-4 h-4 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
+                  d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+              </svg>
+            </div>
+            <p className="text-sm font-semibold text-gray-700">Message details</p>
+          </button>
+
+          <button
+            onClick={() => { onDelete(message.id); onClose(); }}
+            className="w-full flex items-center gap-3 px-5 py-3.5 text-left hover:bg-red-50 transition-colors group border-t border-gray-100"
           >
             <div className="w-8 h-8 rounded-full bg-red-100 group-hover:bg-red-200 flex items-center justify-center shrink-0 transition-colors">
               <svg className="w-4 h-4 text-red-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -572,7 +582,10 @@ function DeletePopup({
                   d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
               </svg>
             </div>
-            <p className="text-sm font-semibold text-red-600">Delete message</p>
+            <div>
+              <p className="text-sm font-semibold text-red-600">Delete message</p>
+              <p className="text-[11px] text-gray-400">Removed from the chat history</p>
+            </div>
           </button>
 
           <button
@@ -589,6 +602,87 @@ function DeletePopup({
         </div>
       </div>
     </div>
+  );
+}
+
+// ── Message details popup ─────────────────────────────────────────────────────
+const REPLY_TYPE_LABELS: Record<string, string> = {
+  list_reply:   "List selection",
+  button_reply: "Button tap",
+  quick_reply:  "Quick reply",
+};
+
+function DetailRow({ label, value, mono = false }: { label: string; value: string; mono?: boolean }) {
+  return (
+    <div className="flex items-start justify-between gap-4 px-5 py-2.5">
+      <span className="text-xs text-gray-400 shrink-0 pt-0.5">{label}</span>
+      <span className={`text-xs text-[#2B0D3E] text-right break-all ${mono ? "font-mono bg-gray-50 px-1.5 py-0.5 rounded" : ""}`}>
+        {value}
+      </span>
+    </div>
+  );
+}
+
+function MessageDetailsPopup({ message, onClose }: { message: ChatMessage; onClose: () => void }) {
+  const reply = message.metadata?.interactiveReply;
+  return (
+    <div
+      className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/40 backdrop-blur-[2px]"
+      onClick={onClose}
+    >
+      <div
+        className="w-full sm:w-80 rounded-t-2xl sm:rounded-2xl bg-white shadow-2xl overflow-hidden"
+        onClick={(e) => e.stopPropagation()}
+      >
+        <div className="px-5 pt-5 pb-3 border-b border-gray-100 flex items-center justify-between">
+          <p className="text-sm font-semibold text-gray-800">Message details</p>
+          <button
+            onClick={onClose}
+            className="w-7 h-7 rounded-full hover:bg-gray-100 flex items-center justify-center text-gray-400 hover:text-gray-600"
+            title="Close"
+          >
+            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+            </svg>
+          </button>
+        </div>
+
+        <div className="py-1 divide-y divide-gray-50">
+          <DetailRow label={message.direction === "IN" ? "Received" : "Sent"} value={new Date(message.timestamp).toLocaleString()} />
+          <DetailRow label="Type" value={reply ? "Interactive reply" : message.messageType} />
+          <DetailRow label="Status" value={message.status.toLowerCase()} />
+          {message.deleted && (
+            <DetailRow label="Deleted by" value={message.deletedBy ?? "Staff"} />
+          )}
+        </div>
+
+        {reply && (
+          <div className="border-t border-gray-100">
+            <p className="px-5 pt-3 pb-1 text-[11px] font-semibold uppercase tracking-wide text-[#7A3F91]">
+              Guest selection
+            </p>
+            <div className="pb-2 divide-y divide-gray-50">
+              {reply.title && <DetailRow label="Selected option" value={reply.title} />}
+              {reply.description && <DetailRow label="Description" value={reply.description} />}
+              <DetailRow label="Reply type" value={REPLY_TYPE_LABELS[reply.type] ?? reply.type} />
+              <DetailRow label="Payload ID" value={reply.id} mono />
+            </div>
+          </div>
+        )}
+
+        <div className="px-5 py-2.5 border-t border-gray-100 bg-gray-50/60">
+          <DetailRowInline label="Message ID" value={message.id} />
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function DetailRowInline({ label, value }: { label: string; value: string }) {
+  return (
+    <p className="text-[10px] text-gray-400 break-all">
+      {label}: <span className="font-mono">{value}</span>
+    </p>
   );
 }
 
@@ -616,8 +710,9 @@ export default function ChatWindow() {
   const [editingName, setEditingName] = useState(false);
   const [nameInput, setNameInput]     = useState("");
 
-  // Delete state
-  const [deleteTarget, setDeleteTarget] = useState<{ id: string; isOut: boolean } | null>(null);
+  // ⋮ message menu state — actions sheet (details / delete), then details popup
+  const [actionsTarget, setActionsTarget] = useState<ChatMessage | null>(null);
+  const [detailsTarget, setDetailsTarget] = useState<ChatMessage | null>(null);
 
   // Undo-send state: messageId → remaining seconds
   const [pendingUndos, setPendingUndos] = useState<Map<string, number>>(new Map());
@@ -1303,7 +1398,14 @@ return () => {
               {group.messages.map((m) => {
                 const isOut = m.direction === "OUT";
                 const isFirstUnread = m.id === firstUnreadId;
-                if (!isOut && /^(room_|photos_|opt_)[a-zA-Z0-9_-]+$/.test(m.body ?? "")) return null;
+                // Interactive replies: the bubble shows the human-readable title
+                // the guest tapped (body already holds it for new messages; the
+                // metadata title covers rows where body is still the payload id).
+                const irMeta = (m as ChatMessage).metadata?.interactiveReply;
+                const displayBody = irMeta?.title ?? m.body;
+                // Legacy rows (pre-metadata) stored only the internal payload id —
+                // keep hiding those from the thread.
+                if (!isOut && /^(room_|photos_|opt_|plan_)[a-zA-Z0-9_-]+$/.test(displayBody ?? "")) return null;
 
                 // For template messages loaded from DB (no in-memory .template field),
                 // parse the JSON body to extract display components.
@@ -1331,15 +1433,15 @@ return () => {
                         <div className="flex-1 h-px bg-green-300 opacity-60" />
                       </div>
                     )}
-                    {/* Bubble row — hover reveals ⋮ delete button */}
+                    {/* Bubble row — hover reveals ⋮ message menu */}
                     <div className={`flex items-end gap-1.5 group/row ${isOut ? "justify-end" : "justify-start"}`}>
 
                       {/* ⋮ button — left side for incoming, right side for outgoing */}
                       {!isOut && !m.deleted && (
                         <button
-                          onClick={() => setDeleteTarget({ id: m.id, isOut })}
+                          onClick={() => setActionsTarget(m)}
                           className="opacity-0 group-hover/row:opacity-100 transition-opacity shrink-0 w-6 h-6 rounded-full hover:bg-gray-200 flex items-center justify-center text-gray-400 hover:text-gray-600 mb-1"
-                          title="Delete message"
+                          title="Message options"
                         >
                           <svg className="w-3.5 h-3.5" fill="currentColor" viewBox="0 0 24 24">
                             <path d="M12 8c1.1 0 2-.9 2-2s-.9-2-2-2-2 .9-2 2 .9 2 2 2zm0 2c-1.1 0-2 .9-2 2s.9 2 2 2 2-.9 2-2-.9-2-2-2zm0 6c-1.1 0-2 .9-2 2s.9 2 2 2 2-.9 2-2-.9-2-2-2z" />
@@ -1398,7 +1500,7 @@ return () => {
                             />
                           </div>
                         ) : (
-                          <div className="wa-bubble-text">{m.body}</div>
+                          <div className="wa-bubble-text">{displayBody}</div>
                         )}
 
                         <div className="wa-bubble-meta">
@@ -1410,9 +1512,9 @@ return () => {
 
                       {isOut && !m.deleted && (
                         <button
-                          onClick={() => setDeleteTarget({ id: m.id, isOut })}
+                          onClick={() => setActionsTarget(m)}
                           className="opacity-0 group-hover/row:opacity-100 transition-opacity shrink-0 w-6 h-6 rounded-full hover:bg-gray-200 flex items-center justify-center text-gray-400 hover:text-gray-600 mb-1"
-                          title="Delete message"
+                          title="Message options"
                         >
                           <svg className="w-3.5 h-3.5" fill="currentColor" viewBox="0 0 24 24">
                             <path d="M12 8c1.1 0 2-.9 2-2s-.9-2-2-2-2 .9-2 2 .9 2 2 2zm0 2c-1.1 0-2 .9-2 2s.9 2 2 2 2-.9 2-2-.9-2-2-2zm0 6c-1.1 0-2 .9-2 2s.9 2 2 2 2-.9 2-2-.9-2-2-2z" />
@@ -1727,12 +1829,21 @@ return () => {
         </div>
       )}
 
-      {/* Delete popup */}
-      {deleteTarget && (
-        <DeletePopup
-          messageId={deleteTarget.id}
-          onClose={() => setDeleteTarget(null)}
+      {/* ⋮ message actions popup */}
+      {actionsTarget && (
+        <MessageActionsPopup
+          message={actionsTarget}
+          onClose={() => setActionsTarget(null)}
           onDelete={handleDelete}
+          onDetails={() => { setDetailsTarget(actionsTarget); setActionsTarget(null); }}
+        />
+      )}
+
+      {/* Message details popup */}
+      {detailsTarget && (
+        <MessageDetailsPopup
+          message={detailsTarget}
+          onClose={() => setDetailsTarget(null)}
         />
       )}
 
