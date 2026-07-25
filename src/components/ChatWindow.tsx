@@ -3,7 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import { apiFetch } from "@/lib/api";
 import { useSocket } from "@/context/SocketContext";
-import { useChatStore, type TemplateBubbleMeta, type Message as ChatMessage } from "@/store/chatStore";
+import { useChatStore, type TemplateBubbleMeta, type Message as ChatMessage, type OutboundInteractiveMeta } from "@/store/chatStore";
 import { useMounted } from "@/lib/useMounted";
 import BookingForm from "./BookingForm";
 import MediaPickerModal from "./MediaPickerModal";
@@ -211,14 +211,18 @@ function DocIcon({ fileName, mimeType }: { fileName: string | null; mimeType: st
 
 // ── List message bubble ────────────────────────────────────────────────────────
 
-function ListMessageBubble({ body }: { body: string }) {
+function ListMessageBubble({ body, meta }: { body: string; meta?: OutboundInteractiveMeta | null }) {
+  // New rows: body is plain text, structure lives in metadata.interactive.
+  // Legacy rows (pre-metadata): body is serialized JSON — parse for display.
   let bodyText = body;
-  let buttonLabel = "View Options";
-  try {
-    const parsed = JSON.parse(body) as { bodyText?: string; buttonLabel?: string };
-    bodyText    = parsed.bodyText    ?? body;
-    buttonLabel = parsed.buttonLabel ?? "View Options";
-  } catch { /* body is plain text — render as-is */ }
+  let buttonLabel = meta?.buttonLabel || "View Options";
+  if (!meta) {
+    try {
+      const parsed = JSON.parse(body) as { bodyText?: string; buttonLabel?: string };
+      bodyText    = parsed.bodyText    ?? body;
+      buttonLabel = parsed.buttonLabel ?? "View Options";
+    } catch { /* body is plain text — render as-is */ }
+  }
 
   return (
     <div className="space-y-2 p-1">
@@ -228,6 +232,39 @@ function ListMessageBubble({ body }: { body: string }) {
         <span className="text-[10px]">▼</span>
       </div>
       <p className="text-[10px] text-[#2B0D3E]/70 text-center">List message</p>
+    </div>
+  );
+}
+
+// WhatsApp reply-buttons message: body text + the tappable button labels below,
+// rendered like WA (buttons are display-only for staff).
+function ButtonsMessageBubble({ body, meta }: { body: string; meta?: OutboundInteractiveMeta | null }) {
+  let bodyText = body;
+  let buttons = meta?.buttons ?? [];
+  if (!meta) {
+    try {
+      const parsed = JSON.parse(body) as { bodyText?: string; buttons?: { id: string; title: string }[] };
+      bodyText = parsed.bodyText ?? body;
+      buttons  = parsed.buttons  ?? [];
+    } catch { /* body is plain text — render as-is */ }
+  }
+
+  return (
+    <div className="space-y-2 p-1">
+      <p className="text-sm whitespace-pre-wrap leading-relaxed">{bodyText}</p>
+      {buttons.length > 0 && (
+        <div className="space-y-1">
+          {buttons.map((b) => (
+            <div
+              key={b.id}
+              className="flex items-center justify-center rounded-lg border border-[#2B0D3E]/15 bg-white/60 px-3 py-1.5 text-xs text-[#1B52A8] font-medium select-none"
+            >
+              {b.title}
+            </div>
+          ))}
+        </div>
+      )}
+      <p className="text-[10px] text-[#2B0D3E]/70 text-center">Reply buttons</p>
     </div>
   );
 }
@@ -625,6 +662,11 @@ function DetailRow({ label, value, mono = false }: { label: string; value: strin
 
 function MessageDetailsPopup({ message, onClose }: { message: ChatMessage; onClose: () => void }) {
   const reply = message.metadata?.interactiveReply;
+  const sent  = message.metadata?.interactive;
+  const typeLabel =
+    reply ? "Interactive reply" :
+    sent  ? (sent.type === "buttons" ? "Reply buttons" : "List message") :
+    message.messageType;
   return (
     <div
       className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/40 backdrop-blur-[2px]"
@@ -649,7 +691,7 @@ function MessageDetailsPopup({ message, onClose }: { message: ChatMessage; onClo
 
         <div className="py-1 divide-y divide-gray-50">
           <DetailRow label={message.direction === "IN" ? "Received" : "Sent"} value={new Date(message.timestamp).toLocaleString()} />
-          <DetailRow label="Type" value={reply ? "Interactive reply" : message.messageType} />
+          <DetailRow label="Type" value={typeLabel} />
           <DetailRow label="Status" value={message.status.toLowerCase()} />
           {message.deleted && (
             <DetailRow label="Deleted by" value={message.deletedBy ?? "Staff"} />
@@ -666,6 +708,32 @@ function MessageDetailsPopup({ message, onClose }: { message: ChatMessage; onClo
               {reply.description && <DetailRow label="Description" value={reply.description} />}
               <DetailRow label="Reply type" value={REPLY_TYPE_LABELS[reply.type] ?? reply.type} />
               <DetailRow label="Payload ID" value={reply.id} mono />
+            </div>
+          </div>
+        )}
+
+        {sent && (
+          <div className="border-t border-gray-100">
+            <p className="px-5 pt-3 pb-1 text-[11px] font-semibold uppercase tracking-wide text-[#7A3F91]">
+              {sent.type === "buttons" ? "Buttons sent" : "Options sent"}
+            </p>
+            <div className="pb-2 max-h-48 overflow-y-auto">
+              {sent.type !== "buttons" && sent.buttonLabel && (
+                <DetailRow label="Button label" value={sent.buttonLabel} />
+              )}
+              {sent.buttons?.map((b) => (
+                <DetailRow key={b.id} label={b.title} value={b.id} mono />
+              ))}
+              {sent.sections?.map((s, si) => (
+                <div key={si}>
+                  {s.title && (
+                    <p className="px-5 pt-2 pb-0.5 text-[10px] font-medium text-gray-400">{s.title}</p>
+                  )}
+                  {s.rows.map((r) => (
+                    <DetailRow key={r.id} label={r.title} value={r.id} mono />
+                  ))}
+                </div>
+              ))}
             </div>
           </div>
         )}
@@ -1459,7 +1527,15 @@ return () => {
                         </div>
                       ) : m.messageType === "list" ? (
                         <div className={`wa-bubble max-w-[65%] ${isOut ? "wa-bubble-out" : "wa-bubble-in"}`}>
-                          <ListMessageBubble body={m.body ?? ""} />
+                          <ListMessageBubble body={m.body ?? ""} meta={(m as ChatMessage).metadata?.interactive} />
+                          <div className="wa-bubble-meta">
+                            <span>{formatMsgTime(m.timestamp)}</span>
+                            {isOut && !m.deleted && <StatusTicks status={m.status} />}
+                          </div>
+                        </div>
+                      ) : m.messageType === "button" ? (
+                        <div className={`wa-bubble max-w-[65%] ${isOut ? "wa-bubble-out" : "wa-bubble-in"}`}>
+                          <ButtonsMessageBubble body={m.body ?? ""} meta={(m as ChatMessage).metadata?.interactive} />
                           <div className="wa-bubble-meta">
                             <span>{formatMsgTime(m.timestamp)}</span>
                             {isOut && !m.deleted && <StatusTicks status={m.status} />}

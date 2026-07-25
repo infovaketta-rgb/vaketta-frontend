@@ -34,8 +34,20 @@ export type InteractiveReplyMeta = {
   description?: string | null;
 };
 
+// Outbound interactive messages (bot-sent WA list / reply-buttons): body holds
+// the human-readable text; the structure (button label, rows, buttons + their
+// payload ids) lives here so the bubble renders like WhatsApp — never raw JSON.
+export type InteractiveListRowMeta = { id: string; title: string; description?: string };
+export type OutboundInteractiveMeta = {
+  type: "list" | "buttons" | string;
+  buttonLabel?: string | null;
+  sections?: { title?: string | null; rows: InteractiveListRowMeta[] }[];
+  buttons?: { id: string; title: string }[];
+};
+
 export type MessageMetadata = {
   interactiveReply?: InteractiveReplyMeta;
+  interactive?: OutboundInteractiveMeta;
 };
 
 export type Message = {

@@ -71,11 +71,22 @@ function getLastMessagePreview(
       audio:    "🎵 Voice message",
       document: "📄 Document",
       carousel: "🛏️ Room options",
+      list:     "📋 List message",
+      button:   "🔘 Reply buttons",
     };
     const label = labels[lastMessageType] ?? "📎 Attachment";
     // For media-with-caption we suffix the caption. Carousel's body is a JSON
     // payload, not human-readable, so the label alone is the right preview.
     if (lastMessageType === "carousel") return label;
+    // Interactive sends: new rows store plain body text; legacy rows stored the
+    // serialized payload — parse out bodyText so raw JSON never hits the preview.
+    if (lastMessageType === "list" || lastMessageType === "button") {
+      let text = lastMessage ?? "";
+      if (text.startsWith("{")) {
+        try { text = (JSON.parse(text) as { bodyText?: string }).bodyText ?? ""; } catch { text = ""; }
+      }
+      return text ? `${label} • ${text}` : label;
+    }
     return lastMessage ? `${label} • ${lastMessage}` : label;
   }
   return lastMessage ?? "No messages yet";
