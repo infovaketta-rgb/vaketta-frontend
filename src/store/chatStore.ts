@@ -70,6 +70,21 @@ export type Message = {
 
 type MessageChannel = "WHATSAPP" | "INSTAGRAM";
 
+/**
+ * Rendered text of a template message body ({renderedBody, components} JSON).
+ * Falls back to the raw body for plain-text/legacy rows. Used only for
+ * optimistic-vs-real dedup — rendering lives in ChatWindow's resolver.
+ */
+function templateRenderedBody(body: string | null): string | null {
+  if (!body) return body;
+  try {
+    const parsed = JSON.parse(body) as { renderedBody?: string };
+    return parsed.renderedBody ?? body;
+  } catch {
+    return body;
+  }
+}
+
 type ChatState = {
   selectedGuestId: string | null;
   selectedGuestPhone: string | null;
@@ -123,20 +138,21 @@ export const useChatStore = create<ChatState>((set) => ({
     // When a real message arrives, locate its optimistic tmp counterpart so we
     // can copy over frontend-only metadata (e.g. template bubble structure)
     // before dropping it.
+    const isSameContent = (m: Message) => {
+      if (m.direction !== message.direction) return false;
+      if (m.body === message.body) return true;
+      // Template messages: both sides store JSON {renderedBody, components}
+      // (the optimistic body is built with the backend's serializer). Compare
+      // the rendered text rather than the raw JSON so incidental differences
+      // in key order or omitted-vs-null fields don't strand a duplicate bubble.
+      if (message.messageType === "template" && m.messageType === "template") {
+        return templateRenderedBody(message.body) === templateRenderedBody(m.body);
+      }
+      return false;
+    };
+
     const tmpMatch = !message.id.startsWith("tmp_")
-      ? state.messages.find((m) => {
-          if (!m.id.startsWith("tmp_") || m.direction !== message.direction) return false;
-          if (m.body === message.body) return true;
-          // Template messages: real body is JSON {renderedBody, components},
-          // but the optimistic tmp stores plain renderedBody.
-          if (message.messageType === "template" && message.body) {
-            try {
-              const { renderedBody } = JSON.parse(message.body) as { renderedBody?: string };
-              return renderedBody === m.body;
-            } catch { return false; }
-          }
-          return false;
-        })
+      ? state.messages.find((m) => m.id.startsWith("tmp_") && isSameContent(m))
       : null;
 
     const enriched: Message = tmpMatch?.template
@@ -146,10 +162,7 @@ export const useChatStore = create<ChatState>((set) => ({
     // if real message arrives, drop any optimistic temp entry with the same body+direction
     const filtered = message.id.startsWith("tmp_")
       ? state.messages
-      : state.messages.filter(
-          (m) =>
-            !(m.id.startsWith("tmp_") && m.body === message.body && m.direction === message.direction)
-        );
+      : state.messages.filter((m) => !(m.id.startsWith("tmp_") && isSameContent(m)));
 
     // also drop REPLACED placeholders
     const cleaned = filtered.filter((m) => m.status !== "REPLACED");

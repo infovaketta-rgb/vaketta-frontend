@@ -391,6 +391,77 @@ function StatusTicks({ status }: { status: string }) {
   );
 }
 
+// ── Template message normalization ───────────────────────────────────────────
+// The backend persists template messages with `body` = JSON
+// {renderedBody, components} (see templates.service sendTemplateMessage). The
+// optimistic bubble must produce the SAME shape, otherwise the pre-refresh
+// bubble renders differently (or leaks raw payload) from the persisted one.
+//
+// buildTemplateMessageBody() is the single writer of that shape; resolveTemplateBubble()
+// is the single reader. Both the optimistic send path and the render loop go
+// through them, so there is exactly one definition of how a template looks.
+
+/** Interpolate {{var}} placeholders — same rule the backend applies. */
+export function renderTemplateBody(text: string, values: Record<string, string>): string {
+  return (text ?? "").replace(
+    /\{\{\s*([a-zA-Z0-9_]+)\s*\}\}/g,
+    (_m, id: string) => values[id] ?? `{{${id}}}`
+  );
+}
+
+/**
+ * Serialize a template into the exact `Message.body` string the backend stores.
+ * Mirrors sendTemplateMessage's `bubbleComponents` + JSON.stringify.
+ */
+export function buildTemplateMessageBody(
+  components: {
+    header?:  { format?: string; type?: string; text?: string; mediaUrl?: string; sampleUrl?: string };
+    body?:    { text?: string };
+    footer?:  { text?: string };
+    buttons?: TemplateBubbleMeta["buttons"];
+  },
+  values: Record<string, string>,
+): string {
+  const renderedBody = renderTemplateBody(components.body?.text ?? "", values);
+  const hdr = components.header;
+  const bubbleComponents: TemplateBubbleMeta = {
+    ...(hdr ? {
+      header: {
+        format:    normalizeHeaderFormat(hdr.format ?? hdr.type),
+        text:      hdr.text      ?? undefined,
+        mediaUrl:  hdr.mediaUrl  ?? undefined,
+        sampleUrl: hdr.sampleUrl ?? undefined,
+      },
+    } : {}),
+    body: { text: renderedBody },
+    ...(components.footer?.text ? { footer: { text: components.footer.text } } : {}),
+    ...(components.buttons?.length ? { buttons: components.buttons } : {}),
+  };
+  return JSON.stringify({ renderedBody, components: bubbleComponents });
+}
+
+/** Only these four formats are emitted by the backend's parseMetaComponents. */
+function normalizeHeaderFormat(raw?: string): NonNullable<TemplateBubbleMeta["header"]>["format"] {
+  return raw === "TEXT" || raw === "IMAGE" || raw === "VIDEO" || raw === "DOCUMENT" ? raw : undefined;
+}
+
+/**
+ * Read a stored template message back into {meta, body} for rendering.
+ * Works identically for optimistic and DB-loaded rows because both store the
+ * same JSON body. `m.template` (legacy in-memory meta) still wins when present.
+ */
+export function resolveTemplateBubble(m: ChatMessage): { meta: TemplateBubbleMeta | null; body: string } {
+  if (m.template) return { meta: m.template, body: m.body ?? "" };
+  if (m.messageType !== "template" || !m.body) return { meta: null, body: m.body ?? "" };
+  try {
+    const parsed = JSON.parse(m.body) as { renderedBody?: string; components?: TemplateBubbleMeta };
+    return { meta: parsed.components ?? null, body: parsed.renderedBody ?? m.body };
+  } catch {
+    // Plain-text body — wa-bubble-text fallback.
+    return { meta: null, body: m.body };
+  }
+}
+
 // ── Template card (WhatsApp-style) ────────────────────────────────────────────
 
 function TemplateCard({
@@ -1191,29 +1262,24 @@ return () => {
     setTemplatePickerOpen(false);
     setSendError("");
 
-    // Interpolate {{var}} placeholders so the optimistic bubble reads naturally
-    // even before the real server message arrives.
-    const renderedBody = (template.components.body?.text ?? "").replace(
-      /\{\{\s*([a-zA-Z0-9_]+)\s*\}\}/g,
-      (_m, id) => values[id] ?? `{{${id}}}`
-    );
+    // WhatsApp-only feature — the picker is hidden on Instagram threads, but
+    // guard here too so no code path can enqueue a doomed send.
+    if (selectedGuestChannel === "INSTAGRAM") {
+      setSendError("WhatsApp templates can't be sent to Instagram conversations.");
+      setTimeout(() => setSendError(""), 4000);
+      return;
+    }
 
-    // Narrow the header.format to the union TemplateBubbleMeta expects. The
-    // picker types it as `string` because it comes back from the API, but only
-    // these four values are emitted by the backend's parseMetaComponents.
-    type HeaderFormat = NonNullable<TemplateBubbleMeta["header"]>["format"];
-    const rawFmt = template.components.header?.format ?? template.components.header?.type;
-    const headerFormat: HeaderFormat = (
-      rawFmt === "TEXT" || rawFmt === "IMAGE" || rawFmt === "VIDEO" || rawFmt === "DOCUMENT"
-        ? rawFmt
-        : undefined
-    );
+    // Build the optimistic body with the SAME serializer the backend uses, so
+    // the bubble before refresh is byte-identical to the persisted row and
+    // never leaks the raw template payload.
+    const optimisticBody = buildTemplateMessageBody(template.components, values);
 
     const optimisticId = `tmp_${Date.now()}`;
     useChatStore.getState().addMessage({
       id:          optimisticId,
       direction:   "OUT",
-      body:        renderedBody,
+      body:        optimisticBody,
       messageType: "template",
       mediaUrl:    null,
       mimeType:    null,
@@ -1224,19 +1290,6 @@ return () => {
       deleted:     false,
       deletedBy:   null,
       jobId:       null,
-      template:    {
-        header:  template.components.header
-          ? {
-              format:    headerFormat,
-              text:      template.components.header.text,
-              mediaUrl:  template.components.header.mediaUrl,
-              sampleUrl: template.components.header.sampleUrl,
-            }
-          : undefined,
-        body:    { text: renderedBody },
-        footer:  template.components.footer,
-        buttons: template.components.buttons,
-      },
     });
 
     try {
@@ -1244,8 +1297,9 @@ return () => {
         method: "POST",
         body:   JSON.stringify({ guestId, templateId, values }),
       });
-      // Real socket message arrives via `message:new`; addMessage will copy
-      // over `template` meta from the matching tmp and drop the tmp.
+      // Real socket message arrives via `message:new`; addMessage matches it to
+      // this tmp by renderedBody and drops the tmp. No meta copy is needed —
+      // both bodies already carry the full component snapshot.
     } catch (e: any) {
       useChatStore.getState().updateMessageStatus(optimisticId, "FAILED");
       setSendError(e?.message ?? "Failed to send template.");
@@ -1475,20 +1529,9 @@ return () => {
                 // keep hiding those from the thread.
                 if (!isOut && /^(room_|photos_|opt_|plan_)[a-zA-Z0-9_-]+$/.test(displayBody ?? "")) return null;
 
-                // For template messages loaded from DB (no in-memory .template field),
-                // parse the JSON body to extract display components.
-                let tplMeta: TemplateBubbleMeta | null = m.template ?? null;
-                let tplBody = m.body ?? "";
-                if (!tplMeta && m.messageType === "template" && m.body) {
-                  try {
-                    const parsed = JSON.parse(m.body) as {
-                      renderedBody?: string;
-                      components?:   TemplateBubbleMeta;
-                    };
-                    tplBody = parsed.renderedBody ?? m.body;
-                    tplMeta = parsed.components   ?? null;
-                  } catch { /* plain-text body — wa-bubble-text fallback */ }
-                }
+                // Optimistic and DB-loaded template rows share one stored shape,
+                // so a single resolver renders both identically.
+                const { meta: tplMeta, body: tplBody } = resolveTemplateBubble(m as ChatMessage);
 
                 return (
                   <div key={m.id}>
@@ -1771,13 +1814,17 @@ return () => {
                 <span className="text-lg">🗂️</span>
                 From Gallery
               </button>
-              <button
-                onClick={() => { setAttachMenuOpen(false); setTemplatePickerOpen(true); }}
-                className="flex items-center gap-3 px-3 py-2.5 rounded-xl hover:bg-gray-50 transition text-left text-sm text-gray-700 font-medium"
-              >
-                <span className="text-lg">📋</span>
-                Use Template
-              </button>
+              {/* WhatsApp templates are a Meta WhatsApp Cloud API construct with
+                  no Instagram equivalent — hide the entry on IG threads. */}
+              {selectedGuestChannel !== "INSTAGRAM" && (
+                <button
+                  onClick={() => { setAttachMenuOpen(false); setTemplatePickerOpen(true); }}
+                  className="flex items-center gap-3 px-3 py-2.5 rounded-xl hover:bg-gray-50 transition text-left text-sm text-gray-700 font-medium"
+                >
+                  <span className="text-lg">📋</span>
+                  Use Template
+                </button>
+              )}
             </div>
           )}
         </div>
@@ -1954,8 +2001,8 @@ return () => {
         />
       )}
 
-      {/* Template picker */}
-      {templatePickerOpen && (
+      {/* Template picker — WhatsApp only */}
+      {templatePickerOpen && selectedGuestChannel !== "INSTAGRAM" && (
         <TemplatePicker
           onClose={() => setTemplatePickerOpen(false)}
           onSelect={sendTemplate}
