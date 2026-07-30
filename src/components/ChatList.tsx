@@ -8,6 +8,8 @@ import { useMounted } from "@/lib/useMounted";
 import { useToastStore } from "@/store/toastStore";
 import { SkeletonChatRow } from "@/components/Skeleton";
 import NewChatModal from "@/components/NewChatModal";
+import GuestAvatar from "@/components/GuestAvatar";
+import { guestDisplayName, guestInitials } from "@/lib/guestDisplay";
 
 type MessageChannel = "WHATSAPP" | "INSTAGRAM";
 
@@ -22,22 +24,15 @@ type Conversation = {
   lastTimestamp: string | null;
   channel: MessageChannel;
   unreadCount: number;
+  // Instagram profile enrichment — null for WhatsApp guests and for IG guests
+  // whose enrichment hasn't landed yet (or returned NO_CONSENT).
+  igName?: string | null;
+  igUsername?: string | null;
+  igProfilePicUrl?: string | null;
+  igFollowerCount?: number | null;
+  igFollowsBusiness?: boolean | null;
+  igBusinessFollows?: boolean | null;
 };
-
-const AVATAR_COLORS = [
-  "#E57373", "#F06292", "#BA68C8", "#7986CB",
-  "#4FC3F7", "#4DB6AC", "#81C784", "#FFD54F",
-  "#FF8A65", "#A1887F",
-];
-
-function getAvatarColor(phone: string): string {
-  let hash = 0;
-  for (let i = 0; i < phone.length; i++) {
-    hash = (hash << 5) - hash + phone.charCodeAt(i);
-    hash |= 0;
-  }
-  return AVATAR_COLORS[Math.abs(hash) % AVATAR_COLORS.length];
-}
 
 function formatTime(ts: string | null): string {
   if (!ts) return "";
@@ -473,7 +468,7 @@ export default function ChatList() {
           const isActive   = c.guestId === selectedGuestId;
           const isSelected = selected.has(c.guestId);
           const isHovered  = hoveredId === c.guestId;
-          const avatarColor = getAvatarColor(c.phone);
+          const display     = guestDisplayName(c);
           const preview     = getLastMessagePreview(c.lastMessage, c.lastMessageType);
 
           return (
@@ -514,16 +509,14 @@ export default function ChatList() {
                 </div>
               )}
 
-              {/* Colored avatar with channel badge */}
+              {/* Avatar (mirrored IG photo, else colored initials) with channel badge */}
               <div className="relative shrink-0">
-                <div
-                  className="w-11 h-11 rounded-full flex items-center justify-center text-sm font-bold text-white"
-                  style={{ backgroundColor: avatarColor }}
-                >
-                  {c.channel === "INSTAGRAM"
-                    ? (c.name ? c.name.slice(0, 2).toUpperCase() : "IG")
-                    : c.phone.replace(/\D/g, "").slice(-2)}
-                </div>
+                <GuestAvatar
+                  url={c.igProfilePicUrl}
+                  seed={c.phone}
+                  initials={guestInitials(c)}
+                  size={44}
+                />
                 {c.channel === "INSTAGRAM" && (
                   <span
                     className="absolute -bottom-0.5 -right-0.5 w-4 h-4 rounded-full flex items-center justify-center border border-white"
@@ -540,7 +533,10 @@ export default function ChatList() {
               <div className="flex-1 min-w-0">
                 <div className="flex items-center justify-between gap-2">
                   <span className="text-sm font-semibold text-[#0C1B33] truncate">
-                    {c.name || (c.channel === "INSTAGRAM" ? "Instagram User" : formatPhone(c.phone))}
+                    {c.channel === "INSTAGRAM" ? display.primary : (c.name || formatPhone(c.phone))}
+                    {display.staffAlias && (
+                      <span className="font-normal text-[#2B0D3E]/70"> ({display.staffAlias})</span>
+                    )}
                   </span>
                   <span className={`text-[11px] shrink-0 ${c.unreadCount > 0 ? "text-[#7A3F91] font-medium" : "text-[#2B0D3E]/70"}`}>
                     {formatTime(c.lastTimestamp)}
@@ -548,6 +544,9 @@ export default function ChatList() {
                 </div>
                 <div className="flex items-center justify-between gap-2 mt-0.5">
                   <span className={`text-xs truncate ${c.unreadCount > 0 ? "text-[#0C1B33] font-medium" : "text-[#2B0D3E]/70"}`}>
+                    {display.handle && (
+                      <span className="text-[#2B0D3E]/60 mr-1.5">{display.handle}</span>
+                    )}
                     {c.lastDirection === "OUT" && (
                       <span className="text-[#2B0D3E]/60 mr-1">You:</span>
                     )}

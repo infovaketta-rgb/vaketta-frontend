@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { apiFetch } from "@/lib/api";
 import { useSocket } from "@/context/SocketContext";
 import { useChatStore, type TemplateBubbleMeta, type Message as ChatMessage, type OutboundInteractiveMeta } from "@/store/chatStore";
@@ -10,8 +10,24 @@ import MediaPickerModal from "./MediaPickerModal";
 import TemplatePicker, { type SelectedTemplate } from "./TemplatePicker";
 import SavedRepliesPopover from "./SavedRepliesPopover";
 import RoomCarouselCards from "./RoomCarouselCards";
+import GuestAvatar from "./GuestAvatar";
+import { guestDisplayName, guestInitials, formatFollowerCount, followBadge } from "@/lib/guestDisplay";
 
 const API_BASE = process.env.NEXT_PUBLIC_API_BASE ?? "";
+
+// Response shape of GET /conversations/:guestId — chat-header metadata.
+type GuestProfile = {
+  guestId: string;
+  phone: string;
+  name: string | null;
+  channel: "WHATSAPP" | "INSTAGRAM";
+  igName?: string | null;
+  igUsername?: string | null;
+  igProfilePicUrl?: string | null;
+  igFollowerCount?: number | null;
+  igFollowsBusiness?: boolean | null;
+  igBusinessFollows?: boolean | null;
+};
 
 const FRONTEND_LIMITS: Record<string, number> = {
   "image/":       5  * 1024 * 1024,
@@ -628,21 +644,6 @@ function groupMessagesByDate(messages: any[]) {
   return groups;
 }
 
-const AVATAR_COLORS = [
-  "#E57373", "#F06292", "#BA68C8", "#7986CB",
-  "#4FC3F7", "#4DB6AC", "#81C784", "#FFD54F",
-  "#FF8A65", "#A1887F",
-];
-
-function getAvatarColor(phone: string): string {
-  let hash = 0;
-  for (let i = 0; i < phone.length; i++) {
-    hash = (hash << 5) - hash + phone.charCodeAt(i);
-    hash |= 0;
-  }
-  return AVATAR_COLORS[Math.abs(hash) % AVATAR_COLORS.length];
-}
-
 // ── ChatWindow ────────────────────────────────────────────────────────────────
 
 // ── ⋮ message actions popup ───────────────────────────────────────────────────
@@ -849,6 +850,23 @@ export default function ChatWindow() {
   const [editingName, setEditingName] = useState(false);
   const [nameInput, setNameInput]     = useState("");
 
+  // Guest header metadata from GET /conversations/:guestId. Instagram profile
+  // fields land asynchronously (enrichment completes ~1 s after the message
+  // that triggered it), so this is refetched on socket-driven message arrival
+  // rather than polled.
+  const [guestProfile, setGuestProfile] = useState<GuestProfile | null>(null);
+
+  const loadGuestProfile = useCallback(() => {
+    if (!guestId) return;
+    apiFetch(`/conversations/${guestId}`)
+      .then((g: GuestProfile) => setGuestProfile(g))
+      .catch(() => {});
+  }, [guestId]);
+
+  // Drop stale profile data the moment the conversation changes, so the header
+  // never shows the previous guest's avatar while the new fetch is in flight.
+  useEffect(() => { setGuestProfile(null); }, [guestId]);
+
   // ⋮ message menu state — actions sheet (details / delete), then details popup
   const [actionsTarget, setActionsTarget] = useState<ChatMessage | null>(null);
   const [detailsTarget, setDetailsTarget] = useState<ChatMessage | null>(null);
@@ -938,13 +956,23 @@ export default function ChatWindow() {
       })
       .catch(() => {});
 
+    // Header metadata (name/channel + Instagram profile). Fetched per-guest
+    // rather than read off the list, because ChatWindow can be deep-linked.
+    loadGuestProfile();
+
   }, [mounted, guestId]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Socket
   useEffect(() => {
     if (!mounted || !socket) return;
 
-    const onNewMessage = ({ message }: { message: any }) => addMessage(message);
+    const onNewMessage = ({ message }: { message: any }) => {
+      addMessage(message);
+      // Instagram profile enrichment is enqueued by the inbound message that
+      // just arrived and completes ~1 s later, so picking it up on the next
+      // inbound message is enough — no polling.
+      if (message?.guestId === guestId && message.direction === "IN") loadGuestProfile();
+    };
     const onRead = ({ guestId: readGuestId }: { guestId: string }) => markMessagesRead(readGuestId);
     const onStatus = ({ messageId, status }: { messageId: string; status: string }) =>
       updateMessageStatus(messageId, status);
@@ -1370,7 +1398,23 @@ return () => {
   const firstUnreadId = messages.find(
     (m) => m.direction === "IN" && m.status === "RECEIVED"
   )?.id ?? null;
-  const avatarColor = selectedGuestPhone ? getAvatarColor(selectedGuestPhone) : "#7c3aed";
+  // Header identity: prefer the freshly-fetched profile (it carries the
+  // Instagram fields and survives a deep link), falling back to whatever the
+  // list put in the store while that request is in flight.
+  const headerGuest = {
+    phone:   guestProfile?.phone   ?? selectedGuestPhone ?? "",
+    name:    guestProfile?.name    ?? selectedGuestName,
+    channel: guestProfile?.channel ?? selectedGuestChannel ?? "WHATSAPP",
+    igName:            guestProfile?.igName,
+    igUsername:        guestProfile?.igUsername,
+  } as const;
+  const headerDisplay  = guestDisplayName(headerGuest);
+  const isInstagram    = headerGuest.channel === "INSTAGRAM";
+  const followerLabel  = isInstagram ? formatFollowerCount(guestProfile?.igFollowerCount) : null;
+  const follow         = isInstagram
+    ? followBadge(guestProfile?.igFollowsBusiness, guestProfile?.igBusinessFollows)
+    : null;
+  const showBadgeRow   = isInstagram && (followerLabel !== null || follow !== null);
 
   return (
     <div className="flex flex-col h-full flex-1 min-w-0 bg-[#D8E2FF]">
@@ -1388,14 +1432,14 @@ return () => {
           </svg>
         </button>
 
-        {/* Avatar */}
-        <div
-          className="w-9 h-9 rounded-full flex items-center justify-center text-white text-sm font-bold shrink-0"
-          style={{ backgroundColor: avatarColor }}
-        >
-          {selectedGuestChannel === "INSTAGRAM"
-            ? (selectedGuestName ? selectedGuestName.slice(0, 2).toUpperCase() : "IG")
-            : (selectedGuestPhone ? selectedGuestPhone.replace(/\D/g, "").slice(-2) : "G")}
+        {/* Avatar — mirrored Instagram photo when enriched, else initials */}
+        <div className="shrink-0">
+          <GuestAvatar
+            url={guestProfile?.igProfilePicUrl}
+            seed={headerGuest.phone || "guest"}
+            initials={headerGuest.phone ? guestInitials(headerGuest) : "G"}
+            size={36}
+          />
         </div>
 
         {/* Name / status */}
@@ -1416,15 +1460,22 @@ return () => {
             <p
               className="text-sm font-semibold text-gray-900 truncate cursor-pointer hover:text-[#1B52A8] transition"
               title="Click to edit name"
-              onClick={() => { setNameInput(selectedGuestName ?? ""); setEditingName(true); }}
+              onClick={() => { setNameInput(headerGuest.name ?? ""); setEditingName(true); }}
             >
-              {selectedGuestName ||
-                (selectedGuestChannel === "INSTAGRAM"
-                  ? "Instagram User"
-                  : (selectedGuestPhone ? formatPhone(selectedGuestPhone) : "Guest"))}
+              {isInstagram
+                ? headerDisplay.primary
+                : (headerGuest.name || (headerGuest.phone ? formatPhone(headerGuest.phone) : "Guest"))}
+              {headerDisplay.staffAlias && (
+                <span className="font-normal text-gray-500"> ({headerDisplay.staffAlias})</span>
+              )}
             </p>
           )}
-          {selectedGuestChannel === "INSTAGRAM" ? (
+
+          {isInstagram && headerDisplay.handle && (
+            <p className="text-xs text-gray-500 truncate">{headerDisplay.handle}</p>
+          )}
+
+          {isInstagram ? (
             <p
               className="text-xs font-medium"
               style={{ background: "radial-gradient(circle at 30% 107%, #fdf497 0%, #fdf497 5%, #fd5949 45%, #d6249f 60%, #285AEB 90%)", WebkitBackgroundClip: "text", WebkitTextFillColor: "transparent" }}
@@ -1433,6 +1484,33 @@ return () => {
             </p>
           ) : (
             <p className="text-xs text-green-600">WhatsApp</p>
+          )}
+
+          {/* Instagram badge row — omitted entirely before enrichment lands
+              (or on NO_CONSENT), so the header never shows placeholders. */}
+          {showBadgeRow && (
+            <div className="flex items-center gap-1.5 mt-1">
+              {followerLabel !== null && (
+                <span className="text-[10px] text-slate-600 bg-[#F4F2ED] border border-[#E5E0D4] px-1.5 py-0.5 rounded-full">
+                  {followerLabel} followers
+                </span>
+              )}
+              {follow === "mutual" && (
+                <span className="text-[10px] text-[#7A3F91] bg-[#F2EAF7] border border-[#7A3F91]/25 px-1.5 py-0.5 rounded-full">
+                  Mutual
+                </span>
+              )}
+              {follow === "follows-you" && (
+                <span className="text-[10px] text-slate-600 bg-[#F4F2ED] border border-[#E5E0D4] px-1.5 py-0.5 rounded-full">
+                  Follows you
+                </span>
+              )}
+              {follow === "you-follow" && (
+                <span className="text-[10px] text-slate-600 bg-[#F4F2ED] border border-[#E5E0D4] px-1.5 py-0.5 rounded-full">
+                  You follow
+                </span>
+              )}
+            </div>
           )}
         </div>
 
