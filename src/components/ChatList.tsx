@@ -267,6 +267,33 @@ export default function ChatList() {
         const target = updated.find((c) => c.guestId === message.guestId)!;
         return [target, ...updated.filter((c) => c.guestId !== message.guestId)];
       });
+
+      // Instagram profile enrichment (name/@handle/avatar/follow state) is
+      // enqueued by the inbound message and lands ~1s later via a background
+      // job — the patch above never touches those fields, so without this the
+      // list only ever picks up enrichment on a full page refresh. Re-fetch
+      // just this guest's row and merge in only the ig* fields.
+      if (message.direction === "IN" && message.guestId) {
+        apiFetch(`/conversations/${message.guestId}`)
+          .then((g: Partial<Conversation>) => {
+            setConversations((prev) =>
+              prev.map((c) =>
+                c.guestId === message.guestId
+                  ? {
+                      ...c,
+                      igName: g.igName ?? c.igName,
+                      igUsername: g.igUsername ?? c.igUsername,
+                      igProfilePicUrl: g.igProfilePicUrl ?? c.igProfilePicUrl,
+                      igFollowerCount: g.igFollowerCount ?? c.igFollowerCount,
+                      igFollowsBusiness: g.igFollowsBusiness ?? c.igFollowsBusiness,
+                      igBusinessFollows: g.igBusinessFollows ?? c.igBusinessFollows,
+                    }
+                  : c
+              )
+            );
+          })
+          .catch(() => {});
+      }
     };
 
     const onRead = ({ guestId }: { guestId: string }) => {
