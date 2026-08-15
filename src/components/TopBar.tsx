@@ -21,6 +21,10 @@ const PAGE_TITLES: Record<string, string> = {
   "/dashboard/configuration":    "Hotel Configuration",
   "/dashboard/bot":              "WhatsApp Bot",
   "/dashboard/media":            "Media Gallery",
+  "/dashboard/subscription":     "Subscription & Usage",
+  "/dashboard/guests":           "Guests",
+  "/dashboard/availability":     "Availability",
+  "/dashboard/help":             "Help",
 };
 
 const ROLE_STYLES: Record<string, string> = {

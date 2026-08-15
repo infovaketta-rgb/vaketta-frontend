@@ -3,6 +3,7 @@
 import Sidebar from "@/components/Sidebar";
 import TopBar from "@/components/TopBar";
 import ToastContainer from "@/components/Toast";
+import BillingBanner from "@/components/BillingBanner";
 import { useToastStore } from "@/store/toastStore";
 import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
@@ -140,6 +141,9 @@ function DashboardLayoutInner({
       <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
         <TopBar onMenuClick={() => setSidebarOpen(true)} />
         <main className="min-h-0 flex-1 overflow-y-auto overflow-x-hidden">
+          {/* Subscription notice — trial ending, payment overdue, or suspended.
+              Renders nothing on the happy path. */}
+          <BillingBanner />
           {/* WhatsApp Coexistence history sync banner */}
           {syncBanner && (
             <div

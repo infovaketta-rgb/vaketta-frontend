@@ -3,16 +3,21 @@
 import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { adminApiFetch } from "@/lib/adminApi";
-import { logAdminAction } from "@/lib/adminAudit";
 import { SkeletonRow } from "@/components/admin/SkeletonRow";
 import { useMounted } from "@/lib/useMounted";
 import { useSocket } from "@/context/SocketContext";
+import { statusMeta } from "@/lib/subscriptionStatus";
 
 interface Hotel {
   id: string;
   name: string;
   phone: string;
   createdAt: string;
+  // Subscription state was absent from this list entirely, so the only way to
+  // see whether a hotel was paying, trialing or suspended was to open it.
+  subscriptionStatus?: string;
+  billingEndDate?: string | null;
+  plan?: { name: string } | null;
   _count: { users: number; guests: number; bookings: number };
 }
 
@@ -122,7 +127,6 @@ export default function AdminHotelsPage() {
         method: "POST",
         body: JSON.stringify({ name: newName, phone: newPhone }),
       });
-      logAdminAction("hotel.create", { name: newName, phone: newPhone });
       setShowCreate(false);
       setNewName("");
       setNewPhone("");
@@ -140,7 +144,6 @@ export default function AdminHotelsPage() {
     setDeleting(true);
     try {
       await adminApiFetch(`/admin/hotels/${deleteTarget.id}`, { method: "DELETE" });
-      logAdminAction("hotel.delete", { id: deleteTarget.id, name: deleteTarget.name });
       setDeleteTarget(null);
       setHotels((prev) => prev.filter((h) => h.id !== deleteTarget.id));
       setTotal((t) => t - 1);
@@ -202,17 +205,17 @@ export default function AdminHotelsPage() {
           <table className="w-full text-sm">
             <thead>
               <tr className="border-b border-[#E5E0D4] bg-[#F4F2ED] text-xs font-semibold uppercase tracking-wide text-[#0C1B33]/50">
-                {["Name", "Phone", "Users", "Bookings", "Guests", "Joined", ""].map((h, i) => (
+                {["Name", "Phone", "Plan", "Status", "Renews", "Users", "Bookings", "Guests", "Joined", ""].map((h, i) => (
                   <th key={i} className={`px-5 py-3 ${["Users","Bookings","Guests"].includes(h) ? "text-right" : "text-left"}`}>{h}</th>
                 ))}
               </tr>
             </thead>
             <tbody className="divide-y divide-[#E5E0D4]">
               {loading ? (
-                [...Array(8)].map((_, i) => <SkeletonRow key={i} cols={7} />)
+                [...Array(8)].map((_, i) => <SkeletonRow key={i} cols={10} />)
               ) : hotels.length === 0 ? (
                 <tr>
-                  <td colSpan={7} className="px-5 py-12 text-center text-sm text-[#0C1B33]/40">
+                  <td colSpan={10} className="px-5 py-12 text-center text-sm text-[#0C1B33]/40">
                     {debouncedSearch ? `No hotels matching "${debouncedSearch}"` : "No hotels yet."}
                   </td>
                 </tr>
@@ -225,6 +228,21 @@ export default function AdminHotelsPage() {
                       </Link>
                     </td>
                     <td className="px-5 py-3.5 text-[#0C1B33]/60">{h.phone}</td>
+                    <td className="px-5 py-3.5 text-[#0C1B33]/70">
+                      {h.plan?.name ?? <span className="italic text-[#0C1B33]/35">No plan</span>}
+                    </td>
+                    <td className="px-5 py-3.5">
+                      {h.subscriptionStatus ? (
+                        <span className={`inline-flex items-center rounded-full border px-2.5 py-0.5 text-xs font-medium ${statusMeta(h.subscriptionStatus).badge}`}>
+                          {statusMeta(h.subscriptionStatus).label}
+                        </span>
+                      ) : (
+                        <span className="text-[#0C1B33]/35">—</span>
+                      )}
+                    </td>
+                    <td className="px-5 py-3.5 text-xs text-[#0C1B33]/55">
+                      {h.billingEndDate ? new Date(h.billingEndDate).toLocaleDateString() : "—"}
+                    </td>
                     <td className="px-5 py-3.5 text-right text-[#0C1B33]/70">{h._count.users}</td>
                     <td className="px-5 py-3.5 text-right text-[#0C1B33]/70">{h._count.bookings}</td>
                     <td className="px-5 py-3.5 text-right text-[#0C1B33]/70">{h._count.guests}</td>

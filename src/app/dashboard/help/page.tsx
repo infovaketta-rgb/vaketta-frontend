@@ -40,7 +40,7 @@ const FAQS = [
   },
   {
     q: "What happens when my subscription expires?",
-    a: "You will see an expiry notice on the Subscription page. Automated bot replies will stop, but you can still view conversations and manage bookings. Contact support to renew or upgrade your plan.",
+    a: "Automated bot replies stop, and sending messages or making changes is paused. Your data stays available — you and your team can still sign in and read every conversation and booking. The Subscription page keeps working too, so you can see your plan, usage and invoices. Contact support to renew and everything resumes.",
   },
 ];
 

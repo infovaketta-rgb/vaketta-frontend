@@ -2,7 +2,6 @@
 
 import { useEffect, useState } from "react";
 import { adminApiFetch } from "@/lib/adminApi";
-import { logAdminAction } from "@/lib/adminAudit";
 import { SkeletonRow } from "@/components/admin/SkeletonRow";
 import { useMounted } from "@/lib/useMounted";
 
@@ -74,7 +73,6 @@ export default function AdminsPage() {
         method: "POST",
         body: JSON.stringify({ name: form.name, email: form.email, password: form.password, role: form.role }),
       });
-      logAdminAction("admin.create", { email: form.email, role: form.role });
       setAdmins((prev) => [...prev, created]);
       setShowCreate(false);
       setForm({ name: "", email: "", password: "", confirmPassword: "", role: "ADMIN" });
@@ -90,7 +88,6 @@ export default function AdminsPage() {
     setDeleting(true);
     try {
       await adminApiFetch(`/admin/admins/${deleteTarget.id}`, { method: "DELETE" });
-      logAdminAction("admin.delete", { id: deleteTarget.id, email: deleteTarget.email });
       setAdmins((prev) => prev.filter((a) => a.id !== deleteTarget.id));
       setDeleteTarget(null);
     } catch (e: any) {

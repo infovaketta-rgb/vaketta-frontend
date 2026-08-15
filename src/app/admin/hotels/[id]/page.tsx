@@ -4,9 +4,10 @@ import { useEffect, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import Link from "next/link";
 import { adminApiFetch } from "@/lib/adminApi";
-import { logAdminAction } from "@/lib/adminAudit";
 import { useMounted } from "@/lib/useMounted";
 import { COUNTRIES, CURRENCIES, DATE_FORMATS } from "@/lib/locale";
+import { formatMinor } from "@/lib/money";
+import { statusMeta } from "@/lib/subscriptionStatus";
 
 interface RoomType {
   id: string;
@@ -29,6 +30,7 @@ interface Plan {
   name: string;
   priceMonthly: number;
   currency?: string;
+  country?: string;
   conversationLimit: number;
   aiReplyLimit: number;
   extraConversationCharge: number;
@@ -71,21 +73,8 @@ const roleBadgeColors: Record<string, string> = {
 
 const emptyUserForm = { name: "", email: "", password: "", role: "STAFF" };
 
-function statusBadge(s: string) {
-  if (s === "active")  return "text-emerald-700 bg-emerald-50 border border-emerald-200";
-  if (s === "trial")   return "text-[#1B52A8] bg-[#1B52A8]/8 border border-[#1B52A8]/20";
-  if (s === "expired") return "text-red-600 bg-red-50 border border-red-200";
-  return "text-slate-500 bg-slate-50 border border-slate-200";
-}
-
 function planPrice(plan: Plan) {
-  const CURRENCY_SYMBOLS: Record<string, string> = {
-    USD: "$", EUR: "€", GBP: "£", INR: "₹", AED: "د.إ",
-    SAR: "﷼", SGD: "S$", MYR: "RM", AUD: "A$", CAD: "C$",
-    JPY: "¥", THB: "฿", IDR: "Rp", PHP: "₱", LKR: "Rs",
-  };
-  const sym = CURRENCY_SYMBOLS[plan.currency ?? "USD"] ?? (plan.currency ?? "USD") + " ";
-  return `${sym}${(plan.priceMonthly / 100).toLocaleString("en", { minimumFractionDigits: 0 })}/mo`;
+  return `${formatMinor(plan.priceMonthly, plan.currency, { compact: true })}/mo`;
 }
 
 export default function HotelDetailPage() {
@@ -144,7 +133,23 @@ export default function HotelDetailPage() {
   const [showAssignPlan, setShowAssignPlan] = useState(false);
   const [selectedPlanId, setSelectedPlanId] = useState("");
   const [assigningPlan, setAssigningPlan] = useState(false);
+  const [showExtend, setShowExtend] = useState(false);
+  const [extendDays, setExtendDays] = useState("30");
+  const [extending, setExtending] = useState(false);
+  const [showCancel, setShowCancel] = useState(false);
+  const [cancelImmediate, setCancelImmediate] = useState(false);
+  const [cancelling, setCancelling] = useState(false);
+  const [showAllPlans, setShowAllPlans] = useState(false);
   const [billingError, setBillingError] = useState("");
+
+  // A country-targeted plan is only offered to hotels in that country, plus
+  // every global ("ALL") plan. `showAllPlans` is the escape hatch for a hotel
+  // whose country is unset or which genuinely needs an off-region plan.
+  const hotelCountry = hotel?.config?.country ?? "";
+  const visiblePlans =
+    showAllPlans || !hotelCountry
+      ? plans
+      : plans.filter((p) => !p.country || p.country === "ALL" || p.country === hotelCountry);
 
   useEffect(() => {
     if (!mounted || !id) return;
@@ -180,7 +185,6 @@ export default function HotelDetailPage() {
         method: "PATCH",
         body: JSON.stringify({ name: editName.trim() }),
       });
-      logAdminAction("hotel.update", { id, name: editName.trim() });
       setHotel((h) => h ? { ...h, name: updated.name } : h);
       setEditingName(false);
     } catch (e: any) {
@@ -220,18 +224,75 @@ export default function HotelDetailPage() {
     setBillingError("");
     setAssigningPlan(true);
     try {
-      await adminApiFetch(`/admin/hotels/${id}/plan`, {
+      // The response is the new subscription snapshot. It used to be discarded,
+      // which left the header showing the OLD "Ends …" date after a plan change.
+      const sub = await adminApiFetch(`/admin/hotels/${id}/plan`, {
         method: "PATCH",
         body: JSON.stringify({ planId: selectedPlanId }),
       });
       const chosen = plans.find((p) => p.id === selectedPlanId) ?? null;
-      setHotel((h) => h ? { ...h, plan: chosen, subscriptionStatus: "active" } : h);
+      setHotel((h) =>
+        h
+          ? {
+              ...h,
+              plan: chosen,
+              subscriptionStatus: "ACTIVE",
+              billingStartDate: sub?.startDate ?? h.billingStartDate,
+              billingEndDate: sub?.endDate ?? h.billingEndDate,
+            }
+          : h,
+      );
       setShowAssignPlan(false);
       setSelectedPlanId("");
     } catch (e: any) {
       setBillingError(e.message);
     } finally {
       setAssigningPlan(false);
+    }
+  }
+
+  async function handleExtend() {
+    setBillingError("");
+    setExtending(true);
+    try {
+      const sub = await adminApiFetch(`/admin/hotels/${id}/extend`, {
+        method: "POST",
+        body: JSON.stringify({ days: Number(extendDays) }),
+      });
+      setHotel((h) => (h ? { ...h, billingEndDate: sub?.endDate ?? h.billingEndDate } : h));
+      setShowExtend(false);
+    } catch (e: any) {
+      setBillingError(e.message);
+    } finally {
+      setExtending(false);
+    }
+  }
+
+  async function handleCancel() {
+    setBillingError("");
+    setCancelling(true);
+    try {
+      const sub = await adminApiFetch(`/admin/hotels/${id}/cancel`, {
+        method: "POST",
+        body: JSON.stringify({ immediate: cancelImmediate }),
+      });
+      setHotel((h) =>
+        h
+          ? {
+              ...h,
+              // Cancelling at period end keeps the hotel served until the date;
+              // only an immediate cancellation suspends now.
+              subscriptionStatus: cancelImmediate ? "EXPIRED" : h.subscriptionStatus,
+              billingEndDate: sub?.endDate ?? h.billingEndDate,
+            }
+          : h,
+      );
+      setShowCancel(false);
+      setCancelImmediate(false);
+    } catch (e: any) {
+      setBillingError(e.message);
+    } finally {
+      setCancelling(false);
     }
   }
 
@@ -243,7 +304,6 @@ export default function HotelDetailPage() {
         method: "PATCH",
         body: JSON.stringify({ config: { country: localeCountry, currency: localeCurrency, dateFormat: localeDateFormat } }),
       });
-      logAdminAction("hotel.locale.update", { id, country: localeCountry, currency: localeCurrency, dateFormat: localeDateFormat });
       setHotel((h) => h ? { ...h, config: { ...(h.config ?? {}), country: localeCountry, currency: localeCurrency, dateFormat: localeDateFormat } } : h);
       setLocaleSaved(true);
       setTimeout(() => setLocaleSaved(false), 2500);
@@ -264,7 +324,6 @@ export default function HotelDetailPage() {
         method: "PATCH",
         body: JSON.stringify({ maxStayNights: n }),
       });
-      logAdminAction("hotel.maxStay.update", { id, maxStayNights: res.maxStayNights });
       // Backend clamps to the platform ceiling — reflect the stored value.
       setMaxStay(String(res.maxStayNights));
       setHotel((h) => h ? { ...h, config: { ...(h.config ?? {}), maxStayNights: res.maxStayNights } } : h);
@@ -282,7 +341,6 @@ export default function HotelDetailPage() {
     setDeleting(true);
     try {
       await adminApiFetch(`/admin/hotels/${id}`, { method: "DELETE" });
-      logAdminAction("hotel.delete", { id, name: hotel.name });
       router.replace("/admin/hotels");
     } catch (e: any) {
       setError(e.message);
@@ -301,7 +359,6 @@ export default function HotelDetailPage() {
         method: "POST",
         body: JSON.stringify(addUserForm),
       });
-      logAdminAction("hotel.user.create", { hotelId: id, email: addUserForm.email, role: addUserForm.role });
       setHotel((h) => h ? { ...h, users: [...h.users, created] } : h);
       setShowAddUser(false);
       setAddUserForm(emptyUserForm);
@@ -328,7 +385,6 @@ export default function HotelDetailPage() {
         method: "PATCH",
         body: JSON.stringify(editUserForm),
       });
-      logAdminAction("hotel.user.update", { hotelId: id, userId: editUser.id });
       setHotel((h) => h ? { ...h, users: h.users.map((u) => u.id === updated.id ? updated : u) } : h);
       setEditUser(null);
     } catch (e: any) {
@@ -343,7 +399,6 @@ export default function HotelDetailPage() {
     setDeletingUser(true);
     try {
       await adminApiFetch(`/admin/hotels/${id}/users/${deleteUserTarget.id}`, { method: "DELETE" });
-      logAdminAction("hotel.user.delete", { hotelId: id, userId: deleteUserTarget.id });
       setHotel((h) => h ? { ...h, users: h.users.filter((u) => u.id !== deleteUserTarget.id) } : h);
       setDeleteUserTarget(null);
     } catch (e: any) {
@@ -458,20 +513,32 @@ export default function HotelDetailPage() {
           <div>
             <h2 className="text-sm font-semibold text-[#0C1B33]">Subscription</h2>
             <div className="mt-1 flex items-center gap-2">
-              <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium capitalize ${statusBadge(hotel.subscriptionStatus)}`}>
-                {hotel.subscriptionStatus}
+              <span className={`inline-flex items-center rounded-full border px-2 py-0.5 text-xs font-medium ${statusMeta(hotel.subscriptionStatus).badge}`}>
+                {statusMeta(hotel.subscriptionStatus).label}
               </span>
               {hotel.billingEndDate && (
                 <span className="text-xs text-[#0C1B33]/45">Ends {new Date(hotel.billingEndDate).toLocaleDateString()}</span>
               )}
             </div>
           </div>
-          <div className="flex gap-2">
+          <div className="flex flex-wrap gap-2">
             <button
               onClick={() => { setBillingError(""); setShowTrial(true); }}
               className="rounded-lg border border-[#1B52A8]/30 px-3 py-1.5 text-xs font-semibold text-[#1B52A8] hover:bg-[#1B52A8]/5 transition"
             >
               Start Trial
+            </button>
+            <button
+              onClick={() => { setBillingError(""); setExtendDays("30"); setShowExtend(true); }}
+              className="rounded-lg border border-[#E5E0D4] px-3 py-1.5 text-xs font-semibold text-[#0C1B33]/70 hover:bg-[#F4F2ED] transition"
+            >
+              Extend
+            </button>
+            <button
+              onClick={() => { setBillingError(""); setShowCancel(true); }}
+              className="rounded-lg border border-red-200 px-3 py-1.5 text-xs font-semibold text-red-600 hover:bg-red-50 transition"
+            >
+              Cancel
             </button>
             <button
               onClick={() => { setBillingError(""); setSelectedPlanId(""); setShowAssignPlan(true); }}
@@ -506,10 +573,20 @@ export default function HotelDetailPage() {
               {(hotel.plan.extraConversationCharge > 0 || hotel.plan.extraAiReplyCharge > 0) && (
                 <div className="col-span-2 sm:col-span-4">
                   <p className="text-xs text-[#0C1B33]/40 font-medium mb-0.5">Overage</p>
+                  {/* These are minor units in the plan's own currency. They
+                      used to be printed raw after a hardcoded "¢", so an INR
+                      plan's ₹0.50 rate displayed as "¢50". */}
                   <p className="text-xs text-[#0C1B33]/60">
-                    {hotel.plan.extraConversationCharge > 0 && `¢${hotel.plan.extraConversationCharge}/extra conv`}
-                    {hotel.plan.extraConversationCharge > 0 && hotel.plan.extraAiReplyCharge > 0 && " · "}
-                    {hotel.plan.extraAiReplyCharge > 0 && `¢${hotel.plan.extraAiReplyCharge}/extra AI reply`}
+                    {[
+                      hotel.plan.extraConversationCharge > 0
+                        ? `${formatMinor(hotel.plan.extraConversationCharge, hotel.plan.currency)}/extra conv`
+                        : "",
+                      hotel.plan.extraAiReplyCharge > 0
+                        ? `${formatMinor(hotel.plan.extraAiReplyCharge, hotel.plan.currency)}/extra AI reply`
+                        : "",
+                    ]
+                      .filter(Boolean)
+                      .join(" · ")}
                   </p>
                 </div>
               )}
@@ -920,12 +997,28 @@ export default function HotelDetailPage() {
                 <label className="mb-1.5 block text-xs font-semibold uppercase tracking-wide text-[#0C1B33]/60">Plan</label>
                 <select value={selectedPlanId} onChange={(e) => setSelectedPlanId(e.target.value)} className={inputCls}>
                   <option value="">— Select a plan —</option>
-                  {plans.map((p) => (
+                  {/* Country-targeted plans are scoped to this hotel's country
+                      plus global ones. The picker used to list every active plan
+                      regardless, even though the Plans page presents country
+                      targeting as the point of the field. */}
+                  {visiblePlans.map((p) => (
                     <option key={p.id} value={p.id}>
                       {p.name} — {planPrice(p)}
                     </option>
                   ))}
                 </select>
+                {hotel.config?.country && visiblePlans.length < plans.length && (
+                  <p className="mt-1 text-[11px] text-[#0C1B33]/45">
+                    Showing plans for {hotel.config.country} and global plans.{" "}
+                    <button
+                      type="button"
+                      onClick={() => setShowAllPlans(true)}
+                      className="font-medium text-[#1B52A8] hover:underline"
+                    >
+                      Show all
+                    </button>
+                  </p>
+                )}
               </div>
               {selectedPlanId && (() => {
                 const p = plans.find((pl) => pl.id === selectedPlanId);
@@ -935,7 +1028,15 @@ export default function HotelDetailPage() {
                     <p className="font-semibold text-[#0C1B33]">{p.name} — <span className="text-[#B8912E] font-mono">{planPrice(p)}</span></p>
                     <p>{p.conversationLimit === 0 ? "Unlimited" : p.conversationLimit.toLocaleString()} conversations · {p.aiReplyLimit === 0 ? "Unlimited" : p.aiReplyLimit.toLocaleString()} AI replies</p>
                     {(p.extraConversationCharge > 0 || p.extraAiReplyCharge > 0) && (
-                      <p className="text-[#0C1B33]/45">Overage: {p.extraConversationCharge > 0 ? `¢${p.extraConversationCharge}/conv` : ""}{p.extraConversationCharge > 0 && p.extraAiReplyCharge > 0 ? " · " : ""}{p.extraAiReplyCharge > 0 ? `¢${p.extraAiReplyCharge}/reply` : ""}</p>
+                      <p className="text-[#0C1B33]/45">
+                        Overage:{" "}
+                        {[
+                          p.extraConversationCharge > 0 ? `${formatMinor(p.extraConversationCharge, p.currency)}/conv` : "",
+                          p.extraAiReplyCharge > 0 ? `${formatMinor(p.extraAiReplyCharge, p.currency)}/reply` : "",
+                        ]
+                          .filter(Boolean)
+                          .join(" · ")}
+                      </p>
                     )}
                   </div>
                 );
@@ -945,6 +1046,77 @@ export default function HotelDetailPage() {
                 <button onClick={() => setShowAssignPlan(false)} className="flex-1 rounded-lg border border-[#E5E0D4] py-2 text-sm text-[#0C1B33]/70 hover:bg-[#F4F2ED] transition">Cancel</button>
                 <button onClick={handleAssignPlan} disabled={!selectedPlanId || assigningPlan} className="flex-1 rounded-lg bg-[#1B52A8] py-2 text-sm font-semibold text-white disabled:opacity-60 hover:bg-[#163F82] transition">
                   {assigningPlan ? "Assigning…" : "Assign Plan"}
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ── Extend Subscription Modal ── */}
+      {showExtend && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm">
+          <div className="w-full max-w-sm rounded-2xl bg-white shadow-2xl overflow-hidden">
+            <div className="border-b border-[#E5E0D4] bg-[#F4F2ED] px-6 py-4">
+              <h2 className="text-base font-bold text-[#0C1B33]">Extend Subscription</h2>
+            </div>
+            <div className="space-y-4 px-6 py-5">
+              <p className="text-sm text-[#0C1B33]/65">
+                Push <span className="font-semibold">{hotel.name}</span>&rsquo;s current period end further out. Use this
+                for goodwill credit or while a payment clears.
+              </p>
+              <div>
+                <label className="mb-1.5 block text-xs font-semibold uppercase tracking-wide text-[#0C1B33]/60">Days</label>
+                <input
+                  type="number"
+                  min={1}
+                  max={365}
+                  value={extendDays}
+                  onChange={(e) => setExtendDays(e.target.value)}
+                  className={inputCls}
+                />
+              </div>
+              {billingError && <div className="rounded-lg bg-red-50 px-3 py-2 text-xs text-red-700">{billingError}</div>}
+              <div className="flex gap-2">
+                <button onClick={() => setShowExtend(false)} className="flex-1 rounded-lg border border-[#E5E0D4] py-2 text-sm text-[#0C1B33]/70 hover:bg-[#F4F2ED] transition">Cancel</button>
+                <button onClick={handleExtend} disabled={extending} className="flex-1 rounded-lg bg-[#1B52A8] py-2 text-sm font-semibold text-white disabled:opacity-60 hover:bg-[#163F82] transition">
+                  {extending ? "Extending…" : "Extend"}
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ── Cancel Subscription Modal ── */}
+      {showCancel && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm">
+          <div className="w-full max-w-sm rounded-2xl bg-white shadow-2xl overflow-hidden">
+            <div className="border-b border-[#E5E0D4] bg-[#F4F2ED] px-6 py-4">
+              <h2 className="text-base font-bold text-[#0C1B33]">Cancel Subscription</h2>
+            </div>
+            <div className="space-y-4 px-6 py-5">
+              <p className="text-sm text-[#0C1B33]/65">
+                Stop billing <span className="font-semibold">{hotel.name}</span>.
+              </p>
+              <label className="flex cursor-pointer items-start gap-2.5 rounded-xl border border-[#E5E0D4] bg-[#F4F2ED] px-4 py-3">
+                <input
+                  type="checkbox"
+                  checked={cancelImmediate}
+                  onChange={(e) => setCancelImmediate(e.target.checked)}
+                  className="mt-0.5 h-4 w-4 accent-red-600"
+                />
+                <span className="text-xs text-[#0C1B33]/70">
+                  <span className="font-semibold text-[#0C1B33]">Suspend immediately.</span> Leave unchecked to keep
+                  serving until the paid period ends and simply not renew — almost always the right choice for a
+                  customer who has already paid for this month.
+                </span>
+              </label>
+              {billingError && <div className="rounded-lg bg-red-50 px-3 py-2 text-xs text-red-700">{billingError}</div>}
+              <div className="flex gap-2">
+                <button onClick={() => { setShowCancel(false); setCancelImmediate(false); }} className="flex-1 rounded-lg border border-[#E5E0D4] py-2 text-sm text-[#0C1B33]/70 hover:bg-[#F4F2ED] transition">Keep</button>
+                <button onClick={handleCancel} disabled={cancelling} className="flex-1 rounded-lg bg-red-600 py-2 text-sm font-semibold text-white disabled:opacity-60 hover:bg-red-700 transition">
+                  {cancelling ? "Cancelling…" : cancelImmediate ? "Suspend now" : "Cancel at period end"}
                 </button>
               </div>
             </div>

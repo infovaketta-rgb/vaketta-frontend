@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { adminApiFetch } from "@/lib/adminApi";
+import { formatMinor, formatLimit, currencySymbol, toMinor, toMajorInput } from "@/lib/money";
 
 // ── Types ──────────────────────────────────────────────────────────────────────
 
@@ -53,44 +54,30 @@ const COUNTRIES = [
   { code: "NP",  label: "🇳🇵 Nepal",               currency: "NPR" },
 ];
 
+// Currency codes offered here. Symbols and formatting come from lib/money.ts —
+// this page used to carry its own symbol table, one of four in the codebase.
 const CURRENCIES = [
-  { code: "USD", label: "USD — US Dollar ($)",           symbol: "$"    },
-  { code: "EUR", label: "EUR — Euro (€)",                symbol: "€"    },
-  { code: "GBP", label: "GBP — British Pound (£)",       symbol: "£"    },
-  { code: "INR", label: "INR — Indian Rupee (₹)",        symbol: "₹"    },
-  { code: "AED", label: "AED — UAE Dirham (د.إ)",        symbol: "د.إ"  },
-  { code: "SAR", label: "SAR — Saudi Riyal (﷼)",        symbol: "﷼"    },
-  { code: "QAR", label: "QAR — Qatari Riyal (QR)",       symbol: "QR"   },
-  { code: "SGD", label: "SGD — Singapore Dollar (S$)",   symbol: "S$"   },
-  { code: "MYR", label: "MYR — Malaysian Ringgit (RM)",  symbol: "RM"   },
-  { code: "THB", label: "THB — Thai Baht (฿)",           symbol: "฿"    },
-  { code: "AUD", label: "AUD — Australian Dollar (A$)",  symbol: "A$"   },
-  { code: "CAD", label: "CAD — Canadian Dollar (C$)",    symbol: "C$"   },
-  { code: "JPY", label: "JPY — Japanese Yen (¥)",        symbol: "¥"    },
-  { code: "IDR", label: "IDR — Indonesian Rupiah (Rp)",  symbol: "Rp"   },
-  { code: "PHP", label: "PHP — Philippine Peso (₱)",     symbol: "₱"    },
-  { code: "LKR", label: "LKR — Sri Lankan Rupee (Rs)",   symbol: "Rs"   },
-  { code: "NPR", label: "NPR — Nepalese Rupee (रू)",    symbol: "रू"   },
+  { code: "USD", label: "USD — US Dollar" },
+  { code: "EUR", label: "EUR — Euro" },
+  { code: "GBP", label: "GBP — British Pound" },
+  { code: "INR", label: "INR — Indian Rupee" },
+  { code: "AED", label: "AED — UAE Dirham" },
+  { code: "SAR", label: "SAR — Saudi Riyal" },
+  { code: "QAR", label: "QAR — Qatari Riyal" },
+  { code: "SGD", label: "SGD — Singapore Dollar" },
+  { code: "MYR", label: "MYR — Malaysian Ringgit" },
+  { code: "THB", label: "THB — Thai Baht" },
+  { code: "AUD", label: "AUD — Australian Dollar" },
+  { code: "CAD", label: "CAD — Canadian Dollar" },
+  { code: "JPY", label: "JPY — Japanese Yen" },
+  { code: "IDR", label: "IDR — Indonesian Rupiah" },
+  { code: "PHP", label: "PHP — Philippine Peso" },
+  { code: "LKR", label: "LKR — Sri Lankan Rupee" },
+  { code: "NPR", label: "NPR — Nepalese Rupee" },
 ];
-
-function getCurrencySymbol(code: string): string {
-  return CURRENCIES.find((c) => c.code === code)?.symbol ?? code;
-}
-
 
 function getCountryLabel(code: string): string {
   return COUNTRIES.find((c) => c.code === code)?.label ?? code;
-}
-
-// ── Helpers ────────────────────────────────────────────────────────────────────
-
-function priceDisplay(minor: number, currency = "USD") {
-  const sym = getCurrencySymbol(currency);
-  return `${sym}${(minor / 100).toFixed(2)}`;
-}
-
-function limitDisplay(n: number) {
-  return n === 0 ? "Unlimited" : n.toLocaleString();
 }
 
 const EMPTY_FORM: FormState = {
@@ -131,7 +118,7 @@ function PlanModal({
     });
   }
 
-  const sym = getCurrencySymbol(form.currency);
+  const sym = currencySymbol(form.currency);
   const selectedCountry = COUNTRIES.find((c) => c.code === form.country);
 
   return (
@@ -345,11 +332,11 @@ export default function PlansPage() {
           name:                    createForm.name.trim(),
           country:                 createForm.country,
           currency:                createForm.currency,
-          priceMonthly:            Math.round(Number(createForm.priceMonthly) * 100),
+          priceMonthly:            toMinor(createForm.priceMonthly, createForm.currency),
           conversationLimit:       Number(createForm.conversationLimit),
           aiReplyLimit:            Number(createForm.aiReplyLimit),
-          extraConversationCharge: Math.round(Number(createForm.extraConversationCharge || 0) * 100),
-          extraAiReplyCharge:      Math.round(Number(createForm.extraAiReplyCharge || 0) * 100),
+          extraConversationCharge: toMinor(createForm.extraConversationCharge || 0, createForm.currency),
+          extraAiReplyCharge:      toMinor(createForm.extraAiReplyCharge || 0, createForm.currency),
         }),
       });
       setShowCreate(false);
@@ -368,11 +355,11 @@ export default function PlansPage() {
       name:                    plan.name,
       country:                 plan.country ?? "ALL",
       currency:                plan.currency ?? "USD",
-      priceMonthly:            String(plan.priceMonthly / 100),
+      priceMonthly:            toMajorInput(plan.priceMonthly, plan.currency),
       conversationLimit:       String(plan.conversationLimit),
       aiReplyLimit:            String(plan.aiReplyLimit),
-      extraConversationCharge: String((plan.extraConversationCharge ?? 0) / 100),
-      extraAiReplyCharge:      String((plan.extraAiReplyCharge ?? 0) / 100),
+      extraConversationCharge: toMajorInput(plan.extraConversationCharge ?? 0, plan.currency),
+      extraAiReplyCharge:      toMajorInput(plan.extraAiReplyCharge ?? 0, plan.currency),
     });
     setEditErr("");
   }
@@ -389,11 +376,11 @@ export default function PlansPage() {
           name:                    editForm.name.trim(),
           country:                 editForm.country,
           currency:                editForm.currency,
-          priceMonthly:            Math.round(Number(editForm.priceMonthly) * 100),
+          priceMonthly:            toMinor(editForm.priceMonthly, editForm.currency),
           conversationLimit:       Number(editForm.conversationLimit),
           aiReplyLimit:            Number(editForm.aiReplyLimit),
-          extraConversationCharge: Math.round(Number(editForm.extraConversationCharge || 0) * 100),
-          extraAiReplyCharge:      Math.round(Number(editForm.extraAiReplyCharge || 0) * 100),
+          extraConversationCharge: toMinor(editForm.extraConversationCharge || 0, editForm.currency),
+          extraAiReplyCharge:      toMinor(editForm.extraAiReplyCharge || 0, editForm.currency),
         }),
       });
       setEditTarget(null);
@@ -478,19 +465,19 @@ export default function PlansPage() {
                     <td className="px-5 py-3.5">
                       <span className="inline-flex items-center gap-1 rounded-full bg-[#1B52A8]/8 px-2.5 py-0.5 text-xs font-semibold text-[#1B52A8]">
                         {plan.currency ?? "USD"}
-                        <span className="text-[#0C1B33]/50">{getCurrencySymbol(plan.currency ?? "USD")}</span>
+                        <span className="text-[#0C1B33]/50">{currencySymbol(plan.currency ?? "USD")}</span>
                       </span>
                     </td>
                     <td className="px-5 py-3.5 font-semibold text-[#B8912E] font-mono">
-                      {priceDisplay(plan.priceMonthly, plan.currency)}
+                      {formatMinor(plan.priceMonthly, plan.currency)}
                     </td>
-                    <td className="px-5 py-3.5 text-[#0C1B33]/70">{limitDisplay(plan.conversationLimit)}</td>
-                    <td className="px-5 py-3.5 text-[#0C1B33]/70">{limitDisplay(plan.aiReplyLimit)}</td>
+                    <td className="px-5 py-3.5 text-[#0C1B33]/70">{formatLimit(plan.conversationLimit)}</td>
+                    <td className="px-5 py-3.5 text-[#0C1B33]/70">{formatLimit(plan.aiReplyLimit)}</td>
                     <td className="px-5 py-3.5 text-xs text-[#0C1B33]/55 font-mono">
-                      {plan.extraConversationCharge ? priceDisplay(plan.extraConversationCharge, plan.currency) : "—"}
+                      {plan.extraConversationCharge ? formatMinor(plan.extraConversationCharge, plan.currency) : "—"}
                     </td>
                     <td className="px-5 py-3.5 text-xs text-[#0C1B33]/55 font-mono">
-                      {plan.extraAiReplyCharge ? priceDisplay(plan.extraAiReplyCharge, plan.currency) : "—"}
+                      {plan.extraAiReplyCharge ? formatMinor(plan.extraAiReplyCharge, plan.currency) : "—"}
                     </td>
                     <td className="px-5 py-3.5 text-[#0C1B33]/70">{plan._count?.hotels ?? 0}</td>
                     <td className="px-5 py-3.5">

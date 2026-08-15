@@ -4,7 +4,6 @@ import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { adminApiFetch } from "@/lib/adminApi";
 import { clearAdmin, saveAdminName } from "@/lib/adminAuth";
-import { logAdminAction } from "@/lib/adminAudit";
 import { useMounted } from "@/lib/useMounted";
 
 const inputCls =
@@ -113,7 +112,6 @@ export default function SettingsPage() {
       });
       saveAdminName(res.admin.name);
       setProfile((p) => p ? { ...p, name: res.admin.name, email: res.admin.email } : p);
-      logAdminAction("admin.settings.profile", { name, email });
       setProfileSuccess("Profile updated successfully.");
       setTimeout(() => setProfileSuccess(""), 3000);
     } catch (e: any) {
@@ -136,7 +134,6 @@ export default function SettingsPage() {
         method: "PATCH",
         body: JSON.stringify({ currentPassword, newPassword }),
       });
-      logAdminAction("admin.settings.password");
       if (res.passwordChanged) {
         setPasswordSuccess("Password changed. Signing you out…");
         setTimeout(() => { clearAdmin(); router.replace("/admin/login"); }, 2000);
@@ -159,7 +156,6 @@ export default function SettingsPage() {
           whatsappConfigId:       waConfigId.trim(),
         }),
       });
-      logAdminAction("admin.platform.whatsappEmbedSignupUrl");
       setWaSuccess("WhatsApp settings saved.");
       setTimeout(() => setWaSuccess(""), 3000);
     } catch (e: any) {
@@ -177,7 +173,6 @@ export default function SettingsPage() {
         method: "PATCH",
         body: JSON.stringify({ instagramEmbedUrl: igEmbedUrl.trim() }),
       });
-      logAdminAction("admin.platform.instagramEmbedUrl");
       setIgEmbedSuccess("Instagram Embed URL saved.");
       setTimeout(() => setIgEmbedSuccess(""), 3000);
     } catch (e: any) {
@@ -197,7 +192,6 @@ export default function SettingsPage() {
         method: "PATCH",
         body: JSON.stringify({ metaApiVersion: v }),
       });
-      logAdminAction("admin.platform.metaApiVersion");
       setVersionSuccess("Meta API version saved.");
       setTimeout(() => setVersionSuccess(""), 3000);
     } catch (e: any) {
@@ -218,7 +212,6 @@ export default function SettingsPage() {
         method: "PATCH",
         body: JSON.stringify({ maxStayNightsCeiling: n }),
       });
-      logAdminAction("admin.platform.maxStayNightsCeiling", { value: n });
       if (res.maxStayNightsCeiling != null) setMaxStayCeiling(String(res.maxStayNightsCeiling));
       setCeilingSuccess("Maximum stay ceiling saved.");
       setTimeout(() => setCeilingSuccess(""), 3000);

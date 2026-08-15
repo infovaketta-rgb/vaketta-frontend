@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { useState, useEffect, useRef } from "react";
+import { formatMinor, formatLimit } from "@/lib/money";
 
 // ── CSS keyframes injected once ───────────────────────────────────────────────
 const GLOBAL_STYLES = `
@@ -246,8 +247,58 @@ function DashboardMockup() {
 }
 
 // ── Main page ─────────────────────────────────────────────────────────────────
+type PublicPlan = {
+  id:                string;
+  name:              string;
+  currency:          string;
+  priceMonthly:      number;
+  conversationLimit: number;
+  aiReplyLimit:      number;
+};
+
+/**
+ * Pricing shown here used to be a hardcoded array (₹2,499 Starter, ₹5,999
+ * Growth). It had no connection to the Plan rows a superadmin actually edits,
+ * so raising a price in the admin panel silently left the public site quoting
+ * the old one. Now it comes from `GET /public/plans`, with the hardcoded cards
+ * kept only as a pre-fetch placeholder so the section never renders empty.
+ */
+const FALLBACK_CARDS = [
+  { name: "Trial",   price: "Free", period: "14 days",    features: ["Free trial", "All modules included"], cta: "Start free trial", featured: false },
+  { name: "Starter", price: "—",    period: "per month",  features: ["Priority support"],                   cta: "Get started",      featured: true  },
+  { name: "Growth",  price: "—",    period: "per month",  features: ["Dedicated support"],                  cta: "Get started",      featured: false },
+];
+
 export default function LandingPage() {
   useReveal();
+
+  const [plans, setPlans] = useState<PublicPlan[]>([]);
+
+  useEffect(() => {
+    const base = process.env.NEXT_PUBLIC_API_BASE ?? "";
+    fetch(`${base}/public/plans`)
+      .then((r) => (r.ok ? r.json() : []))
+      .then((data) => setPlans(Array.isArray(data) ? data : []))
+      // Marketing copy must never depend on the API being up.
+      .catch(() => setPlans([]));
+  }, []);
+
+  const pricingCards =
+    plans.length > 0
+      ? plans.map((p, i) => ({
+          name: p.name,
+          price: p.priceMonthly === 0 ? "Free" : formatMinor(p.priceMonthly, p.currency, { compact: true }),
+          period: p.priceMonthly === 0 ? "free plan" : "per month",
+          features: [
+            `${formatLimit(p.conversationLimit)} conversations`,
+            `${formatLimit(p.aiReplyLimit)} AI replies`,
+            "All modules included",
+          ],
+          cta: p.priceMonthly === 0 ? "Start free trial" : "Get started",
+          // Highlight the middle tier, the usual "recommended" slot.
+          featured: plans.length > 2 ? i === 1 : i === 0,
+        }))
+      : FALLBACK_CARDS;
 
   return (
     <>
@@ -567,11 +618,7 @@ export default function LandingPage() {
               </p>
             </div>
             <div className="reveal mt-10 grid gap-4 sm:grid-cols-3" style={{ transitionDelay: ".15s" }}>
-              {[
-                { name: "Trial", price: "Free", period: "14 days", features: ["500 conversations","200 AI replies","All modules included"], cta: "Start free trial", featured: false },
-                { name: "Starter", price: "₹2,499", period: "per month", features: ["2,000 conversations","1,000 AI replies","Priority support"], cta: "Get started", featured: true },
-                { name: "Growth", price: "₹5,999", period: "per month", features: ["Unlimited conversations","Unlimited AI replies","Dedicated support"], cta: "Get started", featured: false },
-              ].map((plan) => (
+              {pricingCards.map((plan) => (
                 <div key={plan.name}
                   className={`card3d rounded-2xl border p-6 text-left relative overflow-hidden ${plan.featured ? "border-[#8B5CF6]/40 bg-linear-to-b from-[#8B5CF6]/8 to-white shadow-md" : "border-[#E8E4F3] bg-white shadow-sm"}`}>
                   {plan.featured && <div className="absolute inset-0 rounded-2xl pointer-events-none" style={{ animation: "borderGlow 3s ease-in-out infinite" }} />}

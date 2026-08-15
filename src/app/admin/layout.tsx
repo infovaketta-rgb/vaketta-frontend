@@ -7,6 +7,7 @@ import { adminApiFetch } from "@/lib/adminApi";
 import { clearAdmin, getAdminName } from "@/lib/adminAuth";
 import { AdminSocketProvider, useSocket } from "@/context/SocketContext";
 import { useToastStore } from "@/store/toastStore";
+import { statusMeta } from "@/lib/subscriptionStatus";
 
 // ── Nav items ──────────────────────────────────────────────────────────────────
 
@@ -22,9 +23,11 @@ const NAV_SECTIONS = [
   {
     label: "Billing",
     items: [
-      { href: "/admin/plans",   icon: "📋", label: "Plans" },
-      { href: "/admin/trial",   icon: "🎁", label: "Trial Plan" },
-      { href: "/admin/billing", icon: "💰", label: "Revenue" },
+      { href: "/admin/plans",     icon: "📋", label: "Plans" },
+      { href: "/admin/trial",     icon: "🎁", label: "Trial Plan" },
+      { href: "/admin/billing",   icon: "💰", label: "Revenue" },
+      { href: "/admin/invoices",  icon: "🧾", label: "Invoices" },
+      { href: "/admin/audit-log", icon: "📜", label: "Audit Log" },
     ],
   },
   {
@@ -145,8 +148,8 @@ function AdminLayoutInner({ children }: { children: React.ReactNode }) {
     const onHotelNew = ({ hotel }: { hotel: any }) => {
       addToast(`New hotel registered: ${hotel.name}`, "success");
     };
-    const onSubscriptionChanged = ({ hotelId: _hid, status }: { hotelId: string; status: string }) => {
-      addToast(`Subscription updated: ${status}`, "info");
+    const onSubscriptionChanged = ({ status }: { hotelId: string; planId: string | null; status: string; billingEndDate: string | null }) => {
+      addToast(`Subscription updated: ${statusMeta(status).label}`, "info");
     };
     socket.on("admin:hotel_new", onHotelNew);
     socket.on("admin:subscription_changed", onSubscriptionChanged);
