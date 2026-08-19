@@ -10,6 +10,11 @@ export default defineConfig({
     environment: "jsdom",
     globals: true,
     setupFiles: ["./vitest.setup.ts"],
+    // Billing periods are half-open, so the UI renders `periodEnd - 1ms` as the
+    // inclusive end date. Which calendar day that lands on depends on the
+    // runner's timezone, so pin it — otherwise "15 Aug → 14 Sep" passes in UTC
+    // and fails on an IST developer machine.
+    env: { TZ: "UTC" },
     // Only our own tests — never node_modules' bundled test files.
     include: ["src/**/*.{test,spec}.{ts,tsx}"],
   },

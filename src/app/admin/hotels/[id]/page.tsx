@@ -47,6 +47,8 @@ interface HotelDetail {
   subscriptionStatus: string;
   billingStartDate: string | null;
   billingEndDate: string | null;
+  /** Plan queued to begin at the trial's end, if any. */
+  scheduledPlanId?: string | null;
   plan: Plan | null;
   users: HotelUser[];
   roomTypes: RoomType[];
@@ -75,6 +77,26 @@ const emptyUserForm = { name: "", email: "", password: "", role: "STAFF" };
 
 function planPrice(plan: Plan) {
   return `${formatMinor(plan.priceMonthly, plan.currency, { compact: true })}/mo`;
+}
+
+/**
+ * Billing periods are half-open `[start, end)`, so `billingEndDate` is the first
+ * instant of the NEXT period. Show the inclusive last day people expect —
+ * a cycle ending 15 Sep 00:00 runs "through 14 Sep", not "ends 15 Sep".
+ */
+function fmtPeriodEnd(iso: string | null): string {
+  if (!iso) return "—";
+  const end = new Date(iso);
+  if (Number.isNaN(end.getTime())) return "—";
+  return new Date(end.getTime() - 1).toLocaleDateString();
+}
+
+/** The exclusive boundary itself — used where the handover INSTANT is the point. */
+function fmtDateTime(iso: string | null): string {
+  if (!iso) return "—";
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return "—";
+  return d.toLocaleString([], { day: "2-digit", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit" });
 }
 
 export default function HotelDetailPage() {
@@ -133,6 +155,8 @@ export default function HotelDetailPage() {
   const [showAssignPlan, setShowAssignPlan] = useState(false);
   const [selectedPlanId, setSelectedPlanId] = useState("");
   const [assigningPlan, setAssigningPlan] = useState(false);
+  // Defaults to the trial boundary so assigning a plan never cuts a trial short.
+  const [planStartAt, setPlanStartAt] = useState<"now" | "trial_end">("trial_end");
   const [showExtend, setShowExtend] = useState(false);
   const [extendDays, setExtendDays] = useState("30");
   const [extending, setExtending] = useState(false);
@@ -150,6 +174,12 @@ export default function HotelDetailPage() {
     showAllPlans || !hotelCountry
       ? plans
       : plans.filter((p) => !p.country || p.country === "ALL" || p.country === hotelCountry);
+
+  // A live trial is the only case where a plan can be deferred to a boundary.
+  const onTrial =
+    hotel?.subscriptionStatus === "TRIALING" &&
+    !!hotel?.billingEndDate &&
+    new Date(hotel.billingEndDate).getTime() > Date.now();
 
   useEffect(() => {
     if (!mounted || !id) return;
@@ -226,19 +256,24 @@ export default function HotelDetailPage() {
     try {
       // The response is the new subscription snapshot. It used to be discarded,
       // which left the header showing the OLD "Ends …" date after a plan change.
+      // The deferred option only exists while a trial is running.
       const sub = await adminApiFetch(`/admin/hotels/${id}/plan`, {
         method: "PATCH",
-        body: JSON.stringify({ planId: selectedPlanId }),
+        body: JSON.stringify({ planId: selectedPlanId, startAt: onTrial ? planStartAt : "now" }),
       });
       const chosen = plans.find((p) => p.id === selectedPlanId) ?? null;
+
+      // Scheduling leaves the hotel TRIALING until the boundary — the response
+      // is still the trial row, so its dates must not be read as paid ones.
+      const scheduled = sub?.status === "TRIALING";
       setHotel((h) =>
         h
           ? {
               ...h,
-              plan: chosen,
-              subscriptionStatus: "ACTIVE",
+              ...(scheduled ? {} : { plan: chosen, subscriptionStatus: "ACTIVE" }),
               billingStartDate: sub?.startDate ?? h.billingStartDate,
               billingEndDate: sub?.endDate ?? h.billingEndDate,
+              scheduledPlanId: sub?.scheduledPlanId ?? null,
             }
           : h,
       );
@@ -517,7 +552,7 @@ export default function HotelDetailPage() {
                 {statusMeta(hotel.subscriptionStatus).label}
               </span>
               {hotel.billingEndDate && (
-                <span className="text-xs text-[#0C1B33]/45">Ends {new Date(hotel.billingEndDate).toLocaleDateString()}</span>
+                <span className="text-xs text-[#0C1B33]/45">Ends {fmtPeriodEnd(hotel.billingEndDate)}</span>
               )}
             </div>
           </div>
@@ -1041,11 +1076,49 @@ export default function HotelDetailPage() {
                   </div>
                 );
               })()}
+              {/* Only meaningful during a trial. The default defers to the trial
+                  boundary: billing starts the instant the trial ends, with no
+                  gap in service and no days taken off the customer's trial. */}
+              {onTrial && (
+                <div>
+                  <label className="mb-1.5 block text-xs font-semibold uppercase tracking-wide text-[#0C1B33]/60">
+                    Billing starts
+                  </label>
+                  <div className="space-y-2">
+                    {([
+                      ["trial_end", "When the trial ends", `Trial runs to ${fmtDateTime(hotel.billingEndDate)}. Paid billing begins at that exact moment — no gap.`],
+                      ["now", "Immediately", "Ends the trial today and starts a paid period now."],
+                    ] as const).map(([value, label, hint]) => (
+                      <label
+                        key={value}
+                        className={`flex cursor-pointer gap-2.5 rounded-xl border px-3 py-2.5 transition ${
+                          planStartAt === value
+                            ? "border-[#1B52A8] bg-[#1B52A8]/5"
+                            : "border-[#E5E0D4] hover:bg-[#F4F2ED]"
+                        }`}
+                      >
+                        <input
+                          type="radio"
+                          name="planStartAt"
+                          value={value}
+                          checked={planStartAt === value}
+                          onChange={() => setPlanStartAt(value)}
+                          className="mt-0.5 accent-[#1B52A8]"
+                        />
+                        <span className="text-xs">
+                          <span className="block font-semibold text-[#0C1B33]">{label}</span>
+                          <span className="block text-[#0C1B33]/55">{hint}</span>
+                        </span>
+                      </label>
+                    ))}
+                  </div>
+                </div>
+              )}
               {billingError && <div className="rounded-lg bg-red-50 px-3 py-2 text-xs text-red-700">{billingError}</div>}
               <div className="flex gap-2">
                 <button onClick={() => setShowAssignPlan(false)} className="flex-1 rounded-lg border border-[#E5E0D4] py-2 text-sm text-[#0C1B33]/70 hover:bg-[#F4F2ED] transition">Cancel</button>
                 <button onClick={handleAssignPlan} disabled={!selectedPlanId || assigningPlan} className="flex-1 rounded-lg bg-[#1B52A8] py-2 text-sm font-semibold text-white disabled:opacity-60 hover:bg-[#163F82] transition">
-                  {assigningPlan ? "Assigning…" : "Assign Plan"}
+                  {assigningPlan ? "Assigning…" : onTrial && planStartAt === "trial_end" ? "Schedule Plan" : "Assign Plan"}
                 </button>
               </div>
             </div>

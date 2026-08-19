@@ -33,10 +33,26 @@ type Snapshot = {
   autoRenew:               boolean;
 };
 
+type ScheduledPlan = {
+  id:           string;
+  name:         string;
+  currency:     string;
+  priceMonthly: number;
+};
+
 type Subscription = {
   status:           string;
   billingStartDate: string | null;
+  /** EXCLUSIVE period boundary — never render this as the end date. */
   billingEndDate:   string | null;
+  periodStart:      string | null;
+  periodEnd:        string | null;
+  /** Last instant of the period — this is what an end date should show. */
+  periodEndInclusive: string | null;
+  billingAnchorDay: number | null;
+  trialConverted:   boolean;
+  trialEndsAt:      string | null;
+  scheduledPlan:    ScheduledPlan | null;
   trialMessage:     string | null;
   plan:             Plan | null;
   snapshot:         Snapshot | null;
@@ -50,10 +66,19 @@ type Overage = {
   total:               number;
 };
 
+type UsagePeriod = {
+  periodStart:        string;
+  periodEnd:          string;
+  periodEndInclusive: string;
+  month:              string;
+};
+
 type UsagePayload = {
   current:  { conversationsUsed: number; aiRepliesUsed: number; month: string };
   history:  { month: string; conversationsUsed: number; aiRepliesUsed: number }[];
   overage:  Overage;
+  /** The billing period usage is metered into. Absent on older responses. */
+  period?:  UsagePeriod | null;
   currency: string | null;
   limits:   { conversations: number; aiReplies: number } | null;
 };
@@ -83,6 +108,24 @@ function pct(used: number, limit: number): number {
 function fmtDate(iso: string | null): string {
   if (!iso) return "—";
   return new Date(iso).toLocaleDateString([], { day: "2-digit", month: "short", year: "numeric" });
+}
+
+/**
+ * Format a period's EXCLUSIVE end as the inclusive last day people expect.
+ *
+ * Periods are stored half-open: 15 Aug → 15 Sep means "through 14 Sep". Showing
+ * the raw boundary made a monthly cycle look like it ran into the next one, and
+ * an anchor-15 subscription read as "15 Aug → 15 Sep" rather than "→ 14 Sep".
+ *
+ * Subtracting 1ms rather than a whole day is deliberate: the boundary is
+ * midnight in the platform's billing timezone, and the last instant before it
+ * formats to the correct calendar day in the viewer's zone too.
+ */
+export function fmtPeriodEnd(exclusiveIso: string | null): string {
+  if (!exclusiveIso) return "—";
+  const end = new Date(exclusiveIso);
+  if (Number.isNaN(end.getTime())) return "—";
+  return fmtDate(new Date(end.getTime() - 1).toISOString());
 }
 
 const INVOICE_BADGE: Record<Invoice["status"], string> = {
@@ -204,8 +247,10 @@ function PlanCard({ sub }: { sub: Subscription }) {
             </div>
             <div className="space-y-1">
               <p className="text-xs text-[#0C1B33]/40 font-medium uppercase tracking-wide">Current Period</p>
+              {/* The stored end is EXCLUSIVE; render the inclusive last day, so
+                  an anchor-15 cycle reads "15 Aug → 14 Sep", not "→ 15 Sep". */}
               <p className="text-sm text-[#0C1B33]/75">
-                {fmtDate(display.startDate)} → {fmtDate(display.endDate)}
+                {fmtDate(display.startDate)} → {fmtPeriodEnd(display.endDate)}
               </p>
               {remaining !== null && remaining >= 0 && (
                 <p className="text-xs text-[#0C1B33]/45">
@@ -318,9 +363,26 @@ export default function SubscriptionPage() {
         </div>
       )}
 
+      {/* A plan queued to take over the instant the trial ends. Shown so the
+          customer knows there is no cut-off coming — the paid period starts on
+          exactly the boundary the trial finishes on, with no gap. */}
+      {status === "TRIALING" && sub?.scheduledPlan && (
+        <div className="rounded-2xl border border-emerald-200 bg-emerald-50 px-6 py-5">
+          <h2 className="text-sm font-bold text-emerald-800">
+            {sub.scheduledPlan.name} starts when your trial ends
+          </h2>
+          <p className="mt-1 text-sm text-emerald-700">
+            Your trial runs through <strong>{fmtPeriodEnd(sub.trialEndsAt)}</strong>. On{" "}
+            <strong>{fmtDate(sub.trialEndsAt)}</strong> your{" "}
+            {formatMinor(sub.scheduledPlan.priceMonthly, sub.scheduledPlan.currency)}/mo plan takes
+            over automatically — your automation keeps running without interruption.
+          </p>
+        </div>
+      )}
+
       {/* TrialConfig.trialMessage is admin-editable and labelled "shown on the
           Subscription page during trial" — but no endpoint had ever returned it. */}
-      {status === "TRIALING" && sub?.trialMessage && (
+      {status === "TRIALING" && sub?.trialMessage && !sub?.scheduledPlan && (
         <div className="rounded-2xl border border-[#1B52A8]/15 bg-blue-50 px-6 py-5">
           <h2 className="text-sm font-bold text-[#0C1B33]">You&rsquo;re on a free trial</h2>
           <p className="mt-1 text-sm text-[#0C1B33]/70">{sub.trialMessage}</p>
@@ -337,9 +399,14 @@ export default function SubscriptionPage() {
       {/* Usage card */}
       <div className="rounded-2xl border border-[#E5E0D4] bg-white shadow-sm overflow-hidden">
         <div className="border-b border-[#E5E0D4] bg-linear-to-r from-[#F4F2ED] to-white px-6 py-4">
-          <h2 className="text-sm font-semibold text-[#0C1B33]">Usage This Month</h2>
+          <h2 className="text-sm font-semibold text-[#0C1B33]">Usage This Period</h2>
+          {/* Usage buckets follow the BILLING period now, so this states the
+              actual window rather than a calendar month that no longer matches
+              it — the old copy promised a billing-cycle reset it did not do. */}
           <p className="mt-0.5 text-xs text-[#0C1B33]/50">
-            {usage?.current?.month ?? "—"} · Resets at the start of each billing cycle.
+            {usage?.period
+              ? `${fmtDate(usage.period.periodStart)} → ${fmtPeriodEnd(usage.period.periodEnd)} · Resets on your billing date.`
+              : `${usage?.current?.month ?? "—"} · Resets at the start of each billing cycle.`}
           </p>
         </div>
         <div className="px-6 py-5 space-y-6">
@@ -393,7 +460,7 @@ export default function SubscriptionPage() {
                   <tr key={inv.id} className="hover:bg-[#F4F2ED]/60 transition">
                     <td className="px-5 py-3 font-mono text-xs text-[#0C1B33]">{inv.number}</td>
                     <td className="px-5 py-3 text-[#0C1B33]/70">
-                      {fmtDate(inv.periodStart)} → {fmtDate(inv.periodEnd)}
+                      {fmtDate(inv.periodStart)} → {fmtPeriodEnd(inv.periodEnd)}
                     </td>
                     <td className="px-5 py-3 font-semibold text-[#0C1B33] tabular-nums">
                       {formatMinor(inv.total, inv.currency)}

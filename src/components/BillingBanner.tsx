@@ -26,7 +26,13 @@ type Notice = {
 /** Days of trial remaining at which we start nagging. */
 const TRIAL_WARN_DAYS = 7;
 
-function buildNotice(status: string | null, billingEndDate: string | null): Notice | null {
+export type ScheduledPlan = { name: string } | null;
+
+export function buildNotice(
+  status: string | null,
+  billingEndDate: string | null,
+  scheduledPlan: ScheduledPlan = null,
+): Notice | null {
   const normalized = normalizeStatus(status);
   if (!normalized) return null;
 
@@ -41,6 +47,10 @@ function buildNotice(status: string | null, billingEndDate: string | null): Noti
   }
 
   if (normalized === "TRIALING") {
+    // A plan already takes over the moment the trial ends, so there is nothing
+    // to warn about — nagging here would be asking for something already done.
+    if (scheduledPlan) return null;
+
     const left = daysUntil(billingEndDate);
     if (left === null || left > TRIAL_WARN_DAYS) return null;
     const when = left <= 0 ? "today" : left === 1 ? "tomorrow" : `in ${left} days`;
@@ -71,7 +81,7 @@ export default function BillingBanner() {
     apiFetch("/hotel-settings/billing/subscription")
       .then((sub) => {
         if (cancelled) return;
-        setNotice(buildNotice(sub?.status ?? null, sub?.billingEndDate ?? null));
+        setNotice(buildNotice(sub?.status ?? null, sub?.billingEndDate ?? null, sub?.scheduledPlan ?? null));
       })
       .catch(() => {
         // Billing state is advisory here; a failed fetch must never break the
