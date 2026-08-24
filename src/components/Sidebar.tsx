@@ -44,6 +44,11 @@ export default function Sidebar({ open = false, onClose }: SidebarProps) {
   const role = mounted ? getUserRole() : null;
   const showBookings   = role === "ADMIN" || role === "MANAGER";
   const showAdminLinks = role === "ADMIN";
+  // Mirrors the backend gate on /hotel-settings/billing/* (requireBillingViewer).
+  // MANAGER and STAFF now get a 403 there, so linking them to a page that can
+  // only render errors would be worse than not showing it. Presentation only —
+  // the server, not this flag, is what enforces access.
+  const showBilling    = role === "ADMIN" || role === "OWNER";
 
   return (
     <>
@@ -106,14 +111,16 @@ export default function Sidebar({ open = false, onClose }: SidebarProps) {
             </ul>
           </div>
 
-          <div>
-            <p className="mb-2 px-3 text-[10px] font-semibold uppercase tracking-wider text-white/35">
-              Account
-            </p>
-            <ul className="flex flex-col gap-0.5">
-              <NavItem href="/dashboard/subscription" label="Subscription" onClick={onClose} />
-            </ul>
-          </div>
+          {showBilling && (
+            <div>
+              <p className="mb-2 px-3 text-[10px] font-semibold uppercase tracking-wider text-white/35">
+                Account
+              </p>
+              <ul className="flex flex-col gap-0.5">
+                <NavItem href="/dashboard/subscription" label="Subscription" onClick={onClose} />
+              </ul>
+            </div>
+          )}
 
           {showAdminLinks && (
             <div>
