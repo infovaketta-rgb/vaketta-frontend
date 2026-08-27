@@ -1,8 +1,9 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { apiFetch } from "@/lib/api";
 import { useMounted } from "@/lib/useMounted";
+import { openRazorpayCheckout, type CheckoutHandlerPayload } from "@/lib/razorpay";
 import { formatMinor, formatRate, formatLimit } from "@/lib/money";
 import { statusMeta, daysUntil, normalizeStatus } from "@/lib/subscriptionStatus";
 
@@ -284,6 +285,88 @@ export default function SubscriptionPage() {
   const [loading,  setLoading]  = useState(true);
   const [error,    setError]    = useState("");
 
+  // Razorpay: which invoice is mid-payment, and any payment-specific message.
+  // Kept separate from `error` so a failed payment never blanks the page.
+  const [payingId, setPayingId] = useState<string | null>(null);
+  const [payError, setPayError] = useState("");
+  const [payNotice, setPayNotice] = useState("");
+
+  /** Re-pull billing data after a payment so status/invoices reflect it. */
+  const refreshBilling = useCallback(async () => {
+    const [s, u, i] = await Promise.allSettled([
+      apiFetch("/hotel-settings/billing/subscription"),
+      apiFetch("/hotel-settings/billing/usage"),
+      apiFetch("/hotel-settings/billing/invoices"),
+    ]);
+    if (s.status === "fulfilled") setSub(s.value);
+    if (u.status === "fulfilled") setUsage(u.value);
+    if (i.status === "fulfilled") setInvoices(i.value ?? []);
+  }, []);
+
+  /**
+   * Pay an OPEN invoice.
+   *
+   * The browser never sends an amount — the server derives it from the
+   * invoice — and never decides the payment succeeded: the signed handler
+   * payload goes back for verification, and the webhook settles independently.
+   */
+  const handlePay = useCallback(async (invoice: Invoice) => {
+    setPayError("");
+    setPayNotice("");
+    setPayingId(invoice.id);
+
+    try {
+      const order = await apiFetch(
+        `/hotel-settings/billing/invoices/${invoice.id}/razorpay-order`,
+        { method: "POST", body: JSON.stringify({}) },
+      );
+
+      const opened = await openRazorpayCheckout({
+        keyId: order.keyId,
+        orderId: order.orderId,
+        amount: order.amount,
+        currency: order.currency,
+        invoiceNumber: order.invoiceNumber,
+        onSuccess: async (payload: CheckoutHandlerPayload) => {
+          try {
+            const result = await apiFetch("/hotel-settings/billing/razorpay/verify", {
+              method: "POST",
+              body: JSON.stringify(payload),
+            });
+            setPayNotice(
+              result?.status === "already_processed"
+                ? "This payment was already recorded."
+                : "Payment received — thank you.",
+            );
+            await refreshBilling();
+          } catch (err: any) {
+            // The webhook is authoritative, so a failed callback verification
+            // does NOT mean the money was lost — say so rather than alarming.
+            setPayError(
+              err?.message ??
+                "We could not confirm the payment immediately. It will be updated shortly.",
+            );
+            await refreshBilling();
+          } finally {
+            setPayingId(null);
+          }
+        },
+        onDismiss: () => {
+          // Closing the modal is neither success nor failure.
+          setPayingId(null);
+        },
+      });
+
+      if (!opened) {
+        setPayError("Could not load the payment window. Check your connection and try again.");
+        setPayingId(null);
+      }
+    } catch (err: any) {
+      setPayError(err?.message ?? "Could not start the payment.");
+      setPayingId(null);
+    }
+  }, [refreshBilling]);
+
   useEffect(() => {
     if (!mounted) return;
 
@@ -438,6 +521,21 @@ export default function SubscriptionPage() {
         </div>
       </div>
 
+      {/* Payment result — deliberately separate from the page-level error, so a
+          declined card never blanks the billing page. */}
+      {(payNotice || payError) && (
+        <div
+          role="status"
+          className={`rounded-xl border px-4 py-3 text-sm ${
+            payError
+              ? "border-red-200 bg-red-50 text-red-700"
+              : "border-emerald-200 bg-emerald-50 text-emerald-700"
+          }`}
+        >
+          {payError || payNotice}
+        </div>
+      )}
+
       {/* Invoices */}
       {invoices.length > 0 && (
         <div className="rounded-2xl border border-[#E5E0D4] bg-white shadow-sm overflow-hidden">
@@ -448,8 +546,8 @@ export default function SubscriptionPage() {
             <table className="w-full text-sm">
               <thead className="bg-[#F4F2ED] border-b border-[#E5E0D4]">
                 <tr>
-                  {["Invoice", "Period", "Amount", "Status"].map((h) => (
-                    <th key={h} className="px-5 py-3 text-left text-xs font-semibold text-[#0C1B33]/50 uppercase tracking-wide">
+                  {["Invoice", "Period", "Amount", "Status", ""].map((h, idx) => (
+                    <th key={h || `col-${idx}`} className="px-5 py-3 text-left text-xs font-semibold text-[#0C1B33]/50 uppercase tracking-wide">
                       {h}
                     </th>
                   ))}
@@ -474,6 +572,19 @@ export default function SubscriptionPage() {
                       <span className={`inline-flex items-center rounded-full border px-2.5 py-0.5 text-xs font-medium ${INVOICE_BADGE[inv.status]}`}>
                         {inv.status === "OPEN" ? `Due ${fmtDate(inv.dueAt)}` : inv.status.toLowerCase()}
                       </span>
+                    </td>
+                    <td className="px-5 py-3 text-right">
+                      {/* Only an OPEN invoice with a balance is payable, and
+                          only in INR while Razorpay is INR-only. */}
+                      {inv.status === "OPEN" && inv.total > inv.amountPaid && inv.currency === "INR" && (
+                        <button
+                          onClick={() => handlePay(inv)}
+                          disabled={payingId !== null}
+                          className="rounded-lg bg-[#1B52A8] px-3 py-1.5 text-xs font-semibold text-white transition hover:bg-[#164389] disabled:cursor-not-allowed disabled:opacity-50"
+                        >
+                          {payingId === inv.id ? "Opening…" : "Pay now"}
+                        </button>
+                      )}
                     </td>
                   </tr>
                 ))}
