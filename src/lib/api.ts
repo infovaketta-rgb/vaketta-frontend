@@ -12,10 +12,15 @@ export async function apiFetch(
 
   const token = localStorage.getItem("TOKEN");
 
+  // FormData must NOT carry an explicit Content-Type: the browser has to set it
+  // itself so it can append the multipart boundary. Hardcoding application/json
+  // over a file upload makes the body unparseable server-side.
+  const isFormData = typeof FormData !== "undefined" && options.body instanceof FormData;
+
   const res = await fetch(API_BASE + path, {
     ...options,
     headers: {
-      "Content-Type": "application/json",
+      ...(isFormData ? {} : { "Content-Type": "application/json" }),
       ...(process.env.NODE_ENV === "development" ? { "ngrok-skip-browser-warning": "true" } : {}),
       ...(token ? { Authorization: `Bearer ${token}` } : {}),
       ...(options.headers || {}),

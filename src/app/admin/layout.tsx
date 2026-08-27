@@ -27,6 +27,7 @@ const NAV_SECTIONS = [
       { href: "/admin/trial",     icon: "🎁", label: "Trial Plan" },
       { href: "/admin/billing",   icon: "💰", label: "Revenue" },
       { href: "/admin/invoices",  icon: "🧾", label: "Invoices" },
+      { href: "/admin/payments",  icon: "✅", label: "Payments" },
       { href: "/admin/audit-log", icon: "📜", label: "Audit Log" },
     ],
   },

@@ -99,6 +99,7 @@ function mockApi(invoices: unknown[], overrides: Record<string, unknown> = {}) {
     "/hotel-settings/billing/invoices": invoices,
     "/hotel-settings/billing/invoices/inv_1/razorpay-order": ORDER,
     "/hotel-settings/billing/razorpay/verify": { status: "success", invoiceId: "inv_1" },
+    "/hotel-settings/billing/payments": [],
     ...overrides,
   };
   apiFetch.mockImplementation((path: string) => {
@@ -337,5 +338,99 @@ describe("failure states", () => {
     await waitFor(() =>
       expect(screen.getByText(/could not load the payment window/i)).toBeInTheDocument(),
     );
+  });
+});
+
+
+// ── Manual / offline payment ─────────────────────────────────────────────────
+
+/**
+ * The offline route exists alongside Razorpay and must not interfere with it.
+ * Once a claim is under review the invoice offers NEITHER payment button —
+ * paying again while the first payment is being verified is how a hotel ends up
+ * paying twice.
+ */
+describe("manual payment", () => {
+  const pendingClaim = {
+    id: "pay_1",
+    invoiceId: "inv_1",
+    status: "PENDING",
+    currency: "INR",
+    amount: 249900,
+    method: "BANK_TRANSFER",
+    reference: "UTR123456",
+    claimedPaidAt: "2026-08-20T00:00:00Z",
+    failureReason: null,
+    createdAt: "2026-08-20T00:00:00Z",
+  };
+
+  it("offers 'Report payment' on an OPEN invoice", async () => {
+    mockApi([openInvoice()]);
+    render(<SubscriptionPage />);
+
+    await waitFor(() =>
+      expect(screen.getByRole("button", { name: /report payment/i })).toBeInTheDocument(),
+    );
+  });
+
+  it("offers it for a NON-INR invoice, where Razorpay is unavailable", async () => {
+    mockApi([openInvoice({ currency: "USD" })]);
+    render(<SubscriptionPage />);
+
+    await waitFor(() =>
+      expect(screen.getByRole("button", { name: /report payment/i })).toBeInTheDocument(),
+    );
+    // Razorpay stays INR-only.
+    expect(screen.queryByRole("button", { name: /pay now/i })).not.toBeInTheDocument();
+  });
+
+  it("shows UNDER REVIEW and hides BOTH pay actions once a claim is pending", async () => {
+    mockApi([openInvoice()], { "/hotel-settings/billing/payments": [pendingClaim] });
+    render(<SubscriptionPage />);
+
+    await waitFor(() => expect(screen.getByText(/under review/i)).toBeInTheDocument());
+    expect(screen.queryByRole("button", { name: /pay now/i })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /report payment/i })).not.toBeInTheDocument();
+  });
+
+  it("restores the pay actions once the claim is no longer pending", async () => {
+    mockApi([openInvoice()], {
+      "/hotel-settings/billing/payments": [{ ...pendingClaim, status: "FAILED", failureReason: "UTR not found" }],
+    });
+    render(<SubscriptionPage />);
+
+    await waitFor(() =>
+      expect(screen.getByRole("button", { name: /report payment/i })).toBeInTheDocument(),
+    );
+    expect(screen.queryByText(/under review/i)).not.toBeInTheDocument();
+  });
+
+  it("shows nothing payable on a PAID invoice even with stale claim data", async () => {
+    mockApi([openInvoice({ status: "PAID", amountPaid: 249900 })], {
+      "/hotel-settings/billing/payments": [pendingClaim],
+    });
+    render(<SubscriptionPage />);
+
+    await waitFor(() => expect(screen.getByText("INV-2026-00001")).toBeInTheDocument());
+    expect(screen.queryByRole("button", { name: /report payment/i })).not.toBeInTheDocument();
+    expect(screen.queryByText(/under review/i)).not.toBeInTheDocument();
+  });
+
+  it("opens the submission form", async () => {
+    mockApi([openInvoice()]);
+    render(<SubscriptionPage />);
+
+    await userEvent.click(await screen.findByRole("button", { name: /report payment/i }));
+
+    expect(await screen.findByRole("button", { name: /submit for review/i })).toBeInTheDocument();
+    expect(screen.getByText(/verify this against our bank records/i)).toBeInTheDocument();
+  });
+
+  it("does not blank the page when the payments endpoint fails", async () => {
+    mockApi([openInvoice()], { "/hotel-settings/billing/payments": new Error("boom") });
+    render(<SubscriptionPage />);
+
+    // allSettled: one failing endpoint must not take the rest of the page down.
+    await waitFor(() => expect(screen.getByText("INV-2026-00001")).toBeInTheDocument());
   });
 });

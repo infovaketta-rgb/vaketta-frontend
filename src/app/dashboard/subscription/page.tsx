@@ -4,6 +4,7 @@ import { useCallback, useEffect, useState } from "react";
 import { apiFetch } from "@/lib/api";
 import { useMounted } from "@/lib/useMounted";
 import { openRazorpayCheckout, type CheckoutHandlerPayload } from "@/lib/razorpay";
+import ManualPaymentModal, { type PayableInvoice } from "@/components/ManualPaymentModal";
 import { formatMinor, formatRate, formatLimit } from "@/lib/money";
 import { statusMeta, daysUntil, normalizeStatus } from "@/lib/subscriptionStatus";
 
@@ -82,6 +83,20 @@ type UsagePayload = {
   period?:  UsagePeriod | null;
   currency: string | null;
   limits:   { conversations: number; aiReplies: number } | null;
+};
+
+/** A payment the hotel has reported or that has been recorded against it. */
+type HotelPayment = {
+  id:             string;
+  invoiceId:      string;
+  status:         "PENDING" | "SUCCEEDED" | "FAILED" | "REFUNDED";
+  currency:       string;
+  amount:         number;
+  method:         string;
+  reference:      string | null;
+  claimedPaidAt:  string | null;
+  failureReason:  string | null;
+  createdAt:      string;
 };
 
 type Invoice = {
@@ -282,6 +297,7 @@ export default function SubscriptionPage() {
   const [usage,    setUsage]    = useState<UsagePayload | null>(null);
   const [plans,    setPlans]    = useState<Plan[]>([]);
   const [invoices, setInvoices] = useState<Invoice[]>([]);
+  const [payments, setPayments] = useState<HotelPayment[]>([]);
   const [loading,  setLoading]  = useState(true);
   const [error,    setError]    = useState("");
 
@@ -291,16 +307,23 @@ export default function SubscriptionPage() {
   const [payError, setPayError] = useState("");
   const [payNotice, setPayNotice] = useState("");
 
+  // Manual/offline payment. Separate from the Razorpay state: the two are
+  // independent routes to settling the same invoice and must not share a
+  // "busy" flag, or opening one would appear to disable the other.
+  const [manualTarget, setManualTarget] = useState<PayableInvoice | null>(null);
+
   /** Re-pull billing data after a payment so status/invoices reflect it. */
   const refreshBilling = useCallback(async () => {
-    const [s, u, i] = await Promise.allSettled([
+    const [s, u, i, pay] = await Promise.allSettled([
       apiFetch("/hotel-settings/billing/subscription"),
       apiFetch("/hotel-settings/billing/usage"),
       apiFetch("/hotel-settings/billing/invoices"),
+      apiFetch("/hotel-settings/billing/payments"),
     ]);
     if (s.status === "fulfilled") setSub(s.value);
     if (u.status === "fulfilled") setUsage(u.value);
     if (i.status === "fulfilled") setInvoices(i.value ?? []);
+    if (pay.status === "fulfilled") setPayments(pay.value ?? []);
   }, []);
 
   /**
@@ -377,12 +400,14 @@ export default function SubscriptionPage() {
       apiFetch("/hotel-settings/billing/usage"),
       apiFetch("/hotel-settings/billing/plans"),
       apiFetch("/hotel-settings/billing/invoices"),
+      apiFetch("/hotel-settings/billing/payments"),
     ])
-      .then(([s, u, p, i]) => {
+      .then(([s, u, p, i, pay]) => {
         if (s.status === "fulfilled") setSub(s.value);
         if (u.status === "fulfilled") setUsage(u.value);
         if (p.status === "fulfilled") setPlans(p.value ?? []);
         if (i.status === "fulfilled") setInvoices(i.value ?? []);
+        if (pay.status === "fulfilled") setPayments(pay.value ?? []);
 
         const firstFailure = [s, u, p, i].find((r) => r.status === "rejected");
         if (s.status === "rejected" && firstFailure && "reason" in firstFailure) {
@@ -399,6 +424,13 @@ export default function SubscriptionPage() {
       </div>
     );
   }
+
+  // An invoice with a claim awaiting verification must not offer "pay again" —
+  // that is how a hotel ends up paying twice while the first payment is still
+  // being checked.
+  const pendingByInvoice = new Map(
+    payments.filter((p) => p.status === "PENDING").map((p) => [p.invoiceId, p]),
+  );
 
   const status   = normalizeStatus(sub?.status);
   const meta     = statusMeta(sub?.status);
@@ -576,14 +608,33 @@ export default function SubscriptionPage() {
                     <td className="px-5 py-3 text-right">
                       {/* Only an OPEN invoice with a balance is payable, and
                           only in INR while Razorpay is INR-only. */}
-                      {inv.status === "OPEN" && inv.total > inv.amountPaid && inv.currency === "INR" && (
-                        <button
-                          onClick={() => handlePay(inv)}
-                          disabled={payingId !== null}
-                          className="rounded-lg bg-[#1B52A8] px-3 py-1.5 text-xs font-semibold text-white transition hover:bg-[#164389] disabled:cursor-not-allowed disabled:opacity-50"
-                        >
-                          {payingId === inv.id ? "Opening…" : "Pay now"}
-                        </button>
+                      {inv.status === "OPEN" && pendingByInvoice.has(inv.id) && (
+                        <span className="inline-flex items-center gap-1.5 rounded-full border border-amber-200 bg-amber-50 px-2.5 py-1 text-xs font-medium text-amber-700">
+                          <span className="h-1.5 w-1.5 rounded-full bg-amber-500" />
+                          Under review
+                        </span>
+                      )}
+                      {inv.status === "OPEN" && inv.total > inv.amountPaid && !pendingByInvoice.has(inv.id) && (
+                        <div className="flex items-center justify-end gap-2">
+                          {/* Razorpay is INR-only in this stage; the offline
+                              route works for every currency, so a non-INR
+                              invoice still has a way to be paid. */}
+                          {inv.currency === "INR" && (
+                            <button
+                              onClick={() => handlePay(inv)}
+                              disabled={payingId !== null}
+                              className="rounded-lg bg-[#1B52A8] px-3 py-1.5 text-xs font-semibold text-white transition hover:bg-[#164389] disabled:cursor-not-allowed disabled:opacity-50"
+                            >
+                              {payingId === inv.id ? "Opening…" : "Pay now"}
+                            </button>
+                          )}
+                          <button
+                            onClick={() => setManualTarget(inv)}
+                            className="rounded-lg border border-[#E5E0D4] px-3 py-1.5 text-xs font-semibold text-[#0C1B33]/70 transition hover:bg-[#F4F2ED]"
+                          >
+                            Report payment
+                          </button>
+                        </div>
                       )}
                     </td>
                   </tr>
@@ -592,6 +643,18 @@ export default function SubscriptionPage() {
             </table>
           </div>
         </div>
+      )}
+
+      {manualTarget && (
+        <ManualPaymentModal
+          invoice={manualTarget}
+          onClose={() => setManualTarget(null)}
+          onSubmitted={() => {
+            setPayError("");
+            setPayNotice("Payment submitted for review. We'll confirm once it's verified.");
+            void refreshBilling();
+          }}
+        />
       )}
 
       {/* Usage history */}
