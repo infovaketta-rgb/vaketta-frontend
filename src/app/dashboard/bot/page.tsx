@@ -166,7 +166,7 @@ const BOT_MSG_META: Record<string, { label: string; hint: string; placeholder: s
   menuFooter: {
     label: "Menu — Footer instructions",
     hint: "Instructions shown below the menu items list.",
-    placeholder: "Reply with the number of your choice.\n_Type *MENU* anytime to return here._",
+    placeholder: "Reply with the number of your choice.\n_Type *Hi* anytime to return here._",
   },
   bookingStart: {
     label: "Booking — Name prompt",
@@ -211,7 +211,7 @@ const BOT_MSG_META: Record<string, { label: string; hint: string; placeholder: s
   bookingCancel: {
     label: "Booking — Cancelled",
     hint: "Shown when guest cancels mid-booking (replies 0, NO, or CANCEL).",
-    placeholder: "❌ Booking cancelled.\n\n_Reply *MENU* to see our services._",
+    placeholder: "❌ Booking cancelled.\n\n_Reply *Hi* to see our services._",
   },
   enquiryDefault: {
     label: "Enquiry — Default opening",
@@ -221,7 +221,7 @@ const BOT_MSG_META: Record<string, { label: string; hint: string; placeholder: s
   menuFallback: {
     label: "Menu — Fallback message",
     hint: "Shown if this hotel has no menu configured at all.",
-    placeholder: "Reply *MENU* to see our options.",
+    placeholder: "Reply *Hi* to see our options.",
   },
 };
 
@@ -254,7 +254,7 @@ function buildMenuText(hotelName: string, menuTitle: string, items: MenuItem[], 
   if (!active.length) return "_No active menu items yet._";
   const defaultGreeting = `Welcome to *${hotelName || "our hotel"}*! 🏨`;
   const greeting = botMsgs["menuGreeting"]?.trim() || defaultGreeting;
-  const footer   = botMsgs["menuFooter"]?.trim() || `Reply with the number of your choice.\n_Type *MENU* anytime to return here._`;
+  const footer   = botMsgs["menuFooter"]?.trim() || `Reply with the number of your choice.\n_Type *Hi* anytime to return here._`;
   let t = `${greeting}\n\n*${menuTitle || "How can we help you?"}*\n\n${DIVIDER}\n`;
   for (const item of active) {
     const icon = item.type === "BOOKING" ? "📅" : item.type === "ENQUIRY" ? "💬" : item.type === "FLOW" ? "🔀" : "ℹ️";
@@ -309,7 +309,7 @@ function buildBookingFlow(item: MenuItem, rooms: RoomType[], botMsgs: Record<str
     { from: "bot",   message: `📋 *Booking Summary*\n\n${DIVIDER}\n👤 *Guest:* John Smith\n🏨 *Room:* ${room0Name}\n📅 *Check-in:* 15 June 2026\n📅 *Check-out:* 18 June 2026\n🌙 *Duration:* 3 nights\n💰 *Estimated Total:* ₹${(room0Price * 3).toLocaleString("en-IN")}\n${DIVIDER}\n\n${summaryNote}`,
       editKey: "bookingSummaryNote", editValue: summaryNote },
     { from: "guest", message: "YES", label: "Guest confirms" },
-    { from: "bot",   message: `✅ *Booking Request Received!*\n\n*Reference:* #A1B2C3D4\n\n${successMsg}\n\n_Reply *MENU* for other services._`,
+    { from: "bot",   message: `✅ *Booking Request Received!*\n\n*Reference:* #A1B2C3D4\n\n${successMsg}\n\n_Reply *Hi* for other services._`,
       editKey: "bookingSuccess", editValue: successMsg },
   ];
 }
@@ -318,7 +318,7 @@ function buildEnquiryFlow(item: MenuItem, botMsgs: Record<string, string>): Flow
   const enquiryMsg = item.replyText || getMsg(botMsgs, "enquiryDefault");
   return [
     { from: "guest", message: `*${item.key}*`, label: `Guest selects "${item.label}"` },
-    { from: "bot",   message: `${enquiryMsg}\n\n_Reply *MENU* at any time to return to the main menu._`,
+    { from: "bot",   message: `${enquiryMsg}\n\n_Reply *Hi* at any time to return to the main menu._`,
       editItemId: item.replyText ? item.id : undefined,
       editKey:    item.replyText ? undefined : "enquiryDefault",
       editValue:  item.replyText ? item.replyText : enquiryMsg },
@@ -330,7 +330,7 @@ function buildEnquiryFlow(item: MenuItem, botMsgs: Record<string, string>): Flow
 function buildInfoFlow(item: MenuItem): FlowStep[] {
   return [
     { from: "guest", message: `*${item.key}*`, label: `Guest selects "${item.label}"` },
-    { from: "bot",   message: `${item.replyText || "_No reply text — edit this item_"}\n\n_Reply *MENU* for other options._`,
+    { from: "bot",   message: `${item.replyText || "_No reply text — edit this item_"}\n\n_Reply *Hi* for other options._`,
       editItemId: item.id, editValue: item.replyText },
   ];
 }
